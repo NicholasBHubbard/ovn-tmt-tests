@@ -1,22 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
-fail=0
+source "$(dirname "$0")/../../lib/assert.sh"
+source "$(dirname "$0")/../../lib/ovn.sh"
 
-if command -v ovs-vsctl >/dev/null 2>&1 && ovs-vsctl show >/dev/null 2>&1; then
-    echo "Precondition failed: OVS is already configured"
-    fail=1
-fi
-
-if command -v pgrep >/dev/null 2>&1; then
-    if pgrep -x ovs-vswitchd >/dev/null 2>&1; then
-        echo "Precondition failed: ovs-vswitchd is already running"
-        fail=1
-    fi
-    if pgrep -x ovsdb-server >/dev/null 2>&1; then
-        echo "Precondition failed: ovsdb-server is already running"
-        fail=1
-    fi
-fi
-
-exit "$fail"
+assert_ovs_unconfigured
+assert_process_absent ovs-vswitchd
+assert_process_absent ovsdb-server
+assert_finish

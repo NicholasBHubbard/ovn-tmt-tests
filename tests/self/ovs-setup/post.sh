@@ -1,16 +1,17 @@
 #!/bin/bash
-set -e
+set -euo pipefail
+
+source "$(dirname "$0")/../../lib/assert.sh"
+source "$(dirname "$0")/../../lib/ovn.sh"
 
 echo "Checking ovs-vsctl..."
-ovs-vsctl show
+assert_ovs_configured
 
 echo "Checking OVS binaries are in PATH..."
-command -v ovs-vswitchd
-command -v ovsdb-server
+assert_command_present ovs-vswitchd
+assert_command_present ovsdb-server
 
-if command -v pgrep >/dev/null 2>&1; then
-    echo "Checking OVS processes..."
-    pgrep -a ovsdb-server
-fi
+echo "Checking OVS processes..."
+assert_process_present ovsdb-server
 
-echo "All OVS checks passed."
+assert_finish

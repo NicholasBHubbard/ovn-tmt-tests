@@ -1,23 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
-fail=0
+source "$(dirname "$0")/../../lib/assert.sh"
+source "$(dirname "$0")/../../lib/ovn.sh"
 
-if command -v pgrep >/dev/null 2>&1; then
-    if pgrep -x ovn-northd >/dev/null 2>&1; then
-        echo "Precondition failed: ovn-northd is already running"
-        fail=1
-    fi
-fi
-
-if command -v ovn-nbctl >/dev/null 2>&1 && ovn-nbctl show >/dev/null 2>&1; then
-    echo "Precondition failed: OVN northbound database is already accessible"
-    fail=1
-fi
-
-if command -v ovn-sbctl >/dev/null 2>&1 && ovn-sbctl show >/dev/null 2>&1; then
-    echo "Precondition failed: OVN southbound database is already accessible"
-    fail=1
-fi
-
-exit "$fail"
+assert_process_absent ovn-northd
+assert_ovn_nb_unavailable
+assert_ovn_sb_unavailable
+assert_finish

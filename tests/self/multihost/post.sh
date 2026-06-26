@@ -1,36 +1,27 @@
 #!/bin/bash
-set -e
+set -euo pipefail
+
+source "$(dirname "$0")/../../lib/assert.sh"
+source "$(dirname "$0")/../../lib/ovn.sh"
 
 echo "Checking OVN central services..."
-pgrep -a ovsdb-server
-pgrep -a ovn-northd
+assert_process_present ovsdb-server
+assert_process_present ovn-northd
 
 echo "Checking NB database is accessible..."
-ovn-nbctl show
+assert_ovn_nb_available
 
 echo "Checking SB database is accessible..."
-ovn-sbctl show
+assert_ovn_sb_available
 
 echo "Checking for registered chassis..."
-CHASSIS_COUNT=$(ovn-sbctl show | grep -c "^Chassis" || true)
-echo "Found $CHASSIS_COUNT chassis registered"
+assert_ovn_chassis_present
 
-if [ "$CHASSIS_COUNT" -eq 0 ]; then
-    echo "ERROR: No chassis registered"
-    ovn-sbctl show
-    exit 1
-fi
-
-if [ -n "$EXPECTED_CHASSIS" ]; then
-    if [ "$CHASSIS_COUNT" -ne "$EXPECTED_CHASSIS" ]; then
-        echo "ERROR: Expected $EXPECTED_CHASSIS chassis, found $CHASSIS_COUNT"
-        ovn-sbctl show
-        exit 1
-    fi
-    echo "Chassis count matches expected: $EXPECTED_CHASSIS"
+if [ -n "${EXPECTED_CHASSIS:-}" ]; then
+    assert_ovn_chassis_count "$EXPECTED_CHASSIS"
 fi
 
 echo "Listing all registered chassis:"
-ovn-sbctl show
+ovn-sbctl show || true
 
-echo "All multi-host topology checks passed."
+assert_finish

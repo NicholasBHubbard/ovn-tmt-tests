@@ -1,22 +1,23 @@
 #!/bin/bash
-set -e
+set -euo pipefail
+
+source "$(dirname "$0")/../../lib/assert.sh"
+source "$(dirname "$0")/../../lib/ovn.sh"
 
 echo "Checking ovsdb-server processes for NB and SB..."
-pgrep -a ovsdb-server
+assert_process_present ovsdb-server
 
 echo "Checking ovn-northd process..."
-pgrep -a ovn-northd
+assert_process_present ovn-northd
 
-echo "Checking ovn-nbctl show..."
-ovn-nbctl show
-
-echo "Checking ovn-sbctl show..."
-ovn-sbctl show
+echo "Checking OVN databases..."
+assert_ovn_nb_available
+assert_ovn_sb_available
 
 echo "Checking NB database listening on port 6641..."
-ss -tlnp | grep 6641
+assert_tcp_listening 6641
 
 echo "Checking SB database listening on port 6642..."
-ss -tlnp | grep 6642
+assert_tcp_listening 6642
 
-echo "All OVN central checks passed."
+assert_finish

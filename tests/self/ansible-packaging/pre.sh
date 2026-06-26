@@ -1,9 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
-repo_root=$(cd "$(dirname "$0")/../../.." && pwd)
-cd "$repo_root"
+source "$(dirname "$0")/../../lib/assert.sh"
+cd_repo_root
 
-test -d roles
-test -d playbooks
-test -d plans
+assert_directory roles
+assert_directory playbooks
+assert_directory plans
+assert_finish

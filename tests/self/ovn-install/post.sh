@@ -1,9 +1,11 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
-ovs-vswitchd --version
-ovsdb-server --version
-ovn-nbctl --version
-ovn-sbctl --version
-ovn-northd --version
-ovn-controller --version
+source "$(dirname "$0")/../../lib/assert.sh"
+
+for binary in ovs-vswitchd ovsdb-server ovn-nbctl ovn-sbctl ovn-northd ovn-controller; do
+    assert_command_present "$binary"
+    assert_command_runs "$binary --version" "$binary" --version
+done
+
+assert_finish

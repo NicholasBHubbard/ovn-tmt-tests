@@ -1,19 +1,21 @@
 #!/bin/bash
-set -e
+set -euo pipefail
+
+source "$(dirname "$0")/../../lib/assert.sh"
+source "$(dirname "$0")/../../lib/ovn.sh"
 
 echo "Checking ovn-controller process..."
-pgrep -a ovn-controller
+assert_process_present ovn-controller
 
 echo "Checking br-int bridge exists..."
-ovs-vsctl list-br | grep br-int
+assert_ovs_bridge_present br-int
 
 echo "Checking OVS external-ids are configured..."
-ovs-vsctl get open . external-ids:ovn-remote
-ovs-vsctl get open . external-ids:ovn-encap-type
-ovs-vsctl get open . external-ids:ovn-encap-ip
-ovs-vsctl get open . external-ids:system-id
+for key in ovn-remote ovn-encap-type ovn-encap-ip system-id; do
+    assert_ovs_external_id_present "$key"
+done
 
 echo "Checking chassis is registered in SB database..."
-ovn-sbctl show | grep Chassis
+assert_ovn_chassis_present
 
-echo "All OVN host checks passed."
+assert_finish

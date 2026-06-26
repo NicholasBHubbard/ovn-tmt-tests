@@ -1,36 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-repo_root=$(cd "$(dirname "$0")/../../.." && pwd)
-cd "$repo_root"
-
-fail=0
-
-assert_file() {
-    local path=$1
-    if [ ! -f "$path" ]; then
-        echo "Missing expected file: $path"
-        fail=1
-    fi
-}
-
-assert_contains() {
-    local path=$1
-    local pattern=$2
-    if ! grep -R -F -q -- "$pattern" "$path"; then
-        echo "Expected '$pattern' in $path"
-        fail=1
-    fi
-}
-
-assert_not_contains() {
-    local path=$1
-    local pattern=$2
-    if grep -R -F -q -- "$pattern" "$path"; then
-        echo "Unexpected '$pattern' in $path"
-        fail=1
-    fi
-}
+source "$(dirname "$0")/../../lib/assert.sh"
+cd_repo_root
 
 assert_file roles/distro-packages/defaults/main.yml
 assert_file roles/distro-packages/tasks/main.yml
@@ -57,4 +29,4 @@ assert_not_contains roles 'centos-release-nfv-openvswitch'
 assert_not_contains roles 'Enable NFV SIG repo'
 assert_not_contains plans 'dnf install -y openvswitch'
 
-exit "$fail"
+assert_finish
