@@ -7,33 +7,6 @@
 - name: Set up OVN central
   hosts: central
   become: true
-  pre_tasks:
-    - name: Install OVN central packages (dnf)
-      when: ansible_pkg_mgr in ["dnf", "dnf5", "yum"]
-      block:
-        - name: Install ovn-central
-          ansible.builtin.dnf:
-            name:
-              - ovn-central
-            state: present
-      rescue:
-        - name: Enable NFV SIG repo (CentOS)
-          ansible.builtin.dnf:
-            name: centos-release-nfv-openvswitch
-            state: present
-        - name: Install ovn-central (retry)
-          ansible.builtin.dnf:
-            name:
-              - ovn-central
-            state: present
-
-    - name: Install OVN central packages (apt)
-      when: ansible_pkg_mgr == "apt"
-      ansible.builtin.apt:
-        name:
-          - ovn-central
-        state: present
-        update_cache: true
   roles:
     - ovs-setup
     - ovn-central
@@ -41,33 +14,6 @@
 - name: Set up OVN host on compute nodes
   hosts: compute
   become: true
-  pre_tasks:
-    - name: Install OVN host packages (dnf)
-      when: ansible_pkg_mgr in ["dnf", "dnf5", "yum"]
-      block:
-        - name: Install ovn-host
-          ansible.builtin.dnf:
-            name:
-              - ovn-host
-            state: present
-      rescue:
-        - name: Enable NFV SIG repo (CentOS)
-          ansible.builtin.dnf:
-            name: centos-release-nfv-openvswitch
-            state: present
-        - name: Install ovn-host (retry)
-          ansible.builtin.dnf:
-            name:
-              - ovn-host
-            state: present
-
-    - name: Install OVN host packages (apt)
-      when: ansible_pkg_mgr == "apt"
-      ansible.builtin.apt:
-        name:
-          - ovn-host
-        state: present
-        update_cache: true
   roles:
     - ovs-setup
     - ovn-host

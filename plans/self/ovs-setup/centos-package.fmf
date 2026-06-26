@@ -5,6 +5,8 @@ provision:
     image: quay.io/centos/centos:stream9
 
 prepare:
+  - how: shell
+    script: ./tests/self/ovs-setup/pre.sh
   - how: ansible
     playbook: playbooks/ovs-setup.yml
     extra-args: '-e ovs_install_method=package'

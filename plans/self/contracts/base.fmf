@@ -1,0 +1,13 @@
+summary: Verify self-test contract
+
+prepare:
+  - how: shell
+    script: ./tests/self/contracts/pre.sh
+
+discover:
+  how: fmf
+  test:
+    - /tests/self/contracts
+
+execute:
+  how: tmt

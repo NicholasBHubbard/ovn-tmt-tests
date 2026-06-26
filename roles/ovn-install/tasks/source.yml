@@ -1,13 +1,9 @@
 - name: Install build dependencies
-  ansible.builtin.package:
-    name:
-      - autoconf
-      - automake
-      - gcc
-      - libtool
-      - make
-      - openssl-devel
-    state: present
+  ansible.builtin.include_role:
+    name: distro-packages
+  vars:
+    distro_package_names: "{{ ovn_build_dependency_package_names }}"
+    distro_repository_package_names: "{{ ovn_build_repository_package_names }}"
 
 - name: Check if OVS submodule exists
   ansible.builtin.stat:

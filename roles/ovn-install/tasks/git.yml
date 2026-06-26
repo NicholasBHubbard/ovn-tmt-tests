@@ -1,7 +1,8 @@
 - name: Install git
-  ansible.builtin.package:
-    name: git
-    state: present
+  ansible.builtin.include_role:
+    name: distro-packages
+  vars:
+    distro_package_names: "{{ ovn_git_package_names }}"
 
 - name: Clone OVN repository
   ansible.builtin.git:

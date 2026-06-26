@@ -1,3 +1,9 @@
+- name: Verify supported package manager
+  ansible.builtin.assert:
+    that:
+      - ansible_pkg_mgr == "apt" or ansible_pkg_mgr in ["dnf", "dnf5", "yum"]
+    fail_msg: "Only apt and dnf-compatible package managers are supported."
+
 - name: Install OVN from package files (rpm)
   when: ansible_pkg_mgr in ["dnf", "dnf5", "yum"]
   ansible.builtin.dnf:

@@ -1,0 +1,13 @@
+summary: Verify Ansible package configuration self-test
+
+prepare:
+  - how: shell
+    script: ./tests/self/ansible-packaging/pre.sh
+
+discover:
+  how: fmf
+  test:
+    - /tests/self/ansible-packaging
+
+execute:
+  how: tmt

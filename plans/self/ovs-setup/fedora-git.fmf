@@ -5,6 +5,8 @@ provision:
     image: fedora:latest
 
 prepare:
+  - how: shell
+    script: ./tests/self/ovs-setup/pre.sh
   - how: ansible
     playbook: playbooks/ovs-setup.yml
     extra-args: '-e ovs_install_method=git'

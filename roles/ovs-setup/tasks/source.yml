@@ -1,29 +1,9 @@
-- name: Install build dependencies (dnf)
-  when: ansible_pkg_mgr in ["dnf", "dnf5", "yum"]
-  ansible.builtin.dnf:
-    name:
-      - autoconf
-      - automake
-      - gcc
-      - libtool
-      - make
-      - openssl-devel
-      - python3
-    state: present
-
-- name: Install build dependencies (apt)
-  when: ansible_pkg_mgr == "apt"
-  ansible.builtin.apt:
-    name:
-      - autoconf
-      - automake
-      - gcc
-      - libtool
-      - make
-      - libssl-dev
-      - python3
-    state: present
-    update_cache: true
+- name: Install build dependencies
+  ansible.builtin.include_role:
+    name: distro-packages
+  vars:
+    distro_package_names: "{{ ovs_build_dependency_package_names }}"
+    distro_repository_package_names: "{{ ovs_build_repository_package_names }}"
 
 - name: Bootstrap OVS
   ansible.builtin.command:

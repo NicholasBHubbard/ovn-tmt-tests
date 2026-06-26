@@ -1,5 +1,5 @@
 summary: Verify OVN central services are running and databases are accessible
-test: ./test.sh
+test: ./post.sh
 framework: shell
 duration: 5m
 require:

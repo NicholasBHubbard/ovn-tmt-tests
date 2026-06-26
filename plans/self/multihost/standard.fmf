@@ -18,20 +18,20 @@ provision:
     image: fedora:latest
 
 prepare:
-  - how: shell
-    script: |
-      dnf install -y openvswitch ovn-central ovn-host
-
-  - how: ansible
-    playbook: playbooks/ovs-setup.yml
+  - name: Check central preconditions
+    how: shell
     where: [central]
+    script: ./tests/self/multihost/pre.sh
+
+  - name: Check compute preconditions
+    how: shell
+    where: [compute]
+    script: ./tests/self/multihost/pre.sh
+
   - how: ansible
     playbook: playbooks/ovn-central.yml
     where: [central]
 
-  - how: ansible
-    playbook: playbooks/ovs-setup.yml
-    where: [compute]
   - how: ansible
     playbook: playbooks/ovn-host.yml
     where: [compute]

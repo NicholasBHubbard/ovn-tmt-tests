@@ -1,0 +1,4 @@
+summary: Verify self-test contract
+test: ./post.sh
+framework: shell
+duration: 1m

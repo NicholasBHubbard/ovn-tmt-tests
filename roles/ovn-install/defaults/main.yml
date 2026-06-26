@@ -3,14 +3,51 @@ ovn_install_method: source  # source, git, distro, or package
 # source: build from local source directory
 ovn_source_dir: /usr/src/ovn
 ovn_configure_flags: ""
+ovn_build_dependency_package_names:
+  dnf:
+    - autoconf
+    - automake
+    - gcc
+    - libtool
+    - make
+    - openssl-devel
+  apt:
+    - autoconf
+    - automake
+    - gcc
+    - libtool
+    - make
+    - libssl-dev
+ovn_build_repository_package_names:
+  dnf: []
+  apt: []
 
 # git: clone from repo, then build
 ovn_git_repo: https://github.com/ovn-org/ovn.git
 ovn_git_branch: main
 ovn_git_version: "{{ ovn_git_branch }}"
+ovn_git_package_names:
+  dnf:
+    - git
+  apt:
+    - git
 
 # distro: install from distro repos (auto-detects dnf/apt)
 ovn_distro_version: latest
+ovn_distro_package_names:
+  dnf:
+    - openvswitch
+    - ovn
+    - ovn-central
+    - ovn-host
+  apt:
+    - openvswitch-switch
+    - ovn-common
+    - ovn-central
+    - ovn-host
+ovn_distro_repository_package_names:
+  dnf: []
+  apt: []
 
 # package: install from specific package files
 ovn_package_files: []

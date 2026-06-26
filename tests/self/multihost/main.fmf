@@ -1,5 +1,5 @@
 summary: Verify multi-host OVN topology is correctly configured
-test: ./verify-topology.sh
+test: ./post.sh
 framework: shell
 duration: 5m
 require:

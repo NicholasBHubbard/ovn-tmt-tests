@@ -1,3 +1,11 @@
+- name: Install OVN host packages
+  when: ovn_host_install_packages
+  ansible.builtin.include_role:
+    name: distro-packages
+  vars:
+    distro_package_names: "{{ ovn_host_package_names }}"
+    distro_repository_package_names: "{{ ovn_host_repository_package_names }}"
+
 - name: Verify OVN binaries are installed
   ansible.builtin.command:
     cmd: which ovn-controller

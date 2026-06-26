@@ -9,6 +9,9 @@ prepare:
     how: ansible
     playbook: playbooks/ovn-central.yml
     extra-args: '-e ovs_install_method=package'
+  - name: Check OVN host preconditions
+    how: shell
+    script: ./tests/self/ovn-host/pre.sh
   - name: Set up OVN host
     how: ansible
     playbook: playbooks/ovn-host.yml

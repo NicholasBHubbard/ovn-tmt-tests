@@ -5,6 +5,8 @@ provision:
     image: fedora:latest
 
 prepare:
+  - how: shell
+    script: ./tests/self/ovn-install/pre.sh
   - how: ansible
     playbook: playbooks/ovn-install.yml
     extra-args: '-e ovn_install_method=git'

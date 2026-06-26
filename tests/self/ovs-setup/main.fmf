@@ -1,4 +1,4 @@
 summary: Verify OVS is installed, running, and binaries are in PATH
-test: ./test.sh
+test: ./post.sh
 framework: shell
 duration: 5m
