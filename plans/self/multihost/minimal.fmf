@@ -1,0 +1,30 @@
+summary: Minimal OVN topology (1 central + 1 compute) on Fedora
+
+environment:
+  EXPECTED_CHASSIS: "1"
+
+provision:
+  - name: central
+    role: central
+    how: container
+    image: fedora:latest
+  - name: compute-1
+    role: compute
+    how: container
+    image: fedora:latest
+
+prepare:
+  - name: Set up OVN topology
+    how: ansible
+    playbook: playbooks/multihost.yml
+    extra-args: '-e ovs_install_method=package'
+
+discover:
+  - how: fmf
+    where:
+      - central
+    test:
+      - /tests/self/multihost
+
+execute:
+  how: tmt
