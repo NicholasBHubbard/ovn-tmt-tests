@@ -1,0 +1,13 @@
+- name: Install git
+  ansible.builtin.package:
+    name: git
+    state: present
+
+- name: Clone OVN repository
+  ansible.builtin.git:
+    repo: "{{ ovn_git_repo }}"
+    dest: "{{ ovn_source_dir }}"
+    version: "{{ ovn_git_version }}"
+
+- name: Build and install from cloned source
+  include_tasks: source.yml

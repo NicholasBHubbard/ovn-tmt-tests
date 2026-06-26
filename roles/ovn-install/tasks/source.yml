@@ -1,0 +1,41 @@
+- name: Install build dependencies
+  ansible.builtin.package:
+    name:
+      - autoconf
+      - automake
+      - gcc
+      - libtool
+      - make
+      - openssl-devel
+    state: present
+
+- name: Check if OVS submodule exists
+  ansible.builtin.stat:
+    path: "{{ ovn_source_dir }}/ovs/configure.ac"
+  register: ovs_submodule
+
+- name: Initialize OVS submodule
+  when: not ovs_submodule.stat.exists
+  ansible.builtin.command:
+    cmd: git submodule update --init
+    chdir: "{{ ovn_source_dir }}"
+
+- name: Bootstrap OVN
+  ansible.builtin.command:
+    cmd: ./boot.sh
+    chdir: "{{ ovn_source_dir }}"
+
+- name: Configure OVN
+  ansible.builtin.command:
+    cmd: "./configure {{ ovn_configure_flags }}"
+    chdir: "{{ ovn_source_dir }}"
+
+- name: Build OVN
+  ansible.builtin.command:
+    cmd: make -j{{ ansible_processor_vcpus }}
+    chdir: "{{ ovn_source_dir }}"
+
+- name: Install OVN
+  ansible.builtin.command:
+    cmd: make install
+    chdir: "{{ ovn_source_dir }}"

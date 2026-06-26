@@ -1,0 +1,19 @@
+- name: Install OVS and OVN from distro repos (dnf)
+  when: ansible_pkg_mgr in ["dnf", "dnf5", "yum"]
+  ansible.builtin.dnf:
+    name:
+      - openvswitch
+      - ovn
+      - ovn-central
+      - ovn-host
+    state: "{{ 'latest' if ovn_distro_version == 'latest' else 'present' }}"
+
+- name: Install OVS and OVN from distro repos (apt)
+  when: ansible_pkg_mgr == "apt"
+  ansible.builtin.apt:
+    name:
+      - openvswitch-switch
+      - ovn-common
+      - ovn-central
+      - ovn-host
+    state: "{{ 'latest' if ovn_distro_version == 'latest' else 'present' }}"

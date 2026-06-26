@@ -1,0 +1,15 @@
+- name: Install OVN from source
+  when: ovn_install_method == "source"
+  include_tasks: source.yml
+
+- name: Install OVN from git
+  when: ovn_install_method == "git"
+  include_tasks: git.yml
+
+- name: Install OVN from distro repos
+  when: ovn_install_method == "distro"
+  include_tasks: distro.yml
+
+- name: Install OVN from package files
+  when: ovn_install_method == "package"
+  include_tasks: package.yml
