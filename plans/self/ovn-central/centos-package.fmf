@@ -1,0 +1,18 @@
+summary: Test ovn-central role on CentOS Stream 9
+
+provision:
+  - how: container
+    image: quay.io/centos/centos:stream9
+
+prepare:
+  - how: ansible
+    playbook: playbooks/ovn-central.yml
+    extra-args: '-e ovs_install_method=package'
+
+discover:
+  how: fmf
+  test:
+    - /tests/self/ovn-central
+
+execute:
+  how: tmt
