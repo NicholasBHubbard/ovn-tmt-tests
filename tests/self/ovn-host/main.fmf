@@ -1,0 +1,4 @@
+summary: Verify OVN host services are running and connected to central
+test: ./test.sh
+framework: shell
+duration: 5m

@@ -1,0 +1,77 @@
+- name: Verify OVN binaries are installed
+  ansible.builtin.command:
+    cmd: which ovn-controller
+  changed_when: false
+
+- name: Verify OVS is running
+  ansible.builtin.command:
+    cmd: ovs-vsctl show
+  changed_when: false
+
+# --- Configure OVS external-ids for OVN ---
+
+- name: Configure ovn-remote
+  ansible.builtin.command:
+    cmd: "ovs-vsctl set open . external-ids:ovn-remote={{ ovn_remote }}"
+
+- name: Configure ovn-encap-type
+  ansible.builtin.command:
+    cmd: "ovs-vsctl set open . external-ids:ovn-encap-type={{ ovn_encap_type }}"
+
+- name: Configure ovn-encap-ip
+  ansible.builtin.command:
+    cmd: "ovs-vsctl set open . external-ids:ovn-encap-ip={{ ovn_encap_ip }}"
+
+- name: Configure system-id
+  ansible.builtin.command:
+    cmd: "ovs-vsctl set open . external-ids:system-id={{ ovn_chassis_name }}"
+
+# --- Create OVN bridges ---
+
+- name: Create OVN bridges
+  ansible.builtin.command:
+    cmd: "ovs-vsctl --may-exist add-br {{ item }}"
+  loop: "{{ ovn_bridges }}"
+
+- name: Configure bridge mappings
+  when: ovn_bridge_mappings | length > 0
+  ansible.builtin.command:
+    cmd: "ovs-vsctl set open . external-ids:ovn-bridge-mappings={{ ovn_bridge_mappings }}"
+
+# --- Start ovn-controller ---
+
+- name: Check for ovn-controller systemd unit
+  ansible.builtin.stat:
+    path: /usr/lib/systemd/system/ovn-controller.service
+  register: ovn_controller_unit
+
+- name: Find ovn-ctl script
+  when: not ovn_controller_unit.stat.exists
+  ansible.builtin.shell:
+    cmd: find /usr -name ovn-ctl -type f 2>/dev/null | head -1
+  register: ovn_ctl_find
+  changed_when: false
+  failed_when: ovn_ctl_find.stdout == ""
+
+- name: Start ovn-controller via systemd
+  when: ovn_controller_unit.stat.exists
+  ansible.builtin.service:
+    name: ovn-controller
+    state: started
+    enabled: true
+
+- name: Start ovn-controller via ovn-ctl
+  when: not ovn_controller_unit.stat.exists
+  ansible.builtin.command:
+    cmd: "{{ ovn_ctl_find.stdout }} start_controller"
+
+# --- Wait for chassis registration ---
+
+- name: Wait for ovn-controller to connect to SB database
+  ansible.builtin.command:
+    cmd: ovs-appctl -t ovn-controller connection-status
+  retries: 10
+  delay: 2
+  register: controller_connected
+  until: controller_connected.stdout == "connected"
+  changed_when: false

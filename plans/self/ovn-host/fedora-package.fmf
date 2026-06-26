@@ -1,0 +1,23 @@
+summary: Test ovn-host role on Fedora
+
+provision:
+  - how: container
+    image: fedora:latest
+
+prepare:
+  - name: Set up OVN central
+    how: ansible
+    playbook: playbooks/ovn-central.yml
+    extra-args: '-e ovs_install_method=package'
+  - name: Set up OVN host
+    how: ansible
+    playbook: playbooks/ovn-host.yml
+    extra-args: '-e ovs_install_method=package'
+
+discover:
+  how: fmf
+  test:
+    - /tests/self/ovn-host
+
+execute:
+  how: tmt
