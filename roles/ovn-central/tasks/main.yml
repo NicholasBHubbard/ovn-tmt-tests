@@ -14,13 +14,8 @@
     state: directory
     mode: "0755"
 
-- name: Check for ovn-northd systemd unit
-  ansible.builtin.stat:
-    path: /usr/lib/systemd/system/ovn-northd.service
-  register: ovn_northd_unit
-
 - name: Find ovn-ctl script
-  when: not ovn_northd_unit.stat.exists
+  when: ansible_service_mgr != 'systemd'
   ansible.builtin.shell:
     cmd: find /usr -name ovn-ctl -type f 2>/dev/null | head -1
   register: ovn_ctl_find
@@ -31,7 +26,7 @@
 
 - name: Start OVN central via systemd
   when:
-    - ovn_northd_unit.stat.exists
+    - ansible_service_mgr == 'systemd'
     - ovn_cluster_members | length == 0
   ansible.builtin.service:
     name: ovn-northd
@@ -40,7 +35,7 @@
 
 - name: Start OVN central via ovn-ctl
   when:
-    - not ovn_northd_unit.stat.exists
+    - ansible_service_mgr != 'systemd'
     - ovn_cluster_members | length == 0
   ansible.builtin.command:
     cmd: >-

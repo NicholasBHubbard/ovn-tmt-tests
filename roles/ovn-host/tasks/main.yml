@@ -40,13 +40,8 @@
 
 # --- Start ovn-controller ---
 
-- name: Check for ovn-controller systemd unit
-  ansible.builtin.stat:
-    path: /usr/lib/systemd/system/ovn-controller.service
-  register: ovn_controller_unit
-
 - name: Find ovn-ctl script
-  when: not ovn_controller_unit.stat.exists
+  when: ansible_service_mgr != 'systemd'
   ansible.builtin.shell:
     cmd: find /usr -name ovn-ctl -type f 2>/dev/null | head -1
   register: ovn_ctl_find
@@ -54,14 +49,14 @@
   failed_when: ovn_ctl_find.stdout == ""
 
 - name: Start ovn-controller via systemd
-  when: ovn_controller_unit.stat.exists
+  when: ansible_service_mgr == 'systemd'
   ansible.builtin.service:
     name: ovn-controller
     state: started
     enabled: true
 
 - name: Start ovn-controller via ovn-ctl
-  when: not ovn_controller_unit.stat.exists
+  when: ansible_service_mgr != 'systemd'
   ansible.builtin.command:
     cmd: "{{ ovn_ctl_find.stdout }} start_controller"
 
