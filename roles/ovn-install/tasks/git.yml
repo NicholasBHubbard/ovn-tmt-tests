@@ -11,4 +11,4 @@
     version: "{{ ovn_git_version }}"
 
 - name: Build and install from cloned source
-  include_tasks: source.yml
+  ansible.builtin.include_tasks: source.yml

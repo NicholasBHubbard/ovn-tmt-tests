@@ -1,4 +1,5 @@
-- hosts: all
+- name: Install OVN
+  hosts: all
   become: true
   roles:
     - ovn-install

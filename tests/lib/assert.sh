@@ -9,7 +9,7 @@ REPO_ROOT=$(cd "$TEST_LIB_DIR/../.." && pwd)
 ASSERT_FAILURES=0
 
 cd_repo_root() {
-    cd "$REPO_ROOT"
+    cd "$REPO_ROOT" || return
 }
 
 record_failure() {

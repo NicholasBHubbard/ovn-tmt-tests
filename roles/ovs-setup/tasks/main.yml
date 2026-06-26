@@ -1,14 +1,14 @@
 - name: Install OVS from distro packages
   when: ovs_install_method == "package"
-  include_tasks: package.yml
+  ansible.builtin.include_tasks: package.yml
 
 - name: Install OVS from source
   when: ovs_install_method == "source"
-  include_tasks: source.yml
+  ansible.builtin.include_tasks: source.yml
 
 - name: Install OVS from git
   when: ovs_install_method == "git"
-  include_tasks: git.yml
+  ansible.builtin.include_tasks: git.yml
 
 - name: Configure OVS
-  include_tasks: configure.yml
+  ansible.builtin.include_tasks: configure.yml

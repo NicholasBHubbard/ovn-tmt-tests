@@ -1,0 +1,4 @@
+summary: Verify GitHub CI workflow
+test: ./post.sh
+framework: shell
+duration: 1m

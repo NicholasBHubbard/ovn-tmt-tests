@@ -1,4 +1,5 @@
-- hosts: all
+- name: Set up OVN central
+  hosts: all
   become: true
   roles:
     - ovs-setup

@@ -24,11 +24,24 @@
 
 - name: Find ovn-ctl script
   when: ansible_service_mgr != 'systemd'
-  ansible.builtin.shell:
-    cmd: find /usr -name ovn-ctl -type f 2>/dev/null | head -1
+  ansible.builtin.find:
+    paths: /usr
+    patterns: ovn-ctl
+    file_type: file
+    recurse: true
   register: ovn_ctl_find
-  changed_when: false
-  failed_when: ovn_ctl_find.stdout == ""
+
+- name: Select ovn-ctl script
+  when: ansible_service_mgr != 'systemd'
+  ansible.builtin.set_fact:
+    ovn_ctl_path: "{{ (ovn_ctl_find.files | map(attribute='path') | list | first) | default('') }}"
+
+- name: Verify ovn-ctl script exists
+  when: ansible_service_mgr != 'systemd'
+  ansible.builtin.assert:
+    that:
+      - ovn_ctl_path | length > 0
+    fail_msg: "Could not find ovn-ctl under /usr."
 
 # --- Standalone mode ---
 
@@ -47,11 +60,12 @@
     - ovn_cluster_members | length == 0
   ansible.builtin.command:
     cmd: >-
-      {{ ovn_ctl_find.stdout }}
+      {{ ovn_ctl_path }}
       --db-nb-create-insecure-remote=yes
       --db-sb-create-insecure-remote=yes
       --ovn-northd-log="-vfile:{{ ovn_log_level }}"
       start_northd
+  changed_when: true
 
 # --- Clustered mode ---
 
@@ -61,9 +75,10 @@
     - ansible_default_ipv4.address == ovn_cluster_members[0]
   ansible.builtin.command:
     cmd: >-
-      {{ ovn_ctl_find.stdout | default('/usr/share/ovn/scripts/ovn-ctl') }}
+      {{ ovn_ctl_path | default('/usr/share/ovn/scripts/ovn-ctl') }}
       --db-nb-cluster-local-addr={{ ansible_default_ipv4.address }}
       start_nb_ovsdb
+  changed_when: true
 
 - name: Start OVN SB cluster (leader)
   when:
@@ -71,9 +86,10 @@
     - ansible_default_ipv4.address == ovn_cluster_members[0]
   ansible.builtin.command:
     cmd: >-
-      {{ ovn_ctl_find.stdout | default('/usr/share/ovn/scripts/ovn-ctl') }}
+      {{ ovn_ctl_path | default('/usr/share/ovn/scripts/ovn-ctl') }}
       --db-sb-cluster-local-addr={{ ansible_default_ipv4.address }}
       start_sb_ovsdb
+  changed_when: true
 
 - name: Start OVN NB cluster (follower)
   when:
@@ -81,10 +97,11 @@
     - ansible_default_ipv4.address != ovn_cluster_members[0]
   ansible.builtin.command:
     cmd: >-
-      {{ ovn_ctl_find.stdout | default('/usr/share/ovn/scripts/ovn-ctl') }}
+      {{ ovn_ctl_path | default('/usr/share/ovn/scripts/ovn-ctl') }}
       --db-nb-cluster-local-addr={{ ansible_default_ipv4.address }}
       --db-nb-cluster-remote-addr={{ ovn_cluster_members[0] }}
       start_nb_ovsdb
+  changed_when: true
 
 - name: Start OVN SB cluster (follower)
   when:
@@ -92,18 +109,20 @@
     - ansible_default_ipv4.address != ovn_cluster_members[0]
   ansible.builtin.command:
     cmd: >-
-      {{ ovn_ctl_find.stdout | default('/usr/share/ovn/scripts/ovn-ctl') }}
+      {{ ovn_ctl_path | default('/usr/share/ovn/scripts/ovn-ctl') }}
       --db-sb-cluster-local-addr={{ ansible_default_ipv4.address }}
       --db-sb-cluster-remote-addr={{ ovn_cluster_members[0] }}
       start_sb_ovsdb
+  changed_when: true
 
 - name: Start ovn-northd (clustered)
   when: ovn_cluster_members | length > 0
   ansible.builtin.command:
     cmd: >-
-      {{ ovn_ctl_find.stdout | default('/usr/share/ovn/scripts/ovn-ctl') }}
+      {{ ovn_ctl_path | default('/usr/share/ovn/scripts/ovn-ctl') }}
       --ovn-northd-log="-vfile:{{ ovn_log_level }}"
       start_northd_no_ovsdb
+  changed_when: true
 
 # --- Wait for databases ---
 
@@ -131,11 +150,13 @@
   when: not ovn_ssl_enabled
   ansible.builtin.command:
     cmd: "ovn-nbctl set-connection ptcp:{{ ovn_nb_port }}"
+  changed_when: true
 
 - name: Configure SB TCP listener
   when: not ovn_ssl_enabled
   ansible.builtin.command:
     cmd: "ovn-sbctl set-connection ptcp:{{ ovn_sb_port }}"
+  changed_when: true
 
 # --- TLS configuration ---
 
@@ -143,18 +164,22 @@
   when: ovn_ssl_enabled
   ansible.builtin.command:
     cmd: "ovn-nbctl set-ssl {{ ovn_ssl_private_key }} {{ ovn_ssl_certificate }} {{ ovn_ssl_ca_cert }}"
+  changed_when: true
 
 - name: Configure SB SSL certificates
   when: ovn_ssl_enabled
   ansible.builtin.command:
     cmd: "ovn-sbctl set-ssl {{ ovn_ssl_private_key }} {{ ovn_ssl_certificate }} {{ ovn_ssl_ca_cert }}"
+  changed_when: true
 
 - name: Configure NB SSL listener
   when: ovn_ssl_enabled
   ansible.builtin.command:
     cmd: "ovn-nbctl set-connection pssl:{{ ovn_nb_port }}"
+  changed_when: true
 
 - name: Configure SB SSL listener
   when: ovn_ssl_enabled
   ansible.builtin.command:
     cmd: "ovn-sbctl set-connection pssl:{{ ovn_sb_port }}"
+  changed_when: true

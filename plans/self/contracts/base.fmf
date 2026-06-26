@@ -4,6 +4,9 @@ prepare:
   - how: shell
     script: ./tests/self/contracts/pre.sh
 
+provision:
+  how: local
+
 discover:
   how: fmf
   test:

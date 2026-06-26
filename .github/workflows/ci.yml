@@ -1,0 +1,213 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      run-container-tests:
+        description: Run container-backed CI smoke tests
+        required: false
+        default: false
+        type: boolean
+      container-plan:
+        description: tmt plan regex for manual container-backed runs
+        required: false
+        default: /plans/self/ci/container
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    name: Detect relevant changes
+    runs-on: ubuntu-24.04
+    outputs:
+      shell: ${{ steps.changed.outputs.shell }}
+      tmt: ${{ steps.changed.outputs.tmt }}
+      ansible: ${{ steps.changed.outputs.ansible }}
+      static-self-tests: ${{ steps.changed.outputs.static_self_tests }}
+      container-self-tests: ${{ steps.changed.outputs.container_self_tests }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Classify changed files
+        id: changed
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            : > changed-files.txt
+            all=true
+          else
+            all=false
+            if [ "${{ github.event_name }}" = "pull_request" ]; then
+              base="${{ github.event.pull_request.base.sha }}"
+            else
+              base="${{ github.event.before }}"
+            fi
+
+            if [ -z "$base" ] || [[ "$base" =~ ^0+$ ]]; then
+              base=$(git rev-list --max-parents=0 HEAD)
+            fi
+
+            git diff --name-only "$base" "$GITHUB_SHA" > changed-files.txt
+          fi
+
+          changed() {
+            local name=$1
+            local pattern=$2
+
+            if [ "$all" = true ] || grep -E -q "$pattern" changed-files.txt; then
+              echo "$name=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "$name=false" >> "$GITHUB_OUTPUT"
+            fi
+          }
+
+          changed shell '^(tests/.*\.sh|tests/lib/|\.github/workflows/ci\.yml)$'
+          changed tmt '^(\.fmf/|plans/|tests/.*\.fmf|tests/self/|tests/lib/|\.github/workflows/ci\.yml)$'
+          changed ansible '^(ansible\.cfg|playbooks/|roles/|\.github/workflows/ci\.yml)$'
+          changed static_self_tests '^(plans/self/(contracts|ansible-packaging|ci)/|tests/self/(contracts|ansible-packaging|ci)/|tests/lib/|\.github/workflows/ci\.yml)$'
+          changed container_self_tests '^(plans/self/ci/|tests/self/ci/|tests/lib/|\.github/workflows/ci\.yml)$'
+
+          echo 'Changed files:'
+          cat changed-files.txt
+
+  shell:
+    name: Shell syntax
+    needs: changes
+    if: needs.changes.outputs.shell == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Install shell tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Run shell syntax checks
+        run: find tests -name '*.sh' -print0 | xargs -0 -n1 bash -n
+
+      - name: Run ShellCheck
+        run: find tests -name '*.sh' -print0 | xargs -0 shellcheck --shell=bash -x -e SC1091
+
+  tmt-lint:
+    name: tmt lint
+    needs: changes
+    if: needs.changes.outputs.tmt == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+          cache: pip
+
+      - name: Install tmt
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install tmt
+
+      - name: Run tmt lint
+        run: tmt lint plans tests
+
+  ansible:
+    name: Ansible checks
+    needs: changes
+    if: needs.changes.outputs.ansible == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+          cache: pip
+
+      - name: Install Ansible tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install ansible-core ansible-lint
+
+      - name: Run Ansible syntax checks
+        run: |
+          for playbook in playbooks/*.yml; do
+            ansible-playbook --syntax-check -i localhost, -c local "$playbook"
+          done
+
+      - name: Run ansible-lint
+        run: ansible-lint --profile production playbooks roles
+
+  static-self-tests:
+    name: Static self-tests
+    needs: changes
+    if: needs.changes.outputs.static_self_tests == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+          cache: pip
+
+      - name: Install tmt
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install tmt
+
+      - name: Run direct static self-tests
+        run: |
+          ./tests/self/contracts/post.sh
+          ./tests/self/ansible-packaging/post.sh
+          ./tests/self/ci/post.sh
+
+      - name: Run static tmt self-test plans
+        run: tmt run --all plan --name '/plans/self/(contracts|ansible-packaging|ci)/base' provision --feeling-safe
+
+  container-self-tests:
+    name: Container self-tests
+    needs: changes
+    if: >-
+      needs.changes.outputs.container_self_tests == 'true' ||
+      (github.event_name == 'workflow_dispatch' && inputs['run-container-tests'])
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+          cache: pip
+
+      - name: Install container test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y podman
+          python -m pip install --upgrade pip
+          python -m pip install 'tmt[provision-container]'
+
+      - name: Run container-backed tmt self-tests
+        env:
+          TMT_PLAN: ${{ github.event_name == 'workflow_dispatch' && inputs['container-plan'] || '/plans/self/ci/container' }}
+        run: tmt run --all plan --name "$TMT_PLAN"

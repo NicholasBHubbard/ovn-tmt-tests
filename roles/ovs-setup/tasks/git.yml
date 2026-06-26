@@ -11,4 +11,4 @@
     version: "{{ ovs_git_branch }}"
 
 - name: Build and install from cloned source
-  include_tasks: source.yml
+  ansible.builtin.include_tasks: source.yml

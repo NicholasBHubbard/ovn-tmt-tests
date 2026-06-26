@@ -1,10 +1,23 @@
 - name: Find ovs-ctl script
   when: ansible_service_mgr != 'systemd'
-  ansible.builtin.shell:
-    cmd: find /usr -name ovs-ctl -type f 2>/dev/null | head -1
+  ansible.builtin.find:
+    paths: /usr
+    patterns: ovs-ctl
+    file_type: file
+    recurse: true
   register: ovs_ctl_find
-  changed_when: false
-  failed_when: ovs_ctl_find.stdout == ""
+
+- name: Select ovs-ctl script
+  when: ansible_service_mgr != 'systemd'
+  ansible.builtin.set_fact:
+    ovs_ctl_path: "{{ (ovs_ctl_find.files | map(attribute='path') | list | first) | default('') }}"
+
+- name: Verify ovs-ctl script exists
+  when: ansible_service_mgr != 'systemd'
+  ansible.builtin.assert:
+    that:
+      - ovs_ctl_path | length > 0
+    fail_msg: "Could not find ovs-ctl under /usr."
 
 - name: Start openvswitch via systemd
   when: ansible_service_mgr == 'systemd'
@@ -16,15 +29,18 @@
 - name: Start openvswitch via ovs-ctl
   when: ansible_service_mgr != 'systemd'
   ansible.builtin.command:
-    cmd: "{{ ovs_ctl_find.stdout }} start"
+    cmd: "{{ ovs_ctl_path }} start"
+  changed_when: true
 
 - name: Create OVS bridges
   when: ovs_bridges | length > 0
   ansible.builtin.command:
     cmd: "ovs-vsctl --may-exist add-br {{ item }}"
   loop: "{{ ovs_bridges }}"
+  changed_when: true
 
 - name: Configure SSL private key
   when: ovs_ssl_enabled
   ansible.builtin.command:
     cmd: "ovs-vsctl set-ssl {{ ovs_ssl_private_key }} {{ ovs_ssl_certificate }} {{ ovs_ssl_ca_cert }}"
+  changed_when: true

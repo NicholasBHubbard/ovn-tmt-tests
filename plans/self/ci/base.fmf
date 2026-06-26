@@ -1,0 +1,16 @@
+summary: Verify GitHub CI workflow
+
+prepare:
+  - how: shell
+    script: ./tests/self/ci/pre.sh
+
+provision:
+  how: local
+
+discover:
+  how: fmf
+  test:
+    - /tests/self/ci
+
+execute:
+  how: tmt
