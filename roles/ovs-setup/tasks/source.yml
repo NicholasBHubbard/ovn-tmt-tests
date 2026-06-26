@@ -1,0 +1,46 @@
+- name: Install build dependencies (dnf)
+  when: ansible_pkg_mgr in ["dnf", "dnf5", "yum"]
+  ansible.builtin.dnf:
+    name:
+      - autoconf
+      - automake
+      - gcc
+      - libtool
+      - make
+      - openssl-devel
+      - python3
+    state: present
+
+- name: Install build dependencies (apt)
+  when: ansible_pkg_mgr == "apt"
+  ansible.builtin.apt:
+    name:
+      - autoconf
+      - automake
+      - gcc
+      - libtool
+      - make
+      - libssl-dev
+      - python3
+    state: present
+    update_cache: true
+
+- name: Bootstrap OVS
+  ansible.builtin.command:
+    cmd: ./boot.sh
+    chdir: "{{ ovs_source_dir }}"
+
+- name: Configure OVS
+  ansible.builtin.command:
+    cmd: "./configure {{ ovs_configure_flags }}"
+    chdir: "{{ ovs_source_dir }}"
+
+- name: Build OVS
+  ansible.builtin.command:
+    cmd: make -j{{ ansible_processor_vcpus }}
+    chdir: "{{ ovs_source_dir }}"
+
+- name: Install OVS
+  ansible.builtin.command:
+    cmd: make install
+    chdir: "{{ ovs_source_dir }}"

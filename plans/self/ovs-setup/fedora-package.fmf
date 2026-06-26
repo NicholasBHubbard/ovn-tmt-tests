@@ -1,0 +1,18 @@
+summary: Test ovs-setup role with package method on Fedora
+
+provision:
+  - how: container
+    image: fedora:latest
+
+prepare:
+  - how: ansible
+    playbook: playbooks/ovs-setup.yml
+    extra-args: '-e ovs_install_method=package'
+
+discover:
+  how: fmf
+  test:
+    - /tests/self/ovs-setup
+
+execute:
+  how: tmt

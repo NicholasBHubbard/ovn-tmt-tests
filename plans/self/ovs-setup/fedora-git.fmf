@@ -1,0 +1,18 @@
+summary: Test ovs-setup role with git method on Fedora
+
+provision:
+  - how: container
+    image: fedora:latest
+
+prepare:
+  - how: ansible
+    playbook: playbooks/ovs-setup.yml
+    extra-args: '-e ovs_install_method=git'
+
+discover:
+  how: fmf
+  test:
+    - /tests/self/ovs-setup
+
+execute:
+  how: tmt

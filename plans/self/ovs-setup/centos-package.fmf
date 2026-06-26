@@ -1,0 +1,18 @@
+summary: Test ovs-setup role with package method on CentOS Stream 9
+
+provision:
+  - how: container
+    image: quay.io/centos/centos:stream9
+
+prepare:
+  - how: ansible
+    playbook: playbooks/ovs-setup.yml
+    extra-args: '-e ovs_install_method=package'
+
+discover:
+  how: fmf
+  test:
+    - /tests/self/ovs-setup
+
+execute:
+  how: tmt

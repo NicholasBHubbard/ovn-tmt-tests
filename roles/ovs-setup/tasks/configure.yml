@@ -1,0 +1,16 @@
+- name: Start openvswitch service
+  ansible.builtin.service:
+    name: openvswitch
+    state: started
+    enabled: true
+
+- name: Create OVS bridges
+  when: ovs_bridges | length > 0
+  ansible.builtin.command:
+    cmd: "ovs-vsctl --may-exist add-br {{ item }}"
+  loop: "{{ ovs_bridges }}"
+
+- name: Configure SSL private key
+  when: ovs_ssl_enabled
+  ansible.builtin.command:
+    cmd: "ovs-vsctl set-ssl {{ ovs_ssl_private_key }} {{ ovs_ssl_certificate }} {{ ovs_ssl_ca_cert }}"

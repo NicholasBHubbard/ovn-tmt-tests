@@ -1,0 +1,14 @@
+- name: Install OVS packages (dnf)
+  when: ansible_pkg_mgr in ["dnf", "dnf5", "yum"]
+  ansible.builtin.dnf:
+    name:
+      - openvswitch
+    state: present
+
+- name: Install OVS packages (apt)
+  when: ansible_pkg_mgr == "apt"
+  ansible.builtin.apt:
+    name:
+      - openvswitch-switch
+    state: present
+    update_cache: true

@@ -1,0 +1,9 @@
+summary: Base plan for ovs-setup role self-tests
+
+discover:
+  how: fmf
+  test:
+    - /tests/self/ovs-setup
+
+execute:
+  how: tmt
