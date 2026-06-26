@@ -18,10 +18,24 @@ provision:
     image: fedora:latest
 
 prepare:
-  - name: Set up OVN topology
-    how: ansible
-    playbook: playbooks/multihost.yml
-    extra-args: '-e ovs_install_method=package'
+  - how: shell
+    script: |
+      dnf install -y openvswitch ovn-central ovn-host
+
+  - how: ansible
+    playbook: playbooks/ovs-setup.yml
+    where: [central]
+  - how: ansible
+    playbook: playbooks/ovn-central.yml
+    where: [central]
+
+  - how: ansible
+    playbook: playbooks/ovs-setup.yml
+    where: [compute]
+  - how: ansible
+    playbook: playbooks/ovn-host.yml
+    where: [compute]
+    extra-args: '-e ovn_remote=tcp:central:6642'
 
 discover:
   - how: fmf

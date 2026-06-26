@@ -1,8 +1,27 @@
-- name: Start openvswitch service
+- name: Check for openvswitch systemd unit
+  ansible.builtin.stat:
+    path: /usr/lib/systemd/system/openvswitch.service
+  register: ovs_systemd_unit
+
+- name: Find ovs-ctl script
+  when: not ovs_systemd_unit.stat.exists
+  ansible.builtin.shell:
+    cmd: find /usr -name ovs-ctl -type f 2>/dev/null | head -1
+  register: ovs_ctl_find
+  changed_when: false
+  failed_when: ovs_ctl_find.stdout == ""
+
+- name: Start openvswitch via systemd
+  when: ovs_systemd_unit.stat.exists
   ansible.builtin.service:
     name: openvswitch
     state: started
     enabled: true
+
+- name: Start openvswitch via ovs-ctl
+  when: not ovs_systemd_unit.stat.exists
+  ansible.builtin.command:
+    cmd: "{{ ovs_ctl_find.stdout }} start"
 
 - name: Create OVS bridges
   when: ovs_bridges | length > 0
