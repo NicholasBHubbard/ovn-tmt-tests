@@ -12,7 +12,8 @@ assert_file "$self_tests"
 
 assert_contains "$ci" 'actions/checkout@v5'
 assert_not_contains "$ci" 'actions/setup-python'
-assert_contains "$ci" 'ubuntu-latest'
+assert_contains "$ci" 'ubuntu-26.04'
+assert_not_contains "$ci" 'ubuntu-latest'
 assert_not_contains "$ci" 'ubuntu-24.04'
 
 assert_contains "$ci" "changed: \${{ steps.self_test_changes.outputs.changed }}"

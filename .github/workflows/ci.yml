@@ -19,7 +19,7 @@ permissions:
 jobs:
   self-test-changes:
     name: Detect self-test changes
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     outputs:
       changed: ${{ steps.self_test_changes.outputs.changed }}
       plans: ${{ steps.discover.outputs.plans }}
@@ -61,7 +61,7 @@ jobs:
 
   shell:
     name: Shell syntax
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
@@ -78,7 +78,7 @@ jobs:
 
   yaml:
     name: YAML lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
@@ -93,7 +93,7 @@ jobs:
 
   tmt-lint:
     name: tmt lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
@@ -106,7 +106,7 @@ jobs:
 
   ansible:
     name: Ansible checks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
