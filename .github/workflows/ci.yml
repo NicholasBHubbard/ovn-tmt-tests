@@ -55,7 +55,9 @@ jobs:
       - name: Discover self-test plans
         id: discover
         run: |
-          plans=$(tmt plan ls --filter 'enabled:true' | grep '/plans/self/' | jq -Rc . | jq -sc .)
+          tmt plan ls --filter 'enabled:true' | grep '/plans/self/' \
+            | sed 's|^/plans/self/||' | jq -Rc . | jq -sc . \
+            | xargs -I{} echo "plans={}" >> "$GITHUB_OUTPUT"
           echo "plans=$plans" >> "$GITHUB_OUTPUT"
 
   shell:
@@ -139,4 +141,4 @@ jobs:
 
       - name: Run tmt self-test plan
         run: >-
-          tmt run --all plan --name '${{ matrix.plan }}' provision --feeling-safe
+          sudo env PATH="$PATH" tmt run --all plan --name '/plans/self/${{ matrix.plan }}' provision --feeling-safe

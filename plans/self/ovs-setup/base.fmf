@@ -1,4 +1,5 @@
 summary: Base plan for ovs-setup role self-tests
+enabled: false
 
 discover:
   how: fmf
