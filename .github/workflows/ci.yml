@@ -27,12 +27,7 @@ jobs:
     name: Detect relevant changes
     runs-on: ubuntu-latest
     outputs:
-      shell: ${{ steps.changed.outputs.shell }}
-      yaml: ${{ steps.changed.outputs.yaml }}
-      tmt: ${{ steps.changed.outputs.tmt }}
-      ansible: ${{ steps.changed.outputs.ansible }}
-      static-self-tests: ${{ steps.changed.outputs.static_self_tests }}
-      container-self-tests: ${{ steps.changed.outputs.container_self_tests }}
+      container_self_tests: ${{ steps.changed.outputs.container_self_tests }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
@@ -63,32 +58,19 @@ jobs:
             git diff --name-only "$base" "$GITHUB_SHA" > changed-files.txt
           fi
 
-          changed() {
-            local name=$1
-            local pattern=$2
-
-            if [ "$all" = true ] || grep -E -q "$pattern" changed-files.txt; then
-              echo "$name=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "$name=false" >> "$GITHUB_OUTPUT"
-            fi
-          }
-
-          changed shell '^(tests/.*\.(sh|bash)|tests/lib/|\.github/workflows/ci\.yml)'
-          changed yaml '^(\.yamllint|.*\.(yml|yaml)|\.github/workflows/ci\.yml)'
-          changed tmt '^(\.fmf/|plans/|tests/.*\.fmf|tests/self/|tests/lib/|\.github/workflows/ci\.yml)'
-          changed ansible '^(ansible\.cfg|playbooks/|roles/|\.github/workflows/ci\.yml)'
-          changed static_self_tests \
-            '^(plans/self/(contracts|ansible-packaging|ci)/|tests/self/(contracts|ansible-packaging|ci)/|tests/lib/|\.github/workflows/ci\.yml)'
-          changed container_self_tests '^(plans/self/ci/|tests/self/ci/|tests/lib/|\.github/workflows/ci\.yml)'
+          if [ "$all" = true ] || grep -E -q \
+            '^(plans/self/ci/|tests/self/ci/|tests/lib/|\.github/workflows/ci\.yml)' \
+            changed-files.txt; then
+            echo "container_self_tests=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "container_self_tests=false" >> "$GITHUB_OUTPUT"
+          fi
 
           echo 'Changed files:'
           cat changed-files.txt
 
   shell:
     name: Shell syntax
-    needs: changes
-    if: needs.changes.outputs.shell == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -107,8 +89,6 @@ jobs:
 
   yaml:
     name: YAML lint
-    needs: changes
-    if: needs.changes.outputs.yaml == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -124,8 +104,6 @@ jobs:
 
   tmt-lint:
     name: tmt lint
-    needs: changes
-    if: needs.changes.outputs.tmt == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -139,8 +117,6 @@ jobs:
 
   ansible:
     name: Ansible checks
-    needs: changes
-    if: needs.changes.outputs.ansible == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -162,8 +138,6 @@ jobs:
 
   static-self-tests:
     name: Static self-tests
-    needs: changes
-    if: needs.changes.outputs.static_self_tests == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
