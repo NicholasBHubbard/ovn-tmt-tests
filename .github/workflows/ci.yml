@@ -55,9 +55,8 @@ jobs:
       - name: Discover self-test plans
         id: discover
         run: |
-          tmt plan ls --filter 'enabled:true' | grep '/plans/self/' \
-            | sed 's|^/plans/self/||' | jq -Rc . | jq -sc . \
-            | xargs -I{} echo "plans={}" >> "$GITHUB_OUTPUT"
+          plans=$(tmt plan ls --filter 'enabled:true' | grep '/plans/self/' \
+            | sed 's|^/plans/self/||' | jq -Rc . | jq -sc .)
           echo "plans=$plans" >> "$GITHUB_OUTPUT"
 
   shell:
