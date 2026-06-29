@@ -62,7 +62,8 @@ jobs:
 
       - name: Run ShellCheck
         run: >-
-          find tests \( -name '*.sh' -o -name '*.bash' \) -exec shellcheck --severity=warning --shell=bash -x -e SC1091 {} +
+          find tests \( -name '*.sh' -o -name '*.bash' \)
+          -exec shellcheck --severity=warning --shell=bash -x -e SC1091 {} +
 
   yaml:
     name: YAML lint
