@@ -1,7 +1,7 @@
 summary: Test ovn-install role with distro method on Debian
 
 provision:
-  - how: virtual
+  - how: container
     image: debian
 
 prepare:

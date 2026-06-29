@@ -3,4 +3,5 @@
   become: true
   roles:
     - ovn-install
+    - ovs-setup
     - ovn-central

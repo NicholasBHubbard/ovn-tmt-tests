@@ -22,8 +22,11 @@ assert_not_contains roles/ovn-host/tasks/main.yml 'distro-packages'
 assert_not_contains roles/ovn-host/defaults/main.yml 'ovn_host_package_names'
 
 assert_contains playbooks/ovn-central.yml 'ovn-install'
+assert_contains playbooks/ovn-central.yml 'ovs-setup'
 assert_contains playbooks/ovn-host.yml 'ovn-install'
+assert_contains playbooks/ovn-host.yml 'ovs-setup'
 assert_contains playbooks/multihost.yml 'ovn-install'
+assert_contains playbooks/multihost.yml 'ovs-setup'
 
 assert_not_contains playbooks 'centos-release-nfv-openvswitch'
 assert_not_contains playbooks 'Enable NFV SIG repo'

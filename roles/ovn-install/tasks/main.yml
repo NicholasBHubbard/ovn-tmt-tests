@@ -1,8 +1,3 @@
-- name: Ensure OVS is installed (package method prerequisite)
-  when: ovn_install_method == "package"
-  ansible.builtin.include_role:
-    name: ovs-setup
-
 - name: Install OVN from source
   when:
     - ovn_install_method == "source"
@@ -31,8 +26,3 @@
   when: not (ovn_installed | default(false))
   ansible.builtin.set_fact:
     ovn_installed: true
-
-- name: Ensure OVS is configured and running
-  when: ovn_install_method != "package"
-  ansible.builtin.include_role:
-    name: ovs-setup

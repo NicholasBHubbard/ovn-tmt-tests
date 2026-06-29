@@ -28,14 +28,9 @@ prepare:
     where: [compute]
     script: ./tests/self/multihost/pre.sh
 
-  - how: ansible
-    playbook: playbooks/ovn-central.yml
-    where: [central]
-
-  - how: ansible
-    playbook: playbooks/ovn-host.yml
-    where: [compute]
-    extra-args: '-e ovn_remote=tcp:central:6642'
+  - name: Set up OVN topology
+    how: ansible
+    playbook: playbooks/multihost.yml
 
 discover:
   - how: fmf
