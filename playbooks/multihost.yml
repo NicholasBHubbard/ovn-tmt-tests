@@ -14,4 +14,4 @@
     - ovs-setup
     - ovn-host
   vars:
-    ovn_remote: "tcp:{{ lookup('env', 'CENTRAL_HOSTNAME') }}:6642"
+    ovn_remote: "tcp:{{ hostvars[groups['central'][0]]['ansible_host'] }}:6642"
