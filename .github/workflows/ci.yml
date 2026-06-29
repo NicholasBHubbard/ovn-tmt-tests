@@ -28,6 +28,7 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       shell: ${{ steps.changed.outputs.shell }}
+      yaml: ${{ steps.changed.outputs.yaml }}
       tmt: ${{ steps.changed.outputs.tmt }}
       ansible: ${{ steps.changed.outputs.ansible }}
       static-self-tests: ${{ steps.changed.outputs.static_self_tests }}
@@ -74,9 +75,11 @@ jobs:
           }
 
           changed shell '^(tests/.*\.(sh|bash)|tests/lib/|\.github/workflows/ci\.yml)'
+          changed yaml '^(\.yamllint|.*\.(yml|yaml)|\.github/workflows/ci\.yml)'
           changed tmt '^(\.fmf/|plans/|tests/.*\.fmf|tests/self/|tests/lib/|\.github/workflows/ci\.yml)'
           changed ansible '^(ansible\.cfg|playbooks/|roles/|\.github/workflows/ci\.yml)'
-          changed static_self_tests '^(plans/self/(contracts|ansible-packaging|ci)/|tests/self/(contracts|ansible-packaging|ci)/|tests/lib/|\.github/workflows/ci\.yml)'
+          changed static_self_tests \
+            '^(plans/self/(contracts|ansible-packaging|ci)/|tests/self/(contracts|ansible-packaging|ci)/|tests/lib/|\.github/workflows/ci\.yml)'
           changed container_self_tests '^(plans/self/ci/|tests/self/ci/|tests/lib/|\.github/workflows/ci\.yml)'
 
           echo 'Changed files:'
@@ -101,6 +104,29 @@ jobs:
 
       - name: Run ShellCheck
         run: find tests \( -name '*.sh' -o -name '*.bash' \) -print0 | xargs -0 shellcheck --shell=bash -x -e SC1091
+
+  yaml:
+    name: YAML lint
+    needs: changes
+    if: needs.changes.outputs.yaml == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+          cache: pip
+
+      - name: Install yamllint
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install yamllint
+
+      - name: Run yamllint
+        run: yamllint .
 
   tmt-lint:
     name: tmt lint
@@ -209,5 +235,8 @@ jobs:
 
       - name: Run container-backed tmt self-tests
         env:
-          TMT_PLAN: ${{ github.event_name == 'workflow_dispatch' && inputs['container-plan'] || '/plans/self/ci/container' }}
+          TMT_PLAN: >-
+            ${{ github.event_name == 'workflow_dispatch'
+            && inputs['container-plan']
+            || '/plans/self/ci/container' }}
         run: tmt run --all plan --name "$TMT_PLAN"

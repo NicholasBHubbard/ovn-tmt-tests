@@ -29,6 +29,11 @@ assert_contains "$workflow" 'shellcheck --shell=bash -x -e SC1091'
 assert_not_contains "$workflow" ")$'"
 assert_contains "$workflow" '*.bash'
 assert_contains "$workflow" 'tmt lint plans tests'
+assert_contains "$workflow" "yaml: \${{ steps.changed.outputs.yaml }}"
+assert_contains "$workflow" "if: needs.changes.outputs.yaml == 'true'"
+assert_contains "$workflow" 'pip install yamllint'
+assert_contains "$workflow" 'yamllint'
+assert_file .yamllint
 assert_contains "$workflow" 'ansible-playbook --syntax-check'
 assert_contains "$workflow" 'ansible-lint --profile production playbooks roles'
 assert_not_contains "$workflow" 'ansible-lint --profile min'
