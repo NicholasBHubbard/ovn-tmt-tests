@@ -1,0 +1,33 @@
+name: Self tests
+
+on:
+  workflow_call:
+    inputs:
+      plans:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    name: ${{ matrix.plan }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        plan: ${{ fromJson(inputs.plans) }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Install self-test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ansible-core podman
+          pipx install 'tmt[provision-container]'
+
+      - name: Run tmt self-test plan
+        run: >-
+          sudo env PATH="$PATH" tmt run --all plan --name '/plans/self/${{ matrix.plan }}' provision --feeling-safe
