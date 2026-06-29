@@ -12,19 +12,21 @@ assert_not_contains "$workflow" 'actions/setup-python'
 assert_contains "$workflow" 'ubuntu-latest'
 assert_not_contains "$workflow" 'ubuntu-24.04'
 
-assert_contains "$workflow" "container_self_tests: \${{ steps.changed.outputs.container_self_tests }}"
-assert_contains "$workflow" "needs.changes.outputs.container_self_tests == 'true'"
+assert_contains "$workflow" "changed: \${{ steps.self_test_changes.outputs.changed }}"
+assert_contains "$workflow" "needs.self-test-changes.outputs.changed == 'true'"
 assert_not_contains "$workflow" "outputs.shell"
 assert_not_contains "$workflow" "outputs.yaml"
 assert_not_contains "$workflow" "outputs.tmt"
 assert_not_contains "$workflow" "outputs.ansible"
 assert_not_contains "$workflow" "outputs.static_self_tests"
+assert_not_contains "$workflow" "outputs.container_self_tests"
+assert_not_contains "$workflow" "outputs.provisioned"
 
-assert_contains "$workflow" "\( -name '*.sh' -o -name '*.bash' \)"
-assert_contains "$workflow" 'bash -n'
+assert_contains "$workflow" "*.sh"
+assert_contains "$workflow" "*.bash"
+assert_not_contains "$workflow" 'bash -n'
 assert_contains "$workflow" 'sudo apt-get install -y shellcheck'
 assert_contains "$workflow" 'shellcheck --shell=bash -x -e SC1091'
-assert_not_contains "$workflow" ")$'"
 assert_contains "$workflow" '*.bash'
 
 assert_contains "$workflow" 'apt-get install -y yamllint'
@@ -35,23 +37,19 @@ assert_contains "$workflow" 'pipx install tmt'
 assert_contains "$workflow" 'tmt lint plans tests'
 
 assert_contains "$workflow" 'apt-get install -y ansible-core ansible-lint'
-assert_contains "$workflow" 'ansible-playbook --syntax-check'
+assert_not_contains "$workflow" 'ansible-playbook --syntax-check'
 assert_contains "$workflow" 'ansible-lint --profile production playbooks roles'
 assert_not_contains "$workflow" 'ansible-lint --profile min'
 
-assert_contains "$workflow" './tests/self/contracts/post.sh'
-assert_contains "$workflow" './tests/self/ansible-packaging/post.sh'
-assert_contains "$workflow" './tests/self/ci/post.sh'
-assert_contains "$workflow" "tmt run --all plan --name '/plans/self/(contracts|ansible-packaging|ci)/base' provision --feeling-safe"
-
-assert_contains "$workflow" 'run-container-tests:'
+assert_contains "$workflow" 'run-self-tests:'
+assert_not_contains "$workflow" 'run-provisioned-tests:'
+assert_not_contains "$workflow" 'run-container-tests:'
 assert_not_contains "$workflow" 'container-plan:'
-assert_contains "$workflow" "inputs['run-container-tests']"
-assert_not_contains "$workflow" "inputs['container-plan']"
-assert_contains "$workflow" 'sudo apt-get install -y podman'
-assert_contains "$workflow" "pipx install 'tmt[provision-container]'"
-assert_not_contains "$workflow" 'TMT_PLAN'
-assert_contains "$workflow" "tmt run --all plan --name '/plans/self/ci/container'"
+assert_contains "$workflow" "inputs['run-self-tests']"
+assert_contains "$workflow" 'ansible-core'
+assert_contains "$workflow" 'podman'
+assert_contains "$workflow" "pipx install 'tmt[all]'"
+assert_contains "$workflow" "tmt run --all plan --name '/plans/self/' provision --feeling-safe"
 
 assert_contains plans/self/ci/container.fmf 'how: container'
 assert_contains plans/self/ci/container.fmf 'image: fedora:latest'

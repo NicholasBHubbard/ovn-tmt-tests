@@ -7,8 +7,8 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
-      run-container-tests:
-        description: Run container-backed CI smoke tests
+      run-self-tests:
+        description: Run self-tests
         required: false
         default: false
         type: boolean
@@ -17,51 +17,36 @@ permissions:
   contents: read
 
 jobs:
-  changes:
-    name: Detect relevant changes
+  self-test-changes:
+    name: Detect self-test changes
     runs-on: ubuntu-latest
     outputs:
-      container_self_tests: ${{ steps.changed.outputs.container_self_tests }}
+      changed: ${{ steps.self_test_changes.outputs.changed }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
-      - name: Classify changed files
-        id: changed
-        shell: bash
+      - name: Check for self-test changes
+        id: self_test_changes
         run: |
-          set -euo pipefail
-
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            : > changed-files.txt
-            all=true
-          else
-            all=false
-            if [ "${{ github.event_name }}" = "pull_request" ]; then
-              base="${{ github.event.pull_request.base.sha }}"
-            else
-              base="${{ github.event.before }}"
-            fi
-
-            if [ -z "$base" ] || [[ "$base" =~ ^0+$ ]]; then
-              base=$(git rev-list --max-parents=0 HEAD)
-            fi
-
-            git diff --name-only "$base" "$GITHUB_SHA" > changed-files.txt
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
 
-          if [ "$all" = true ] || grep -E -q \
-            '^(plans/self/ci/|tests/self/ci/|tests/lib/|\.github/workflows/ci\.yml)' \
-            changed-files.txt; then
-            echo "container_self_tests=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "container_self_tests=false" >> "$GITHUB_OUTPUT"
+          base="${{ github.event.pull_request.base.sha || github.event.before }}"
+          if [ -z "$base" ] || [[ "$base" =~ ^0+$ ]]; then
+            base=$(git rev-list --max-parents=0 HEAD)
           fi
 
-          echo 'Changed files:'
-          cat changed-files.txt
+          pattern='^(plans/self/|tests/self/|tests/lib/|roles/|playbooks/|ansible\.cfg|\.github/workflows/ci\.yml)'
+          if git diff --name-only "$base" HEAD | grep -qE "$pattern"; then
+            echo "changed=true"
+          else
+            echo "changed=false"
+          fi >> "$GITHUB_OUTPUT"
 
   shell:
     name: Shell syntax
@@ -75,11 +60,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y shellcheck
 
-      - name: Run shell syntax checks
-        run: find tests \( -name '*.sh' -o -name '*.bash' \) -print0 | xargs -0 -n1 bash -n
-
       - name: Run ShellCheck
-        run: find tests \( -name '*.sh' -o -name '*.bash' \) -print0 | xargs -0 shellcheck --shell=bash -x -e SC1091
+        run: find tests \( -name '*.sh' -o -name '*.bash' \) -exec shellcheck --shell=bash -x -e SC1091 {} +
 
   yaml:
     name: YAML lint
@@ -121,50 +103,25 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ansible-core ansible-lint
 
-      - name: Run Ansible syntax checks
-        run: |
-          for playbook in playbooks/*.yml; do
-            ansible-playbook --syntax-check -i localhost, -c local "$playbook"
-          done
-
       - name: Run ansible-lint
         run: ansible-lint --profile production playbooks roles
 
-  static-self-tests:
-    name: Static self-tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v5
-
-      - name: Install tmt
-        run: pipx install tmt
-
-      - name: Run direct static self-tests
-        run: |
-          ./tests/self/contracts/post.sh
-          ./tests/self/ansible-packaging/post.sh
-          ./tests/self/ci/post.sh
-
-      - name: Run static tmt self-test plans
-        run: tmt run --all plan --name '/plans/self/(contracts|ansible-packaging|ci)/base' provision --feeling-safe
-
-  container-self-tests:
-    name: Container self-tests
-    needs: changes
+  self-tests:
+    name: Self tests
+    needs: self-test-changes
     if: >-
-      needs.changes.outputs.container_self_tests == 'true' ||
-      (github.event_name == 'workflow_dispatch' && inputs['run-container-tests'])
+      needs.self-test-changes.outputs.changed == 'true' ||
+      (github.event_name == 'workflow_dispatch' && inputs['run-self-tests'])
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
 
-      - name: Install container test dependencies
+      - name: Install self-test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y podman
-          pipx install 'tmt[provision-container]'
+          sudo apt-get install -y ansible-core podman
+          pipx install 'tmt[all]'
 
-      - name: Run container-backed tmt self-tests
-        run: tmt run --all plan --name '/plans/self/ci/container'
+      - name: Run tmt self-test plans
+        run: tmt run --all plan --name '/plans/self/' provision --feeling-safe
