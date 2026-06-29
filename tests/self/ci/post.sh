@@ -50,7 +50,7 @@ assert_not_contains "$ci" 'run-container-tests:'
 assert_not_contains "$ci" 'container-plan:'
 assert_contains "$ci" "inputs['run-self-tests']"
 assert_contains "$ci" "tmt plan ls --filter 'enabled:true'"
-assert_contains "$ci" "fromJson(needs.self-test-changes.outputs.plans)"
+assert_contains "$self_tests" "fromJson(inputs.plans)"
 assert_contains "$ci" "self-tests.yml"
 
 assert_contains "$self_tests" 'actions/checkout@v5'
