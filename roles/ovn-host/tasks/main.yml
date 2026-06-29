@@ -84,7 +84,7 @@
 
 - name: Wait for ovn-controller to connect to SB database
   ansible.builtin.command:
-    cmd: ovs-appctl -t ovn-controller connection-status
+    cmd: ovn-appctl -t ovn-controller connection-status
   retries: 10
   delay: 2
   register: controller_connected
