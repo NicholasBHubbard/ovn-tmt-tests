@@ -29,7 +29,12 @@ jobs:
           pipx install 'tmt[provision-container]'
 
       # Workaround for teemtee/tmt#5012: podman unshare strips PATH
+      - name: Configure ansible podman path
+        run: |
+          sudo mkdir -p /etc/ansible
+          printf '[podman_connection]\nexecutable = /usr/bin/podman\n' | sudo tee -a /etc/ansible/ansible.cfg
+
       - name: Run tmt self-test plan
         run: >-
-          sudo env PATH="$PATH" ANSIBLE_PODMAN_EXECUTABLE=/usr/bin/podman
+          sudo env PATH="$PATH"
           tmt run --all plan --name '/plans/self/${{ matrix.plan }}' provision --feeling-safe
