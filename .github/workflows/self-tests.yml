@@ -25,8 +25,8 @@ jobs:
       - name: Install self-test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ansible-core podman qemu-kvm libvirt-daemon-system libvirt-dev pkg-config genisoimage
-          pipx install 'tmt[provision-container,provision-virtual]'
+          sudo apt-get install -y podman qemu-kvm libvirt-daemon-system libvirt-dev pkg-config genisoimage
+          pipx install ansible-core 'tmt[provision-container,provision-virtual]'
 
       - name: Run tmt self-test plan
         run: >-

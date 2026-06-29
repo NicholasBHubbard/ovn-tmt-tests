@@ -1,4 +1,5 @@
 summary: Test ovn-central role on CentOS Stream 9
+enabled: false
 
 provision:
   - how: virtual

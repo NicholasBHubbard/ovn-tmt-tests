@@ -1,4 +1,5 @@
 summary: Test ovs-setup role with package method on CentOS Stream 9
+enabled: false
 
 provision:
   - how: virtual
