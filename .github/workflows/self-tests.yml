@@ -30,4 +30,5 @@ jobs:
 
       - name: Run tmt self-test plan
         run: >-
-          sudo env PATH="$PATH" tmt run --all plan --name '/plans/self/${{ matrix.plan }}' provision --feeling-safe
+          sudo env PATH="$PATH" ANSIBLE_PODMAN_EXECUTABLE=/usr/bin/podman
+          tmt run --all plan --name '/plans/self/${{ matrix.plan }}' provision --feeling-safe
