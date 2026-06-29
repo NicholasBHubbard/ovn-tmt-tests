@@ -8,14 +8,17 @@ provision:
     role: central
     how: virtual
     image: fedora
+    connection: system
   - name: compute-1
     role: compute
     how: virtual
     image: fedora
+    connection: system
   - name: compute-2
     role: compute
     how: virtual
     image: fedora
+    connection: system
 
 prepare:
   - name: Export central IP
