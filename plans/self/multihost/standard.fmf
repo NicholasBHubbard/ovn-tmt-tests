@@ -18,11 +18,11 @@ provision:
     image: fedora
 
 prepare:
-  - name: Export central hostname
+  - name: Export central IP
     how: shell
+    where: [central]
     script: |
-      source "$TMT_TOPOLOGY_BASH"
-      echo "CENTRAL_HOSTNAME=${TMT_GUESTS[central.hostname]}" >> "$TMT_PLAN_ENVIRONMENT_FILE"
+      echo "CENTRAL_HOSTNAME=$(hostname -I | awk '{print $1}')" >> "$TMT_PLAN_ENVIRONMENT_FILE"
 
   - name: Check central preconditions
     how: shell
