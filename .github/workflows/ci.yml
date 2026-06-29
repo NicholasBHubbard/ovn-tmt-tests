@@ -22,11 +22,15 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       changed: ${{ steps.self_test_changes.outputs.changed }}
+      plans: ${{ steps.discover.outputs.plans }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
+
+      - name: Install tmt
+        run: pipx install tmt
 
       - name: Check for self-test changes
         id: self_test_changes
@@ -47,6 +51,12 @@ jobs:
           else
             echo "changed=false"
           fi >> "$GITHUB_OUTPUT"
+
+      - name: Discover self-test plans
+        id: discover
+        run: |
+          plans=$(tmt plan ls --filter 'enabled:true' | grep '/plans/self/' | jq -Rc . | jq -sc .)
+          echo "plans=$plans" >> "$GITHUB_OUTPUT"
 
   shell:
     name: Shell syntax
@@ -107,12 +117,16 @@ jobs:
         run: ansible-lint --strict --profile production playbooks roles
 
   self-tests:
-    name: Self tests
+    name: Self test ${{ matrix.plan }}
     needs: self-test-changes
     if: >-
       needs.self-test-changes.outputs.changed == 'true' ||
       (github.event_name == 'workflow_dispatch' && inputs['run-self-tests'])
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        plan: ${{ fromJson(needs.self-test-changes.outputs.plans) }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
@@ -123,5 +137,6 @@ jobs:
           sudo apt-get install -y ansible-core podman
           pipx install 'tmt[provision-container]'
 
-      - name: Run tmt self-test plans
-        run: tmt run --all plan --name '/plans/self/' provision --feeling-safe
+      - name: Run tmt self-test plan
+        run: >-
+          tmt run --all plan --name '${{ matrix.plan }}' provision --feeling-safe

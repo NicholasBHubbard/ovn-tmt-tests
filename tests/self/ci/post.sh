@@ -49,7 +49,11 @@ assert_contains "$workflow" "inputs['run-self-tests']"
 assert_contains "$workflow" 'ansible-core'
 assert_contains "$workflow" 'podman'
 assert_contains "$workflow" "pipx install 'tmt[provision-container]'"
-assert_contains "$workflow" "tmt run --all plan --name '/plans/self/' provision --feeling-safe"
+assert_contains "$workflow" "tmt plan ls --filter 'enabled:true'"
+assert_contains "$workflow" "fromJson(needs.self-test-changes.outputs.plans)"
+assert_contains "$workflow" "fail-fast: false"
+assert_contains "$workflow" "tmt run --all plan --name"
+assert_contains "$workflow" "provision --feeling-safe"
 
 assert_contains plans/self/ci/container.fmf 'how: container'
 assert_contains plans/self/ci/container.fmf 'image: fedora:latest'
