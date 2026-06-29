@@ -26,11 +26,11 @@ assert_contains "$workflow" "*.sh"
 assert_contains "$workflow" "*.bash"
 assert_not_contains "$workflow" 'bash -n'
 assert_contains "$workflow" 'sudo apt-get install -y shellcheck'
-assert_contains "$workflow" 'shellcheck --shell=bash -x -e SC1091'
+assert_contains "$workflow" 'shellcheck --severity=warning --shell=bash -x -e SC1091'
 assert_contains "$workflow" '*.bash'
 
 assert_contains "$workflow" 'apt-get install -y yamllint'
-assert_contains "$workflow" 'yamllint'
+assert_contains "$workflow" 'yamllint --strict'
 assert_file .yamllint
 
 assert_contains "$workflow" 'pipx install tmt'
@@ -38,7 +38,7 @@ assert_contains "$workflow" 'tmt lint plans tests'
 
 assert_contains "$workflow" 'pipx install ansible-lint'
 assert_not_contains "$workflow" 'ansible-playbook --syntax-check'
-assert_contains "$workflow" 'ansible-lint --profile production playbooks roles'
+assert_contains "$workflow" 'ansible-lint --strict --profile production playbooks roles'
 assert_not_contains "$workflow" 'ansible-lint --profile min'
 
 assert_contains "$workflow" 'run-self-tests:'
