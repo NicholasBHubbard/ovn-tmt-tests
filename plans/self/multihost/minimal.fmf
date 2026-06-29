@@ -14,6 +14,12 @@ provision:
     image: fedora
 
 prepare:
+  - name: Export central hostname
+    how: shell
+    script: |
+      source "$TMT_TOPOLOGY_BASH"
+      echo "CENTRAL_HOSTNAME=${TMT_GUESTS[central.hostname]}" >> "$TMT_PLAN_ENVIRONMENT_FILE"
+
   - name: Check central preconditions
     how: shell
     where: [central]

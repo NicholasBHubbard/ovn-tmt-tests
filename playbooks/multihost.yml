@@ -1,9 +1,3 @@
-- name: Gather facts from all hosts
-  hosts: all
-  become: true
-  gather_facts: true
-  tasks: []
-
 - name: Set up OVN central
   hosts: central
   become: true
@@ -20,4 +14,4 @@
     - ovs-setup
     - ovn-host
   vars:
-    ovn_remote: "tcp:{{ hostvars[groups['central'][0]]['ansible_default_ipv4']['address'] }}:6642"
+    ovn_remote: "tcp:{{ lookup('env', 'CENTRAL_HOSTNAME') }}:6642"
