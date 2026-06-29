@@ -45,12 +45,13 @@ assert_contains "$workflow" './tests/self/ci/post.sh'
 assert_contains "$workflow" "tmt run --all plan --name '/plans/self/(contracts|ansible-packaging|ci)/base' provision --feeling-safe"
 
 assert_contains "$workflow" 'run-container-tests:'
-assert_contains "$workflow" 'container-plan:'
+assert_not_contains "$workflow" 'container-plan:'
 assert_contains "$workflow" "inputs['run-container-tests']"
-assert_contains "$workflow" "inputs['container-plan']"
+assert_not_contains "$workflow" "inputs['container-plan']"
 assert_contains "$workflow" 'sudo apt-get install -y podman'
 assert_contains "$workflow" "pipx install 'tmt[provision-container]'"
-assert_contains "$workflow" "tmt run --all plan --name \"\$TMT_PLAN\""
+assert_not_contains "$workflow" 'TMT_PLAN'
+assert_contains "$workflow" "tmt run --all plan --name '/plans/self/ci/container'"
 
 assert_contains plans/self/ci/container.fmf 'how: container'
 assert_contains plans/self/ci/container.fmf 'image: fedora:latest'

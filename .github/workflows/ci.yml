@@ -12,11 +12,6 @@ on:
         required: false
         default: false
         type: boolean
-      container-plan:
-        description: tmt plan regex for manual container-backed runs
-        required: false
-        default: /plans/self/ci/container
-        type: string
 
 permissions:
   contents: read
@@ -172,9 +167,4 @@ jobs:
           pipx install 'tmt[provision-container]'
 
       - name: Run container-backed tmt self-tests
-        env:
-          TMT_PLAN: >-
-            ${{ github.event_name == 'workflow_dispatch'
-            && inputs['container-plan']
-            || '/plans/self/ci/container' }}
-        run: tmt run --all plan --name "$TMT_PLAN"
+        run: tmt run --all plan --name '/plans/self/ci/container'
