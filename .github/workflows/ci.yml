@@ -118,7 +118,7 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: '3.14'
-          cache: pip
+          # no pip cache — this project has no requirements.txt
 
       - name: Install yamllint
         run: |
@@ -141,7 +141,7 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: '3.14'
-          cache: pip
+          # no pip cache — this project has no requirements.txt
 
       - name: Install tmt
         run: |
@@ -164,7 +164,7 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: '3.14'
-          cache: pip
+          # no pip cache — this project has no requirements.txt
 
       - name: Install Ansible tooling
         run: |
@@ -193,7 +193,7 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: '3.14'
-          cache: pip
+          # no pip cache — this project has no requirements.txt
 
       - name: Install tmt
         run: |
@@ -224,7 +224,7 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: '3.14'
-          cache: pip
+          # no pip cache — this project has no requirements.txt
 
       - name: Install container test dependencies
         run: |
