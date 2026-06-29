@@ -1,11 +1,11 @@
 - name: Gather service facts
-  when: ansible_service_mgr == 'systemd'
+  when: ansible_facts["service_mgr"] == 'systemd'
   ansible.builtin.service_facts:
 
 - name: Set openvswitch service availability
   ansible.builtin.set_fact:
     ovs_has_systemd_service: >-
-      {{ ansible_service_mgr == 'systemd'
+      {{ ansible_facts["service_mgr"] == 'systemd'
          and 'openvswitch.service' in (ansible_facts.services | default({})) }}
 
 - name: Start openvswitch via systemd

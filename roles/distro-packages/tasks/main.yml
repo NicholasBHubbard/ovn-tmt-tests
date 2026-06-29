@@ -1,12 +1,12 @@
 - name: Verify supported package manager
   ansible.builtin.assert:
     that:
-      - ansible_pkg_mgr == "apt" or ansible_pkg_mgr in ["dnf", "dnf5", "yum"]
+      - ansible_facts["pkg_mgr"] == "apt" or ansible_facts["pkg_mgr"] in ["dnf", "dnf5", "yum"]
     fail_msg: "Only apt and dnf-compatible package managers are supported."
 
 - name: Set package manager family
   ansible.builtin.set_fact:
-    distro_package_manager_family: "{{ 'apt' if ansible_pkg_mgr == 'apt' else 'dnf' }}"
+    distro_package_manager_family: "{{ 'apt' if ansible_facts['pkg_mgr'] == 'apt' else 'dnf' }}"
 
 - name: Select repository packages for package manager
   ansible.builtin.set_fact:
@@ -34,7 +34,7 @@
 
 - name: Install repository packages (dnf)
   when:
-    - ansible_pkg_mgr in ["dnf", "dnf5", "yum"]
+    - ansible_facts["pkg_mgr"] in ["dnf", "dnf5", "yum"]
     - distro_selected_repository_package_names | length > 0
   ansible.builtin.dnf:
     name: "{{ distro_selected_repository_package_names }}"
@@ -42,7 +42,7 @@
 
 - name: Install repository packages (apt)
   when:
-    - ansible_pkg_mgr == "apt"
+    - ansible_facts["pkg_mgr"] == "apt"
     - distro_selected_repository_package_names | length > 0
   ansible.builtin.apt:
     name: "{{ distro_selected_repository_package_names }}"
@@ -50,13 +50,13 @@
     update_cache: "{{ distro_package_update_cache }}"
 
 - name: Install packages (dnf)
-  when: ansible_pkg_mgr in ["dnf", "dnf5", "yum"]
+  when: ansible_facts["pkg_mgr"] in ["dnf", "dnf5", "yum"]
   ansible.builtin.dnf:
     name: "{{ distro_selected_package_names }}"
     state: "{{ distro_package_state }}"
 
 - name: Install packages (apt)
-  when: ansible_pkg_mgr == "apt"
+  when: ansible_facts["pkg_mgr"] == "apt"
   ansible.builtin.apt:
     name: "{{ distro_selected_package_names }}"
     state: "{{ distro_package_state }}"

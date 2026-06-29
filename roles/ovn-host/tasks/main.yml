@@ -47,7 +47,7 @@
 # --- Start ovn-controller ---
 
 - name: Find ovn-ctl script
-  when: ansible_service_mgr != 'systemd'
+  when: ansible_facts["service_mgr"] != 'systemd'
   ansible.builtin.find:
     paths: /usr
     patterns: ovn-ctl
@@ -56,26 +56,26 @@
   register: ovn_ctl_find
 
 - name: Select ovn-ctl script
-  when: ansible_service_mgr != 'systemd'
+  when: ansible_facts["service_mgr"] != 'systemd'
   ansible.builtin.set_fact:
     ovn_ctl_path: "{{ (ovn_ctl_find.files | map(attribute='path') | list | first) | default('') }}"
 
 - name: Verify ovn-ctl script exists
-  when: ansible_service_mgr != 'systemd'
+  when: ansible_facts["service_mgr"] != 'systemd'
   ansible.builtin.assert:
     that:
       - ovn_ctl_path | length > 0
     fail_msg: "Could not find ovn-ctl under /usr."
 
 - name: Start ovn-controller via systemd
-  when: ansible_service_mgr == 'systemd'
+  when: ansible_facts["service_mgr"] == 'systemd'
   ansible.builtin.service:
     name: ovn-controller
     state: started
     enabled: true
 
 - name: Start ovn-controller via ovn-ctl
-  when: ansible_service_mgr != 'systemd'
+  when: ansible_facts["service_mgr"] != 'systemd'
   ansible.builtin.command:
     cmd: "{{ ovn_ctl_path }} start_controller"
   changed_when: true

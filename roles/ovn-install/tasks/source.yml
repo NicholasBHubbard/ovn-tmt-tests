@@ -32,7 +32,7 @@
 
 - name: Build OVS submodule
   ansible.builtin.command:
-    cmd: make -j{{ ansible_processor_vcpus }}
+    cmd: make -j{{ ansible_facts["processor_vcpus"] }}
     chdir: "{{ ovn_source_dir }}/ovs"
   changed_when: true
 
@@ -56,7 +56,7 @@
 
 - name: Build OVN
   ansible.builtin.command:
-    cmd: make -j{{ ansible_processor_vcpus }}
+    cmd: make -j{{ ansible_facts["processor_vcpus"] }}
     chdir: "{{ ovn_source_dir }}"
   changed_when: true
 

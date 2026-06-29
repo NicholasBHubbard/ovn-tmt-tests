@@ -8,8 +8,8 @@ assert_file roles/distro-packages/defaults/main.yml
 assert_file roles/distro-packages/tasks/main.yml
 
 assert_contains roles/distro-packages/tasks/main.yml 'distro_package_names'
-assert_contains roles/distro-packages/tasks/main.yml 'ansible_pkg_mgr == "apt"'
-assert_contains roles/distro-packages/tasks/main.yml 'ansible_pkg_mgr in ["dnf", "dnf5", "yum"]'
+assert_contains roles/distro-packages/tasks/main.yml 'ansible_facts["pkg_mgr"] == "apt"'
+assert_contains roles/distro-packages/tasks/main.yml 'ansible_facts["pkg_mgr"] in ["dnf", "dnf5", "yum"]'
 
 assert_contains roles/ovn-install/defaults/main.yml 'ovn_distro_package_names'
 assert_contains roles/ovn-install/defaults/main.yml 'ovn_distro_repository_package_names'

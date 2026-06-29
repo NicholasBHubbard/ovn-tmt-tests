@@ -1,7 +1,7 @@
 ovn_remote: "tcp:127.0.0.1:6642"
 ovn_encap_type: geneve
-ovn_encap_ip: "{{ ansible_default_ipv4.address }}"
-ovn_chassis_name: "{{ ansible_hostname }}"
+ovn_encap_ip: "{{ ansible_facts['default_ipv4']['address'] }}"
+ovn_chassis_name: "{{ ansible_facts['hostname'] }}"
 ovn_bridge_mappings: ""
 ovn_bridges:
   - br-int
