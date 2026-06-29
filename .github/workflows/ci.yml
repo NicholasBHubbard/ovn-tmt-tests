@@ -119,7 +119,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ansible-core podman
-          pipx install 'tmt[all]'
+          pipx install 'tmt[provision-container]'
 
       - name: Run tmt self-test plans
         run: tmt run --all plan --name '/plans/self/' provision --feeling-safe

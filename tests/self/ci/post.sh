@@ -48,7 +48,7 @@ assert_not_contains "$workflow" 'container-plan:'
 assert_contains "$workflow" "inputs['run-self-tests']"
 assert_contains "$workflow" 'ansible-core'
 assert_contains "$workflow" 'podman'
-assert_contains "$workflow" "pipx install 'tmt[all]'"
+assert_contains "$workflow" "pipx install 'tmt[provision-container]'"
 assert_contains "$workflow" "tmt run --all plan --name '/plans/self/' provision --feeling-safe"
 
 assert_contains plans/self/ci/container.fmf 'how: container'
