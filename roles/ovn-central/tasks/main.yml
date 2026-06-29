@@ -1,11 +1,3 @@
-- name: Install OVN central packages
-  when: ovn_central_install_packages
-  ansible.builtin.include_role:
-    name: distro-packages
-  vars:
-    distro_package_names: "{{ ovn_central_package_names }}"
-    distro_repository_package_names: "{{ ovn_central_repository_package_names }}"
-
 - name: Verify OVN binaries are installed
   ansible.builtin.command:
     cmd: which ovn-northd

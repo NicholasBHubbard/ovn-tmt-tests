@@ -1,4 +1,4 @@
-ovs_install_method: package  # package, source, or git
+ovs_install_method: "{{ install_method | default('package') }}"
 ovs_package_names:
   dnf:
     - openvswitch

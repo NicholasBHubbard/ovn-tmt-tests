@@ -1,14 +1,26 @@
 - name: Install OVS from distro packages
-  when: ovs_install_method == "package"
+  when:
+    - ovs_install_method == "package"
+    - not (ovs_installed | default(false))
   ansible.builtin.include_tasks: package.yml
 
 - name: Install OVS from source
-  when: ovs_install_method == "source"
+  when:
+    - ovs_install_method == "source"
+    - not (ovs_installed | default(false))
   ansible.builtin.include_tasks: source.yml
 
 - name: Install OVS from git
-  when: ovs_install_method == "git"
+  when:
+    - ovs_install_method == "git"
+    - not (ovs_installed | default(false))
   ansible.builtin.include_tasks: git.yml
 
+- name: Mark OVS as installed
+  when: not (ovs_installed | default(false))
+  ansible.builtin.set_fact:
+    ovs_installed: true
+
 - name: Configure OVS
+  when: not (ovs_configured | default(false))
   ansible.builtin.include_tasks: configure.yml

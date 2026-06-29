@@ -1,4 +1,4 @@
-ovn_install_method: source  # source, git, distro, or package
+ovn_install_method: "{{ install_method | default('package') }}"
 
 # source: build from local source directory
 ovn_source_dir: /usr/src/ovn

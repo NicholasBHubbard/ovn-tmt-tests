@@ -1,13 +1,3 @@
-ovn_central_install_packages: true
-ovn_central_package_names:
-  dnf:
-    - ovn-central
-  apt:
-    - ovn-central
-ovn_central_repository_package_names:
-  dnf: []
-  apt: []
-
 ovn_nb_port: 6641
 ovn_sb_port: 6642
 ovn_cluster_members: []

@@ -8,14 +8,14 @@
   hosts: central
   become: true
   roles:
-    - ovs-setup
+    - ovn-install
     - ovn-central
 
 - name: Set up OVN host on compute nodes
   hosts: compute
   become: true
   roles:
-    - ovs-setup
+    - ovn-install
     - ovn-host
   vars:
     ovn_remote: "tcp:{{ hostvars[groups['central'][0]]['ansible_default_ipv4']['address'] }}:6642"

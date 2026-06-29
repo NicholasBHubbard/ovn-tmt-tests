@@ -1,15 +1,38 @@
+- name: Ensure OVS is installed (package method prerequisite)
+  when: ovn_install_method == "package"
+  ansible.builtin.include_role:
+    name: ovs-setup
+
 - name: Install OVN from source
-  when: ovn_install_method == "source"
+  when:
+    - ovn_install_method == "source"
+    - not (ovn_installed | default(false))
   ansible.builtin.include_tasks: source.yml
 
 - name: Install OVN from git
-  when: ovn_install_method == "git"
+  when:
+    - ovn_install_method == "git"
+    - not (ovn_installed | default(false))
   ansible.builtin.include_tasks: git.yml
 
 - name: Install OVN from distro repos
-  when: ovn_install_method == "distro"
+  when:
+    - ovn_install_method == "distro"
+    - not (ovn_installed | default(false))
   ansible.builtin.include_tasks: distro.yml
 
 - name: Install OVN from package files
-  when: ovn_install_method == "package"
+  when:
+    - ovn_install_method == "package"
+    - not (ovn_installed | default(false))
   ansible.builtin.include_tasks: package.yml
+
+- name: Mark OVN as installed
+  when: not (ovn_installed | default(false))
+  ansible.builtin.set_fact:
+    ovn_installed: true
+
+- name: Ensure OVS is configured and running
+  when: ovn_install_method != "package"
+  ansible.builtin.include_role:
+    name: ovs-setup

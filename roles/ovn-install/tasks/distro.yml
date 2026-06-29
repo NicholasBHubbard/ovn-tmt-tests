@@ -5,3 +5,7 @@
     distro_package_names: "{{ ovn_distro_package_names }}"
     distro_repository_package_names: "{{ ovn_distro_repository_package_names }}"
     distro_package_state: "{{ 'latest' if ovn_distro_version == 'latest' else 'present' }}"
+
+- name: Mark OVS as installed (included in OVN distro packages)
+  ansible.builtin.set_fact:
+    ovs_installed: true

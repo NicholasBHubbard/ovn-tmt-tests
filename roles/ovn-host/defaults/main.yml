@@ -1,13 +1,3 @@
-ovn_host_install_packages: true
-ovn_host_package_names:
-  dnf:
-    - ovn-host
-  apt:
-    - ovn-host
-ovn_host_repository_package_names:
-  dnf: []
-  apt: []
-
 ovn_remote: "tcp:127.0.0.1:6642"
 ovn_encap_type: geneve
 ovn_encap_ip: "{{ ansible_default_ipv4.address }}"
