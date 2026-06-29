@@ -36,7 +36,7 @@ assert_file .yamllint
 assert_contains "$workflow" 'pipx install tmt'
 assert_contains "$workflow" 'tmt lint plans tests'
 
-assert_contains "$workflow" 'apt-get install -y ansible-core ansible-lint'
+assert_contains "$workflow" 'pipx install ansible-lint'
 assert_not_contains "$workflow" 'ansible-playbook --syntax-check'
 assert_contains "$workflow" 'ansible-lint --profile production playbooks roles'
 assert_not_contains "$workflow" 'ansible-lint --profile min'
