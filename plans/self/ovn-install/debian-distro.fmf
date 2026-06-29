@@ -1,13 +1,10 @@
 summary: Test ovn-install role with distro method on Debian
 
 provision:
-  - how: container
-    image: debian:latest
+  - how: virtual
+    image: debian
 
 prepare:
-  - how: install
-    package:
-      - sudo
   - how: shell
     script: ./tests/self/ovn-install/pre.sh
   - how: ansible

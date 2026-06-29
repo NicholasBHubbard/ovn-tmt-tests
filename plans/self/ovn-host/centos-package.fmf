@@ -1,8 +1,8 @@
 summary: Test ovn-host role on CentOS Stream 9
 
 provision:
-  - how: container
-    image: quay.io/centos/centos:stream9
+  - how: virtual
+    image: centos-stream-9
 
 prepare:
   - name: Set up OVN central

@@ -6,16 +6,16 @@ environment:
 provision:
   - name: central
     role: central
-    how: container
-    image: fedora:latest
+    how: virtual
+    image: fedora
   - name: compute-1
     role: compute
-    how: container
-    image: fedora:latest
+    how: virtual
+    image: fedora
   - name: compute-2
     role: compute
-    how: container
-    image: fedora:latest
+    how: virtual
+    image: fedora
 
 prepare:
   - name: Check central preconditions

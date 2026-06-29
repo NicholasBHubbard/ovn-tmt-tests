@@ -25,12 +25,10 @@ jobs:
       - name: Install self-test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ansible-core podman
-          pipx install 'tmt[provision-container]'
+          sudo apt-get install -y ansible-core podman qemu-kvm libvirt-daemon-system
+          pipx install 'tmt[provision-container,provision-virtual]'
 
-      # Workaround for teemtee/tmt#5012: podman unshare strips PATH
       - name: Run tmt self-test plan
         run: >-
           sudo env PATH="$PATH"
-          tmt run --environment ANSIBLE_PODMAN_EXECUTABLE=/usr/bin/podman
-          --all plan --name '/plans/self/${{ matrix.plan }}' provision --feeling-safe
+          tmt run --all plan --name '/plans/self/${{ matrix.plan }}' provision --feeling-safe

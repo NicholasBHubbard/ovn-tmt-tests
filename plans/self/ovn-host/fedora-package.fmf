@@ -1,8 +1,8 @@
 summary: Test ovn-host role on Fedora
 
 provision:
-  - how: container
-    image: fedora:latest
+  - how: virtual
+    image: fedora
 
 prepare:
   - name: Set up OVN central

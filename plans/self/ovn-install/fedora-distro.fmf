@@ -1,8 +1,8 @@
 summary: Test ovn-install role with distro method on Fedora
 
 provision:
-  - how: container
-    image: fedora:latest
+  - how: virtual
+    image: fedora
 
 prepare:
   - how: shell

@@ -1,8 +1,8 @@
 summary: Test ovs-setup role with git method on Fedora
 
 provision:
-  - how: container
-    image: fedora:latest
+  - how: virtual
+    image: fedora
 
 prepare:
   - how: shell

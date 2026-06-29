@@ -1,8 +1,8 @@
 summary: Test ovn-central role on Fedora
 
 provision:
-  - how: container
-    image: fedora:latest
+  - how: virtual
+    image: fedora
 
 prepare:
   - how: shell
