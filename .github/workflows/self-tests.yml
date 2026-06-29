@@ -31,5 +31,5 @@ jobs:
 
       - name: Run tmt self-test plan
         run: >-
-          sudo env PATH="$PATH"
+          sudo env PATH="$PATH" ANSIBLE_VERBOSITY=2
           tmt run --all plan --name '/plans/self/${{ matrix.plan }}' provision --feeling-safe

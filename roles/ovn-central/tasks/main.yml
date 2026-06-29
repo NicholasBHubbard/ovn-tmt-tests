@@ -141,13 +141,13 @@
 - name: Configure NB TCP listener
   when: not ovn_ssl_enabled
   ansible.builtin.command:
-    cmd: "ovn-nbctl set-connection ptcp:{{ ovn_nb_port }}"
+    cmd: "ovn-nbctl set-connection ptcp:{{ ovn_nb_port }}:0.0.0.0"
   changed_when: true
 
 - name: Configure SB TCP listener
   when: not ovn_ssl_enabled
   ansible.builtin.command:
-    cmd: "ovn-sbctl set-connection ptcp:{{ ovn_sb_port }}"
+    cmd: "ovn-sbctl set-connection ptcp:{{ ovn_sb_port }}:0.0.0.0"
   changed_when: true
 
 # --- TLS configuration ---
@@ -167,11 +167,11 @@
 - name: Configure NB SSL listener
   when: ovn_ssl_enabled
   ansible.builtin.command:
-    cmd: "ovn-nbctl set-connection pssl:{{ ovn_nb_port }}"
+    cmd: "ovn-nbctl set-connection pssl:{{ ovn_nb_port }}:0.0.0.0"
   changed_when: true
 
 - name: Configure SB SSL listener
   when: ovn_ssl_enabled
   ansible.builtin.command:
-    cmd: "ovn-sbctl set-connection pssl:{{ ovn_sb_port }}"
+    cmd: "ovn-sbctl set-connection pssl:{{ ovn_sb_port }}:0.0.0.0"
   changed_when: true
