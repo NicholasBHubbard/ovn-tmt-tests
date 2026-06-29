@@ -22,9 +22,12 @@ assert_contains "$workflow" "if: needs.changes.outputs.tmt == 'true'"
 assert_contains "$workflow" "if: needs.changes.outputs.ansible == 'true'"
 assert_contains "$workflow" "if: needs.changes.outputs.static_self_tests == 'true'"
 assert_contains "$workflow" "needs.changes.outputs.container_self_tests == 'true'"
+assert_contains "$workflow" "\\( -name '*.sh' -o -name '*.bash' \\)"
 assert_contains "$workflow" 'bash -n'
 assert_contains "$workflow" 'sudo apt-get install -y shellcheck'
 assert_contains "$workflow" 'shellcheck --shell=bash -x -e SC1091'
+assert_not_contains "$workflow" ")$'"
+assert_contains "$workflow" '*.bash'
 assert_contains "$workflow" 'tmt lint plans tests'
 assert_contains "$workflow" 'ansible-playbook --syntax-check'
 assert_contains "$workflow" 'ansible-lint --profile production playbooks roles'

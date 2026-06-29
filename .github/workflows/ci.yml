@@ -73,11 +73,11 @@ jobs:
             fi
           }
 
-          changed shell '^(tests/.*\.sh|tests/lib/|\.github/workflows/ci\.yml)$'
-          changed tmt '^(\.fmf/|plans/|tests/.*\.fmf|tests/self/|tests/lib/|\.github/workflows/ci\.yml)$'
-          changed ansible '^(ansible\.cfg|playbooks/|roles/|\.github/workflows/ci\.yml)$'
-          changed static_self_tests '^(plans/self/(contracts|ansible-packaging|ci)/|tests/self/(contracts|ansible-packaging|ci)/|tests/lib/|\.github/workflows/ci\.yml)$'
-          changed container_self_tests '^(plans/self/ci/|tests/self/ci/|tests/lib/|\.github/workflows/ci\.yml)$'
+          changed shell '^(tests/.*\.(sh|bash)|tests/lib/|\.github/workflows/ci\.yml)'
+          changed tmt '^(\.fmf/|plans/|tests/.*\.fmf|tests/self/|tests/lib/|\.github/workflows/ci\.yml)'
+          changed ansible '^(ansible\.cfg|playbooks/|roles/|\.github/workflows/ci\.yml)'
+          changed static_self_tests '^(plans/self/(contracts|ansible-packaging|ci)/|tests/self/(contracts|ansible-packaging|ci)/|tests/lib/|\.github/workflows/ci\.yml)'
+          changed container_self_tests '^(plans/self/ci/|tests/self/ci/|tests/lib/|\.github/workflows/ci\.yml)'
 
           echo 'Changed files:'
           cat changed-files.txt
@@ -97,10 +97,10 @@ jobs:
           sudo apt-get install -y shellcheck
 
       - name: Run shell syntax checks
-        run: find tests -name '*.sh' -print0 | xargs -0 -n1 bash -n
+        run: find tests \( -name '*.sh' -o -name '*.bash' \) -print0 | xargs -0 -n1 bash -n
 
       - name: Run ShellCheck
-        run: find tests -name '*.sh' -print0 | xargs -0 shellcheck --shell=bash -x -e SC1091
+        run: find tests \( -name '*.sh' -o -name '*.bash' \) -print0 | xargs -0 shellcheck --shell=bash -x -e SC1091
 
   tmt-lint:
     name: tmt lint
