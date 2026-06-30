@@ -11,6 +11,7 @@ DISCLAIMER: This project is currently under development and is not ready for rea
 - Ansible collections:
   - [`ansible.posix`](https://docs.ansible.com/ansible/latest/collections/ansible/posix/)
   - [`community.general`](https://docs.ansible.com/ansible/latest/collections/community/general/)
+- Bash
 
 Install the collections with:
 
