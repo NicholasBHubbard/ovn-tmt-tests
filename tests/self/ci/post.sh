@@ -40,10 +40,12 @@ assert_file .yamllint
 assert_contains "$ci" 'pipx install tmt'
 assert_contains "$ci" 'tmt lint plans tests'
 
-assert_contains "$ci" 'pipx install ansible-lint'
+assert_contains "$ci" 'pip install ansible-lint'
+assert_not_contains "$ci" 'pipx install ansible-lint'
 assert_not_contains "$ci" 'ansible-playbook --syntax-check'
-assert_contains "$ci" 'ansible-lint --strict --profile production playbooks roles'
+assert_contains "$ci" 'ansible-lint --strict playbooks roles'
 assert_not_contains "$ci" 'ansible-lint --profile min'
+assert_file .ansible-lint
 
 assert_contains "$ci" 'run-self-tests:'
 assert_not_contains "$ci" 'run-provisioned-tests:'
@@ -56,6 +58,7 @@ assert_contains "$ci" "self-tests.yml"
 
 assert_contains "$self_tests" 'actions/checkout@v5'
 assert_contains "$self_tests" 'ansible-core'
+assert_contains "$self_tests" 'ansible-galaxy collection install ansible.posix'
 assert_contains "$self_tests" 'podman'
 assert_contains "$self_tests" "provision-container"
 assert_contains "$self_tests" "provision-virtual"
