@@ -19,7 +19,7 @@
 
 - name: Build OVS
   ansible.builtin.command:
-    cmd: make -j{{ ansible_facts["processor_vcpus"] }}
+    cmd: make -j{{ ansible_facts["processor_vcpus"] }} {{ ovs_make_flags }}
     chdir: "{{ ovs_source_dir }}"
   changed_when: true
 

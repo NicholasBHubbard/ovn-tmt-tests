@@ -3,6 +3,7 @@ ovn_install_method: "{{ install_method | default('distro') }}"
 # source: build from local source directory
 ovn_source_dir: /usr/src/ovn
 ovn_configure_flags: ""
+ovn_make_flags: ""
 ovn_build_dependency_package_names:
   dnf:
     - autoconf

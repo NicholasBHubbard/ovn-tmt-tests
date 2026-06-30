@@ -11,6 +11,7 @@ ovs_repository_package_names:
 # source: build from local source directory
 ovs_source_dir: /usr/src/ovs
 ovs_configure_flags: ""
+ovs_make_flags: ""
 ovs_build_dependency_package_names:
   dnf:
     - autoconf
