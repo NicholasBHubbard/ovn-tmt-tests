@@ -13,5 +13,6 @@ assert_command_present ovsdb-server
 
 echo "Checking OVS processes..."
 assert_process_present ovsdb-server
+assert_process_present ovs-vswitchd
 
 assert_finish

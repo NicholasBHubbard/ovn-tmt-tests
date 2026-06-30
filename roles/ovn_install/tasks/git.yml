@@ -3,6 +3,7 @@
     name: distro_packages
   vars:
     distro_package_names: "{{ ovn_git_package_names }}"
+    distro_repository_package_names: "{{ ovn_build_repository_package_names }}"
 
 - name: Clone OVN repository
   ansible.builtin.git:

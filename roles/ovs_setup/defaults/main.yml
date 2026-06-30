@@ -36,6 +36,7 @@ ovs_build_repository_package_names:
 # git: clone from repo, then build
 ovs_git_repo: https://github.com/openvswitch/ovs.git
 ovs_git_branch: main
+ovs_git_version: "{{ ovs_git_branch }}"
 ovs_git_package_names:
   dnf:
     - git

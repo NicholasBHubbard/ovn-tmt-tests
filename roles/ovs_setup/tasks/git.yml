@@ -3,12 +3,13 @@
     name: distro_packages
   vars:
     distro_package_names: "{{ ovs_git_package_names }}"
+    distro_repository_package_names: "{{ ovs_build_repository_package_names }}"
 
 - name: Clone OVS repository
   ansible.builtin.git:
     repo: "{{ ovs_git_repo }}"
     dest: "{{ ovs_source_dir }}"
-    version: "{{ ovs_git_branch }}"
+    version: "{{ ovs_git_version }}"
     depth: 1
     single_branch: true
 
