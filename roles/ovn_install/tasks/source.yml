@@ -1,6 +1,6 @@
 - name: Install build dependencies
   ansible.builtin.include_role:
-    name: distro-packages
+    name: distro_packages
   vars:
     distro_package_names: "{{ ovn_build_dependency_package_names }}"
     distro_repository_package_names: "{{ ovn_build_repository_package_names }}"

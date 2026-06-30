@@ -2,6 +2,6 @@
   hosts: all
   become: true
   roles:
-    - ovn-install
-    - ovs-setup
-    - ovn-central
+    - ovn_install
+    - ovs_setup
+    - ovn_central

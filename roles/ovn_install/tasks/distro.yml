@@ -1,6 +1,6 @@
 - name: Install OVS and OVN from distro repos
   ansible.builtin.include_role:
-    name: distro-packages
+    name: distro_packages
   vars:
     distro_package_names: "{{ ovn_distro_package_names }}"
     distro_repository_package_names: "{{ ovn_distro_repository_package_names }}"

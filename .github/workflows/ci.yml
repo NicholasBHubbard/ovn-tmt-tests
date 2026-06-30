@@ -112,7 +112,9 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Install Ansible tooling
-        run: pipx install ansible-lint
+        run: |
+          pipx install ansible-lint
+          ansible-galaxy collection install ansible.posix
 
       - name: Run ansible-lint
         run: ansible-lint --strict --profile production playbooks roles

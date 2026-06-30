@@ -1,6 +1,6 @@
 - name: Install OVS packages
   ansible.builtin.include_role:
-    name: distro-packages
+    name: distro_packages
   vars:
     distro_package_names: "{{ ovs_package_names }}"
     distro_repository_package_names: "{{ ovs_repository_package_names }}"

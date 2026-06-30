@@ -1,6 +1,6 @@
 - name: Install git
   ansible.builtin.include_role:
-    name: distro-packages
+    name: distro_packages
   vars:
     distro_package_names: "{{ ovn_git_package_names }}"
 
