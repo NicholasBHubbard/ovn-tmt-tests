@@ -2,7 +2,7 @@ summary: Test make_check role in a container
 
 provision:
   - how: container
-    image: fedora:latest
+    image: ubuntu:latest
 
 prepare:
   - how: shell
