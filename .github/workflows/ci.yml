@@ -111,8 +111,11 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v5
 
+      # The runner pre-installs ansible via pip. Remove it so apt
+      # provides a consistent ansible-core + ansible-lint pair.
       - name: Install Ansible tooling
         run: |
+          pip uninstall -y ansible-core
           sudo apt-get update
           sudo apt-get install -y ansible-lint
           ansible-galaxy collection install ansible.posix
