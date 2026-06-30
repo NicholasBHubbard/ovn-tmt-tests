@@ -14,7 +14,7 @@
       ansible.builtin.wait_for:
         host: "{{ hostvars[groups['central'][0]]['ansible_host'] }}"
         port: 6642
-        timeout: 120
+        timeout: 2700
   roles:
     - ovn_install
     - ovs_setup
