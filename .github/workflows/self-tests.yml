@@ -23,13 +23,10 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v5
 
-      # The runner pre-installs ansible via pip. Remove it so apt
-      # provides a consistent ansible-core version.
       - name: Install self-test dependencies
         run: |
-          pip uninstall -y ansible-core ansible
           sudo apt-get update
-          sudo apt-get install -y ansible-core podman qemu-system-x86 \
+          sudo apt-get install -y podman qemu-system-x86 \
             libvirt-daemon-system libvirt-dev pkg-config genisoimage
           ansible-galaxy collection install ansible.posix
           pipx install 'tmt[provision-container,provision-virtual]'
