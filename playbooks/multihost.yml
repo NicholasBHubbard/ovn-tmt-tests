@@ -9,6 +9,12 @@
 - name: Set up OVN host on compute nodes
   hosts: compute
   become: true
+  pre_tasks:
+    - name: Wait for SB database to be reachable on central
+      ansible.builtin.wait_for:
+        host: "{{ hostvars[groups['central'][0]]['ansible_host'] }}"
+        port: 6642
+        timeout: 120
   roles:
     - ovn_install
     - ovs_setup
