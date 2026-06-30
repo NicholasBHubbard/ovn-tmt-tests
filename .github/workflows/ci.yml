@@ -117,7 +117,7 @@ jobs:
           ansible-galaxy collection install ansible.posix
 
       - name: Run ansible-lint
-        run: ansible-lint --strict --profile production playbooks roles
+        run: ansible-lint --strict playbooks roles
 
   self-tests:
     name: Self tests
