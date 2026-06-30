@@ -1,0 +1,7 @@
+summary: OVN system tests with gcc (101-200)
+enabled: true
+
+environment+:
+    CC: gcc
+    TESTSUITE: system-test
+    TEST_RANGE: "101-200"

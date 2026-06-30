@@ -1,0 +1,23 @@
+summary: OVN upstream CI test suite
+enabled: false
+
+environment:
+    OVN_REPO: https://github.com/ovn-org/ovn.git
+    OVN_BRANCH: main
+
+provision:
+    how: virtual
+    image: fedora
+    memory: 4096
+
+prepare:
+    - how: shell
+      script: ./tests/ovn-ci/prepare.sh
+
+discover:
+    how: fmf
+    test:
+        - /tests/ovn-ci
+
+execute:
+    how: tmt

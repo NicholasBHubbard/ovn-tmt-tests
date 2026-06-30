@@ -9,6 +9,9 @@
     repo: "{{ ovn_git_repo }}"
     dest: "{{ ovn_source_dir }}"
     version: "{{ ovn_git_version }}"
+    depth: 1
+    single_branch: true
+    recursive: true
 
 - name: Build and install from cloned source
   ansible.builtin.include_tasks: source.yml

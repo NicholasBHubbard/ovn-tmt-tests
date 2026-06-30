@@ -9,6 +9,8 @@
     repo: "{{ ovs_git_repo }}"
     dest: "{{ ovs_source_dir }}"
     version: "{{ ovs_git_branch }}"
+    depth: 1
+    single_branch: true
 
 - name: Build and install from cloned source
   ansible.builtin.include_tasks: source.yml

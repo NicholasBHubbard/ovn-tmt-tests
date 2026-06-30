@@ -1,0 +1,6 @@
+summary: Compile OVN with clang (--disable-ssl)
+enabled: true
+
+environment+:
+    CC: clang
+    OPTS: --disable-ssl

@@ -5,19 +5,6 @@
     distro_package_names: "{{ ovn_build_dependency_package_names }}"
     distro_repository_package_names: "{{ ovn_build_repository_package_names }}"
 
-- name: Check if OVS submodule exists
-  ansible.builtin.stat:
-    path: "{{ ovn_source_dir }}/ovs/configure.ac"
-  register: ovs_submodule
-
-# The git module cannot initialize submodules inside an arbitrary existing checkout.
-- name: Initialize OVS submodule  # noqa command-instead-of-module
-  when: not ovs_submodule.stat.exists
-  ansible.builtin.command:
-    cmd: git submodule update --init
-    chdir: "{{ ovn_source_dir }}"
-  changed_when: true
-
 - name: Bootstrap OVS submodule
   ansible.builtin.command:
     cmd: ./boot.sh

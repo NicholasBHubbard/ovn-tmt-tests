@@ -1,0 +1,8 @@
+summary: OVN unit tests with clang+ASAN (501-1000)
+enabled: true
+
+environment+:
+    CC: clang
+    TESTSUITE: test
+    SANITIZERS: sanitizers
+    TEST_RANGE: "501-1000"

@@ -1,0 +1,6 @@
+summary: OVN unit tests with gcc
+enabled: true
+
+environment+:
+    CC: gcc
+    TESTSUITE: test
