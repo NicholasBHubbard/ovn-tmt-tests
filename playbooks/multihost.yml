@@ -13,11 +13,11 @@
     - name: Wait for SB database to be reachable on central
       ansible.builtin.wait_for:
         host: "{{ hostvars[groups['central'][0]]['ansible_host'] }}"
-        port: 6642
+        port: "{{ ovn_sb_port }}"
         timeout: 2700
   roles:
     - ovn_install
     - ovs_setup
     - ovn_host
   vars:
-    ovn_remote: "tcp:{{ hostvars[groups['central'][0]]['ansible_host'] }}:6642"
+    ovn_remote: "tcp:{{ hostvars[groups['central'][0]]['ansible_host'] }}:{{ ovn_sb_port }}"
