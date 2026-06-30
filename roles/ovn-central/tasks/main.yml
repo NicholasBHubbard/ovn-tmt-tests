@@ -136,6 +136,23 @@
   until: sb_ready.rc == 0
   changed_when: false
 
+# --- Open firewall ports ---
+
+- name: Gather service facts
+  ansible.builtin.service_facts:
+
+- name: Open OVN database ports in firewall
+  when:
+    - "'firewalld.service' in ansible_facts.services"
+    - "ansible_facts.services['firewalld.service'].state == 'running'"
+  ansible.posix.firewalld:
+    port: "{{ item }}/tcp"
+    state: enabled
+    immediate: true
+  loop:
+    - "{{ ovn_nb_port }}"
+    - "{{ ovn_sb_port }}"
+
 # --- Configure listeners ---
 
 - name: Configure NB TCP listener
