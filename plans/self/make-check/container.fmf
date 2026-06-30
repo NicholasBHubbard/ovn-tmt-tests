@@ -1,0 +1,20 @@
+summary: Test make_check role in a container
+
+provision:
+  - how: container
+    image: fedora:latest
+
+prepare:
+  - how: shell
+    script: ./tests/self/make-check/pre.sh
+  - how: ansible
+    playbook: playbooks/make-check.yml
+    extra-args: '-e make_check_source_dir=/tmp/make-check-workspace'
+
+discover:
+  how: fmf
+  test:
+    - /tests/self/make-check
+
+execute:
+  how: tmt

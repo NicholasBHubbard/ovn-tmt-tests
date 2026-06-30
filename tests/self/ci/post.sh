@@ -58,7 +58,7 @@ assert_contains "$ci" "self-tests.yml"
 
 assert_contains "$self_tests" 'actions/checkout@v5'
 assert_contains "$self_tests" 'ansible-core'
-assert_contains "$self_tests" 'ansible-galaxy collection install ansible.posix'
+assert_contains "$self_tests" 'ansible-galaxy collection install ansible.posix community.general'
 assert_contains "$self_tests" 'podman'
 assert_contains "$self_tests" "provision-container"
 assert_contains "$self_tests" "provision-virtual"

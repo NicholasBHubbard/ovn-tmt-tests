@@ -116,7 +116,7 @@ jobs:
       - name: Install Ansible tooling
         run: |
           pip install ansible-lint
-          ansible-galaxy collection install ansible.posix
+          ansible-galaxy collection install ansible.posix community.general
 
       - name: Run ansible-lint
         run: ansible-lint --strict playbooks roles
