@@ -27,7 +27,7 @@ jobs:
       # provides a consistent ansible-core version.
       - name: Install self-test dependencies
         run: |
-          pip uninstall -y ansible-core
+          pip uninstall -y ansible-core ansible
           sudo apt-get update
           sudo apt-get install -y ansible-core podman qemu-system-x86 \
             libvirt-daemon-system libvirt-dev pkg-config genisoimage

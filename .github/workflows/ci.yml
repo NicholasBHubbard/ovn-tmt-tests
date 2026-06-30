@@ -115,7 +115,7 @@ jobs:
       # provides a consistent ansible-core + ansible-lint pair.
       - name: Install Ansible tooling
         run: |
-          pip uninstall -y ansible-core
+          pip uninstall -y ansible-core ansible
           sudo apt-get update
           sudo apt-get install -y ansible-lint
           ansible-galaxy collection install ansible.posix
