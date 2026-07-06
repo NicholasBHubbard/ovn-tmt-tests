@@ -1,6 +1,6 @@
 - name: Install OVS from distro packages
   when:
-    - ovs_install_method == "package"
+    - ovs_install_method in ["package", "distro"]
     - not (ovs_installed | default(false))
   ansible.builtin.include_tasks: package.yml
 
