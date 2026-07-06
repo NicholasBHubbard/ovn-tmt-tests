@@ -14,32 +14,44 @@
     state: directory
     mode: "0755"
 
+- name: Gather service facts
+  when: ansible_facts["service_mgr"] == 'systemd'
+  ansible.builtin.service_facts:
+
+- name: Set ovn-northd service availability
+  ansible.builtin.set_fact:
+    ovn_has_northd_service: >-
+      {{ ansible_facts["service_mgr"] == 'systemd'
+         and 'ovn-northd.service' in (ansible_facts.services | default({})) }}
+
 - name: Find ovn-ctl script
-  when: ansible_facts["service_mgr"] != 'systemd'
+  when: not ovn_has_northd_service
   ansible.builtin.find:
-    paths: /usr
+    paths:
+      - /usr
+      - /usr/local
     patterns: ovn-ctl
     file_type: file
     recurse: true
   register: ovn_ctl_find
 
 - name: Select ovn-ctl script
-  when: ansible_facts["service_mgr"] != 'systemd'
+  when: not ovn_has_northd_service
   ansible.builtin.set_fact:
     ovn_ctl_path: "{{ (ovn_ctl_find.files | map(attribute='path') | list | first) | default('') }}"
 
 - name: Verify ovn-ctl script exists
-  when: ansible_facts["service_mgr"] != 'systemd'
+  when: not ovn_has_northd_service
   ansible.builtin.assert:
     that:
       - ovn_ctl_path | length > 0
-    fail_msg: "Could not find ovn-ctl under /usr."
+    fail_msg: "Could not find ovn-ctl under /usr or /usr/local."
 
 # --- Standalone mode ---
 
 - name: Start OVN central via systemd
   when:
-    - ansible_facts["service_mgr"] == 'systemd'
+    - ovn_has_northd_service
     - ovn_cluster_members | length == 0
   ansible.builtin.service:
     name: ovn-northd
@@ -48,7 +60,7 @@
 
 - name: Start OVN central via ovn-ctl
   when:
-    - ansible_facts["service_mgr"] != 'systemd'
+    - not ovn_has_northd_service
     - ovn_cluster_members | length == 0
   ansible.builtin.command:
     cmd: >-
@@ -67,7 +79,7 @@
     - ansible_facts["default_ipv4"]["address"] == ovn_cluster_members[0]
   ansible.builtin.command:
     cmd: >-
-      {{ ovn_ctl_path | default('/usr/share/ovn/scripts/ovn-ctl') }}
+      {{ ovn_ctl_path }}
       --db-nb-cluster-local-addr={{ ansible_facts["default_ipv4"]["address"] }}
       start_nb_ovsdb
   changed_when: true
@@ -78,7 +90,7 @@
     - ansible_facts["default_ipv4"]["address"] == ovn_cluster_members[0]
   ansible.builtin.command:
     cmd: >-
-      {{ ovn_ctl_path | default('/usr/share/ovn/scripts/ovn-ctl') }}
+      {{ ovn_ctl_path }}
       --db-sb-cluster-local-addr={{ ansible_facts["default_ipv4"]["address"] }}
       start_sb_ovsdb
   changed_when: true
@@ -89,7 +101,7 @@
     - ansible_facts["default_ipv4"]["address"] != ovn_cluster_members[0]
   ansible.builtin.command:
     cmd: >-
-      {{ ovn_ctl_path | default('/usr/share/ovn/scripts/ovn-ctl') }}
+      {{ ovn_ctl_path }}
       --db-nb-cluster-local-addr={{ ansible_facts["default_ipv4"]["address"] }}
       --db-nb-cluster-remote-addr={{ ovn_cluster_members[0] }}
       start_nb_ovsdb
@@ -101,7 +113,7 @@
     - ansible_facts["default_ipv4"]["address"] != ovn_cluster_members[0]
   ansible.builtin.command:
     cmd: >-
-      {{ ovn_ctl_path | default('/usr/share/ovn/scripts/ovn-ctl') }}
+      {{ ovn_ctl_path }}
       --db-sb-cluster-local-addr={{ ansible_facts["default_ipv4"]["address"] }}
       --db-sb-cluster-remote-addr={{ ovn_cluster_members[0] }}
       start_sb_ovsdb
@@ -111,7 +123,7 @@
   when: ovn_cluster_members | length > 0
   ansible.builtin.command:
     cmd: >-
-      {{ ovn_ctl_path | default('/usr/share/ovn/scripts/ovn-ctl') }}
+      {{ ovn_ctl_path }}
       --ovn-northd-log="-vfile:{{ ovn_log_level }}"
       start_northd_no_ovsdb
   changed_when: true
