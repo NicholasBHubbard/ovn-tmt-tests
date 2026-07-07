@@ -47,7 +47,7 @@ executed.
 
 ### [`playbooks/`](playbooks/)
 
-Ansible playbooks used by tmt `prepare` steps.
+Ansible playbooks used by tmt [prepare](https://tmt.readthedocs.io/en/stable/plugins/prepare.html) steps.
 
 ### [`roles/`](roles/)
 
