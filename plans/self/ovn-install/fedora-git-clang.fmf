@@ -1,0 +1,20 @@
+summary: Test ovn-install role with git method and clang on Fedora
+
+provision:
+  - how: virtual
+    image: fedora
+
+prepare:
+  - how: shell
+    script: ./tests/self/ovn-install/pre.sh
+  - how: ansible
+    playbook: playbooks/ovn-install.yml
+    extra-args: '-e ovn_install_method=git -e ovn_cc=clang'
+
+discover:
+  how: fmf
+  test:
+    - /tests/self/ovn-install
+
+execute:
+  how: tmt

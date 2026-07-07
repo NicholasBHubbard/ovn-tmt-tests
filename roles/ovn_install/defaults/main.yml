@@ -1,4 +1,5 @@
 ovn_install_method: "{{ install_method | default('distro') }}"
+ovn_cc: ""
 
 # source: build from local source directory
 ovn_source_dir: /usr/src/ovn
