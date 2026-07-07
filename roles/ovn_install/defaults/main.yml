@@ -50,5 +50,6 @@ ovn_distro_repository_package_names:
   dnf: []
   apt: []
 
-# package: install from specific package files
+# package: install from specific package files or a directory of packages
 ovn_package_files: []
+ovn_package_dir: ""

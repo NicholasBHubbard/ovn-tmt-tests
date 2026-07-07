@@ -1,0 +1,6 @@
+summary: Verify OVN clustered central services are running
+test: ./post.sh
+framework: shell
+duration: 10m
+require:
+  - procps-ng

@@ -1,0 +1,10 @@
+summary: Base plan for ovn-central SSL self-tests
+enabled: false
+
+discover:
+  how: fmf
+  test:
+    - /tests/self/ovn-central-ssl
+
+execute:
+  how: tmt

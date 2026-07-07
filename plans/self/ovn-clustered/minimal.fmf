@@ -1,0 +1,46 @@
+summary: Minimal OVN cluster (3 central nodes) on Fedora
+
+provision:
+  - name: central-1
+    role: leader
+    how: virtual
+    image: fedora
+    connection: system
+  - name: central-2
+    role: follower
+    how: virtual
+    image: fedora
+    connection: system
+  - name: central-3
+    role: follower
+    how: virtual
+    image: fedora
+    connection: system
+
+prepare:
+  - name: Check preconditions on all nodes
+    how: shell
+    where: [leader, follower]
+    script: ./tests/self/ovn-clustered/pre.sh
+
+  - name: Set up cluster leader
+    how: ansible
+    playbook: playbooks/ovn-clustered.yml
+    extra-args: '-e install_method=distro'
+    where: [leader]
+
+  - name: Set up cluster followers
+    how: ansible
+    playbook: playbooks/ovn-clustered.yml
+    extra-args: '-e install_method=distro'
+    where: [follower]
+
+discover:
+  - how: fmf
+    where:
+      - leader
+    test:
+      - /tests/self/ovn-clustered
+
+execute:
+  how: tmt

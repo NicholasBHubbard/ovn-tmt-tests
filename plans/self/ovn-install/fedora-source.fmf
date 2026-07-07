@@ -1,0 +1,23 @@
+summary: Test ovn-install role with source method on Fedora
+enabled: false
+
+provision:
+  - how: virtual
+    image: fedora
+
+prepare:
+  - how: shell
+    script: ./tests/self/ovn-install/pre.sh
+  - how: shell
+    script: ./tests/self/ovn-install/prepare-source.sh
+  - how: ansible
+    playbook: playbooks/ovn-install.yml
+    extra-args: '-e ovn_install_method=source'
+
+discover:
+  how: fmf
+  test:
+    - /tests/self/ovn-install
+
+execute:
+  how: tmt

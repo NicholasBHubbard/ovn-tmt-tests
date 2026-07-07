@@ -1,0 +1,14 @@
+- name: Set up OVN cluster
+  hosts: leader,follower
+  become: true
+  pre_tasks:
+    - name: Build cluster member list from inventory
+      ansible.builtin.set_fact:
+        ovn_cluster_members: >-
+          {{ (groups['leader'] | default([]) + groups['follower'] | default([]))
+             | map('extract', hostvars, 'ansible_host')
+             | list }}
+  roles:
+    - ovn_install
+    - ovs_setup
+    - ovn_central

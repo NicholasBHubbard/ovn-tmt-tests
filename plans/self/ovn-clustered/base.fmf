@@ -1,0 +1,10 @@
+summary: Base plan for OVN clustered mode self-tests
+enabled: false
+
+discover:
+  how: fmf
+  test:
+    - /tests/self/ovn-clustered
+
+execute:
+  how: tmt

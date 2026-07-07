@@ -1,0 +1,6 @@
+summary: Verify OVN central services with SSL/TLS listeners
+test: ./post.sh
+framework: shell
+duration: 5m
+require:
+  - procps-ng
