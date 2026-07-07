@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-source "$(dirname "$0")/../../lib/assert.sh"
+source "$TMT_TREE/tests/lib/assert.sh"
 
 mkdir -p /etc/openvswitch
 cd /etc/openvswitch

@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-source "$(dirname "$0")/../../lib/assert.sh"
+source "$TMT_TREE/tests/lib/assert.sh"
 cd_repo_root
 
 assert_file roles/distro_packages/defaults/main.yml

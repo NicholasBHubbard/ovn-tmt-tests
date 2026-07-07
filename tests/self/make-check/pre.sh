@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-source "$(dirname "$0")/../../lib/assert.sh"
+source "$TMT_TREE/tests/lib/assert.sh"
 
 if command -v dnf >/dev/null 2>&1; then
     dnf install -y make

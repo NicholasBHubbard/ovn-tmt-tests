@@ -2,7 +2,7 @@
 set -euo pipefail
 
 source "$TMT_TREE/tests/lib/assert.sh"
-cd_repo_root
 
-assert_directory .github
+assert_file /usr/src/ovn/tests/testsuite.log
+
 assert_finish
