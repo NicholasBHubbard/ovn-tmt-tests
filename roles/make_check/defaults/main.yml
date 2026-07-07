@@ -1,3 +1,4 @@
 make_check_target: check
+make_check_testsuiteflags: ""
 make_check_jobs: "{{ ansible_facts['processor_vcpus'] }}"
 make_check_params: {}
