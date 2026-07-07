@@ -17,7 +17,7 @@ for test_dir in tests/self/*; do
     for path in "$test_dir/pre.sh" "$test_dir/post.sh"; do
         if [ -f "$path" ]; then
             assert_executable "$path"
-            assert_contains "$path" '../../lib/assert.sh'
+            assert_contains "$path" '$TMT_TREE/tests/lib/assert.sh'
         fi
     done
 
@@ -39,7 +39,7 @@ if find tests/self -name main.fmf -print0 | xargs -0 grep -F -n -e 'test: ./test
     record_failure "Self-tests must run post.sh, not legacy verifier script names."
 fi
 
-if ! grep -R -F -q '../../lib/ovn.sh' tests/self; then
+if ! grep -R -F -q '$TMT_TREE/tests/lib/ovn.sh' tests/self; then
     record_failure "At least one self-test must use tests/lib/ovn.sh."
 fi
 

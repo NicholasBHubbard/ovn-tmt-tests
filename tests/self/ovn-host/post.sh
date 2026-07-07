@@ -2,7 +2,7 @@
 set -euo pipefail
 
 source "$TMT_TREE/tests/lib/assert.sh"
-source "$(dirname "$0")/../../lib/ovn.sh"
+source "$TMT_TREE/tests/lib/ovn.sh"
 
 echo "Checking ovn-controller process..."
 assert_process_present ovn-controller
