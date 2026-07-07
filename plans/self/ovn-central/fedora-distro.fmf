@@ -14,7 +14,7 @@ prepare:
 discover:
   how: fmf
   test:
-    - /tests/self/ovn-central
+    - /tests/self/ovn-central$
 
 execute:
   how: tmt
