@@ -3,7 +3,11 @@ set -euo pipefail
 
 source "$(dirname "$0")/../../lib/assert.sh"
 
-apt-get update && apt-get install -y make
+if command -v dnf >/dev/null 2>&1; then
+    dnf install -y make
+elif command -v apt-get >/dev/null 2>&1; then
+    apt-get update && apt-get install -y make
+fi
 
 mkdir -p /tmp/make-check-workspace
 cat > /tmp/make-check-workspace/Makefile <<'MAKEFILE'

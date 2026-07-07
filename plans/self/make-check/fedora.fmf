@@ -1,8 +1,8 @@
-summary: Test make_check role in a container
+summary: Test make_check role on Fedora
 
 provision:
-  - how: container
-    image: ubuntu:latest
+  - how: virtual
+    image: fedora
 
 prepare:
   - how: shell
