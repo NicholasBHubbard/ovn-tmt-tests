@@ -1,3 +1,9 @@
+- name: Verify install method is valid
+  ansible.builtin.assert:
+    that:
+      - ovn_install_method in ["source", "git", "distro", "package"]
+    fail_msg: "Unknown ovn_install_method '{{ ovn_install_method }}'. Valid: source, git, distro, package."
+
 - name: Install OVN from source
   when:
     - ovn_install_method == "source"

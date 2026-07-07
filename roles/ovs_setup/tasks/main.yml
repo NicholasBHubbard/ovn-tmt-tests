@@ -1,3 +1,9 @@
+- name: Verify install method is valid
+  ansible.builtin.assert:
+    that:
+      - ovs_install_method in ["package", "distro", "source", "git"]
+    fail_msg: "Unknown ovs_install_method '{{ ovs_install_method }}'. Valid: package, distro, source, git."
+
 - name: Install OVS from distro packages
   when:
     - ovs_install_method in ["package", "distro"]
