@@ -1,6 +1,6 @@
 - name: Run make check
   community.general.make:
     chdir: "{{ make_check_source_dir }}"
-    target: check
+    target: "{{ make_check_target }}"
     jobs: "{{ make_check_jobs }}"
     params: "{{ make_check_params }}"
