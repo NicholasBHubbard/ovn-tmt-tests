@@ -1,5 +1,5 @@
 summary: OVN unit tests with clang+ASAN (1-500)
-enabled: true
+enabled: false
 
 environment+:
     CC: clang

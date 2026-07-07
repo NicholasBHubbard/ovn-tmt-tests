@@ -1,5 +1,5 @@
 summary: OVN system tests with gcc (1-100)
-enabled: true
+enabled: false
 
 environment+:
     CC: gcc

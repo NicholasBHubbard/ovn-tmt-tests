@@ -1,5 +1,4 @@
 summary: OVN upstream CI test suite
-enabled: false
 
 environment:
     OVN_REPO: https://github.com/ovn-org/ovn.git

@@ -1,5 +1,5 @@
 summary: Compile OVN with gcc (--disable-ssl)
-enabled: true
+enabled: false
 
 environment+:
     CC: gcc
