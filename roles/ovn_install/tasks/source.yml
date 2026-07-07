@@ -3,7 +3,7 @@
     _ovn_build_env: "{{ {'CC': ovn_cc} if ovn_cc else {} }}"
 
 - name: Install selected compiler
-  when: ovn_cc and ovn_cc != "gcc"
+  when: ovn_cc != "" and ovn_cc != "gcc"
   ansible.builtin.include_role:
     name: distro_packages
   vars:
