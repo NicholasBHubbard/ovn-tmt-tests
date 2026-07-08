@@ -2,6 +2,7 @@ summary: OVN unit tests with gcc
 
 environment:
     MAKE_CHECK_TESTSUITEFLAGS: ""
+    OVN_CONFIGURE_FLAGS: ""
 
 provision:
   - how: container
@@ -10,7 +11,7 @@ provision:
 prepare:
   - how: ansible
     playbook: playbooks/ovn-install.yml
-    extra-args: '-e ovn_install_method=git -e ovn_cc=gcc'
+    extra-args: '-e ovn_install_method=git -e ovn_cc=gcc -e ovn_configure_flags=$OVN_CONFIGURE_FLAGS'
   - how: ansible
     playbook: playbooks/ovn-test-deps.yml
   - how: ansible
