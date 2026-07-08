@@ -13,7 +13,7 @@ prepare:
     playbook: playbooks/ovn-install.yml
     extra-args: '-e ovn_install_method=git -e ovn_cc=gcc -e ovn_configure_flags=$OVN_CONFIGURE_FLAGS'
   - how: ansible
-    playbook: playbooks/ovn-test-deps.yml
+    playbook: playbooks/ovn-unit-test-deps.yml
   - how: ansible
     playbook: playbooks/make-check.yml
     extra-args: '-e make_check_source_dir=/usr/src/ovn -e make_check_testsuiteflags=$MAKE_CHECK_TESTSUITEFLAGS'

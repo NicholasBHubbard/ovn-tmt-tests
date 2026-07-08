@@ -1,0 +1,43 @@
+- name: Install OVN system test dependencies
+  hosts: all
+  become: true
+  vars:
+    ovn_system_test_package_names:
+      dnf:
+        - iproute
+        - iproute-tc
+        - iputils
+        - kmod
+        - procps-ng
+        - net-tools
+        - nmap-ncat
+        - tcpdump
+        - ethtool
+        - nftables
+        - nfdump
+        - dhcp-client
+        - dhcp-server
+        - unbound
+        - curl
+        - wget
+      apt:
+        - iproute2
+        - iputils-ping
+        - iputils-arping
+        - kmod
+        - procps
+        - net-tools
+        - nmap
+        - tcpdump
+        - ethtool
+        - nftables
+        - nfdump
+        - isc-dhcp-client
+        - isc-dhcp-server
+        - unbound
+        - curl
+        - wget
+  roles:
+    - role: distro_packages
+      vars:
+        distro_package_names: "{{ ovn_system_test_package_names }}"

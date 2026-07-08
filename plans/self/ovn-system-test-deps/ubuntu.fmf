@@ -1,0 +1,19 @@
+summary: Test OVN system test deps on Ubuntu
+
+provision:
+  - how: container
+    image: ubuntu
+
+prepare:
+  - how: shell
+    script: ./tests/self/ovn-system-test-deps/pre.sh
+  - how: ansible
+    playbook: playbooks/ovn-system-test-deps.yml
+
+discover:
+  how: fmf
+  test:
+    - /tests/self/ovn-system-test-deps
+
+execute:
+  how: tmt

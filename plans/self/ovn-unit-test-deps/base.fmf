@@ -1,0 +1,10 @@
+summary: Base plan for ovn-unit-test-deps self-tests
+enabled: false
+
+discover:
+  how: fmf
+  test:
+    - /tests/self/ovn-unit-test-deps
+
+execute:
+  how: tmt

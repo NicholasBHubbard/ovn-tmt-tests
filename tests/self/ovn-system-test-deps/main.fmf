@@ -1,0 +1,4 @@
+summary: Verify OVN system test dependencies are installed
+test: ./post.sh
+framework: shell
+duration: 5m

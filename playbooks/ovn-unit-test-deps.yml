@@ -1,0 +1,26 @@
+- name: Install OVN unit test dependencies
+  hosts: all
+  become: true
+  vars:
+    ovn_unit_test_package_names:
+      dnf:
+        - openssl
+        - python3-pip
+      apt:
+        - openssl
+        - python3-pip
+    ovn_unit_test_pip_packages:
+      - scapy>=2.6.1
+      - pyftpdlib
+      - tftpy
+      - netaddr
+      - pyOpenSSL
+  roles:
+    - role: distro_packages
+      vars:
+        distro_package_names: "{{ ovn_unit_test_package_names }}"
+  tasks:
+    - name: Install Python test dependencies
+      ansible.builtin.pip:
+        name: "{{ ovn_unit_test_pip_packages }}"
+        break_system_packages: true
