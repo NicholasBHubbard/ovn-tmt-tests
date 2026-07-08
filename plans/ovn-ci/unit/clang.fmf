@@ -1,6 +1,0 @@
-summary: OVN unit tests with clang
-enabled: false
-
-environment+:
-    CC: clang
-    TESTSUITE: test

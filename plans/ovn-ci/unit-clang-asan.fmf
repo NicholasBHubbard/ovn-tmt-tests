@@ -1,7 +1,7 @@
-summary: OVN unit tests with clang+ASAN (1-500)
+summary: OVN unit tests with clang+ASAN
 
 environment:
-    MAKE_CHECK_TESTSUITEFLAGS: "1-500"
+    MAKE_CHECK_TESTSUITEFLAGS: ""
     OVN_CONFIGURE_FLAGS: "--enable-address-sanitizer"
 
 provision:
