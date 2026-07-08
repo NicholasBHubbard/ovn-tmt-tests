@@ -1,8 +1,8 @@
 summary: Test OVN system test deps on RHEL
 
 provision:
-  - how: container
-    image: registry.access.redhat.com/ubi9/ubi
+  - how: virtual
+    image: rhel
 
 prepare:
   - how: shell

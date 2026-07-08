@@ -1,7 +1,7 @@
 summary: Test OVN system test deps on Debian
 
 provision:
-  - how: container
+  - how: virtual
     image: debian
 
 prepare:

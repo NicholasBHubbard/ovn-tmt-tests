@@ -1,7 +1,7 @@
 summary: Test OVN system test deps on Fedora
 
 provision:
-  - how: container
+  - how: virtual
     image: fedora
 
 prepare:
