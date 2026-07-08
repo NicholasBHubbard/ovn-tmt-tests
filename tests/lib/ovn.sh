@@ -6,6 +6,13 @@ TEST_OVN_LIB_LOADED=1
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/assert.sh"
 
+assert_ovn_binaries_installed() {
+    for binary in ovs-vswitchd ovsdb-server ovn-nbctl ovn-sbctl ovn-northd ovn-controller; do
+        assert_command_present "$binary"
+        assert_command_runs "$binary --version" "$binary" --version
+    done
+}
+
 assert_ovs_configured() {
     assert_command_present ovs-vsctl
 

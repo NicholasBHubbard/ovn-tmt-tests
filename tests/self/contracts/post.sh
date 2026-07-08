@@ -17,7 +17,10 @@ for test_dir in tests/self/*; do
     for path in "$test_dir/pre.sh" "$test_dir/post.sh"; do
         if [ -f "$path" ]; then
             assert_executable "$path"
-            assert_contains "$path" '$TMT_TREE/tests/lib/assert.sh'
+            if ! grep -q -F '$TMT_TREE/tests/lib/assert.sh' "$path" && \
+               ! grep -q -F '$TMT_TREE/tests/lib/ovn.sh' "$path"; then
+                record_failure "$path must source assert.sh or ovn.sh from \$TMT_TREE/tests/lib/"
+            fi
         fi
     done
 
