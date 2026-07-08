@@ -14,7 +14,6 @@
         - tcpdump
         - ethtool
         - nftables
-        - nfdump
         - dhcp-client
         - dhcp-server
         - unbound
@@ -31,7 +30,6 @@
         - tcpdump
         - ethtool
         - nftables
-        - nfdump
         - isc-dhcp-client
         - isc-dhcp-server
         - unbound
