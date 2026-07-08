@@ -2,7 +2,7 @@ summary: Test OVN system test deps on RHEL
 
 provision:
   - how: virtual
-    image: rhel
+    image: centos-stream
 
 prepare:
   - how: shell
