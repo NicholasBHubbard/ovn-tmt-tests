@@ -1,0 +1,29 @@
+summary: OVN system tests with clang+ASAN
+
+environment:
+    MAKE_CHECK_TESTSUITEFLAGS: ""
+    OVN_CONFIGURE_FLAGS: "--enable-address-sanitizer"
+
+provision:
+  - how: virtual
+    image: fedora
+
+prepare:
+  - how: ansible
+    playbook: playbooks/ovn-install.yml
+    extra-args: '-e ovn_install_method=git -e ovn_cc=clang -e ovn_configure_flags=$OVN_CONFIGURE_FLAGS'
+  - how: ansible
+    playbook: playbooks/ovn-unit-test-deps.yml
+  - how: ansible
+    playbook: playbooks/ovn-system-test-deps.yml
+  - how: ansible
+    playbook: playbooks/make-check.yml
+    extra-args: '-e make_check_source_dir=/usr/src/ovn -e make_check_target=check-kernel -e make_check_testsuiteflags=$MAKE_CHECK_TESTSUITEFLAGS'
+
+discover:
+  how: fmf
+  test:
+    - /tests/ovn-make-check
+
+execute:
+  how: tmt
