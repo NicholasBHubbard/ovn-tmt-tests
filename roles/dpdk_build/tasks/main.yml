@@ -4,6 +4,7 @@
   vars:
     distro_package_names:
       dnf:
+        - gcc
         - meson
         - ninja-build
         - python3-pyelftools
