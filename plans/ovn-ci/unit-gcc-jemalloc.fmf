@@ -1,0 +1,29 @@
+summary: OVN unit tests with gcc and jemalloc
+
+environment:
+    MAKE_CHECK_TESTSUITEFLAGS: ""
+    OVN_CONFIGURE_FLAGS: "LIBS=-ljemalloc"
+
+provision:
+  - how: container
+    image: fedora
+
+prepare:
+  - how: shell
+    script: dnf install -y jemalloc-devel
+  - how: ansible
+    playbook: playbooks/ovn-install.yml
+    extra-args: '-e ovn_install_method=git -e ovn_cc=gcc -e ovn_configure_flags=$OVN_CONFIGURE_FLAGS'
+  - how: ansible
+    playbook: playbooks/ovn-unit-test-deps.yml
+  - how: ansible
+    playbook: playbooks/make-check.yml
+    extra-args: '-e make_check_source_dir=/usr/src/ovn -e make_check_testsuiteflags=$MAKE_CHECK_TESTSUITEFLAGS'
+
+discover:
+  how: fmf
+  test:
+    - /tests/ovn-make-check
+
+execute:
+  how: tmt
