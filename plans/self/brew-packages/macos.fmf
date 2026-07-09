@@ -1,0 +1,18 @@
+summary: Test brew package installation on macOS
+
+provision:
+  - how: local
+
+prepare:
+  - how: shell
+    script: ./tests/self/brew-packages/pre.sh
+  - how: ansible
+    playbook: tests/self/brew-packages/install.yml
+
+discover:
+  how: fmf
+  test:
+    - /tests/self/brew-packages
+
+execute:
+  how: tmt

@@ -12,6 +12,8 @@
         - "{{ ovn_cc }}"
       apt:
         - "{{ ovn_cc }}"
+      brew:
+        - "{{ ovn_cc }}"
 
 - name: Install build dependencies
   ansible.builtin.include_role:

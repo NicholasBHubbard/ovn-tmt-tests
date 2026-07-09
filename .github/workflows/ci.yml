@@ -130,3 +130,26 @@ jobs:
     uses: ./.github/workflows/self-tests.yml
     with:
       plans: ${{ needs.self-test-changes.outputs.plans }}
+
+  macos:
+    name: macOS brew packages
+    needs: self-test-changes
+    if: >-
+      needs.self-test-changes.outputs.changed == 'true' ||
+      (github.event_name == 'workflow_dispatch' && inputs['run-self-tests'])
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Install tmt and Ansible
+        run: |
+          pip3 install tmt ansible-core
+          ansible-galaxy collection install ansible.posix community.general
+
+      - name: Run macOS self-test
+        run: >-
+          tmt run --all
+          plan --name '/plans/self/brew-packages/macos'
+          provision --feeling-safe

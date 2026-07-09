@@ -1,0 +1,4 @@
+summary: Verify homebrew package installation
+test: ./post.sh
+framework: shell
+duration: 5m

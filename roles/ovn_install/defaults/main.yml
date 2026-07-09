@@ -22,6 +22,9 @@ ovn_build_dependency_package_names:
     - libtool
     - make
     - libssl-dev
+  brew:
+    - automake
+    - libtool
 ovn_build_repository_package_names:
   dnf: []
   apt: []
@@ -34,6 +37,8 @@ ovn_git_package_names:
   dnf:
     - git
   apt:
+    - git
+  brew:
     - git
 
 # distro: install from distro repos (auto-detects dnf/apt)

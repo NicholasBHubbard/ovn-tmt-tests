@@ -1,0 +1,9 @@
+- name: Install packages via homebrew
+  hosts: all
+  roles:
+    - role: distro_packages
+      vars:
+        distro_package_names:
+          brew:
+            - automake
+            - libtool

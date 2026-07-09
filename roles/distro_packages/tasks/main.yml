@@ -1,12 +1,15 @@
 - name: Verify supported package manager
   ansible.builtin.assert:
     that:
-      - ansible_facts["pkg_mgr"] == "apt" or ansible_facts["pkg_mgr"] in ["dnf", "dnf5", "yum"]
-    fail_msg: "Only apt and dnf-compatible package managers are supported."
+      - ansible_facts["pkg_mgr"] in ["apt", "dnf", "dnf5", "yum", "homebrew"]
+    fail_msg: "Only apt, dnf-compatible, and homebrew package managers are supported."
 
 - name: Set package manager family
   ansible.builtin.set_fact:
-    distro_package_manager_family: "{{ 'apt' if ansible_facts['pkg_mgr'] == 'apt' else 'dnf' }}"
+    distro_package_manager_family: >-
+      {{ 'apt' if ansible_facts['pkg_mgr'] == 'apt'
+         else 'brew' if ansible_facts['pkg_mgr'] == 'homebrew'
+         else 'dnf' }}
 
 - name: Select repository packages for package manager
   ansible.builtin.set_fact:
@@ -61,3 +64,10 @@
     name: "{{ distro_selected_package_names }}"
     state: "{{ distro_package_state }}"
     update_cache: "{{ distro_package_update_cache }}"
+
+- name: Install packages (homebrew)
+  when: ansible_facts["pkg_mgr"] == "homebrew"
+  become: false
+  community.general.homebrew:
+    name: "{{ distro_selected_package_names }}"
+    state: "{{ distro_package_state }}"
