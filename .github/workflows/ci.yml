@@ -56,6 +56,7 @@ jobs:
         id: discover
         run: |
           plans=$(tmt plan ls --filter 'enabled:true' | grep '/plans/self/' \
+            | grep -v 'brew-packages' \
             | sed 's|^/plans/self/||' | jq -Rc . | jq -sc .)
           echo "plans=$plans" >> "$GITHUB_OUTPUT"
 
@@ -145,7 +146,8 @@ jobs:
 
       - name: Install tmt and Ansible
         run: |
-          pip3 install tmt ansible-core
+          pipx install tmt
+          pipx install ansible-core
           ansible-galaxy collection install ansible.posix community.general
 
       - name: Run macOS self-test
