@@ -1,0 +1,4 @@
+dpdk_version: "24.11.1"
+dpdk_install_dir: /usr/local/dpdk
+dpdk_drivers: "net/null,net/tap,net/virtio"
+dpdk_source_dir: /usr/src/dpdk

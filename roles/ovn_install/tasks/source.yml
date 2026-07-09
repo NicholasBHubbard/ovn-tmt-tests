@@ -26,6 +26,42 @@
     chdir: "{{ ovn_source_dir }}/ovs"
   changed_when: true
 
+- name: Build OVS with DPDK (first pass)
+  when: ovn_dpdk | bool
+  block:
+    - name: Configure OVS with DPDK
+      ansible.builtin.command:
+        cmd: ./configure --with-dpdk=static
+        chdir: "{{ ovn_source_dir }}/ovs"
+      environment: "{{ _ovn_build_env | combine({'PKG_CONFIG_PATH': ovn_dpdk_dir + '/lib64/pkgconfig'}) }}"
+      changed_when: true
+
+    - name: Build OVS with DPDK
+      ansible.builtin.command:
+        cmd: make -j{{ ansible_facts["processor_vcpus"] }} {{ ovn_make_flags }}
+        chdir: "{{ ovn_source_dir }}/ovs"
+      environment: "{{ _ovn_build_env | combine({'PKG_CONFIG_PATH': ovn_dpdk_dir + '/lib64/pkgconfig'}) }}"
+      changed_when: true
+
+    - name: Save DPDK-enabled ovs-vswitchd
+      ansible.builtin.copy:
+        src: "{{ ovn_source_dir }}/ovs/vswitchd/ovs-vswitchd"
+        dest: "{{ ovn_source_dir }}/ovs/vswitchd/ovs-vswitchd_with_dpdk"
+        remote_src: true
+        mode: "0755"
+
+    - name: Clean OVS DPDK build
+      ansible.builtin.command:
+        cmd: make distclean
+        chdir: "{{ ovn_source_dir }}/ovs"
+      changed_when: true
+
+    - name: Re-bootstrap OVS after distclean
+      ansible.builtin.command:
+        cmd: ./boot.sh
+        chdir: "{{ ovn_source_dir }}/ovs"
+      changed_when: true
+
 - name: Configure OVS submodule
   ansible.builtin.command:
     cmd: ./configure
@@ -45,6 +81,14 @@
     cmd: make install
     chdir: "{{ ovn_source_dir }}/ovs"
   changed_when: true
+
+- name: Swap in DPDK-enabled ovs-vswitchd
+  when: ovn_dpdk | bool
+  ansible.builtin.copy:
+    src: "{{ ovn_source_dir }}/ovs/vswitchd/ovs-vswitchd_with_dpdk"
+    dest: /usr/local/sbin/ovs-vswitchd
+    remote_src: true
+    mode: "0755"
 
 - name: Bootstrap OVN
   ansible.builtin.command:

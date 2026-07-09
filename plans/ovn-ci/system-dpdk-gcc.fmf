@@ -1,0 +1,34 @@
+summary: OVN system-dpdk tests with gcc
+
+environment:
+    MAKE_CHECK_TESTSUITEFLAGS: ""
+    OVN_CONFIGURE_FLAGS: ""
+
+provision:
+  - how: virtual
+    image: fedora
+    memory: 8192
+
+prepare:
+  - how: ansible
+    playbook: playbooks/dpdk-build.yml
+  - how: ansible
+    playbook: playbooks/ovn-install.yml
+    extra-args: '-e ovn_install_method=git -e ovn_cc=gcc -e ovn_dpdk=true -e ovn_configure_flags=$OVN_CONFIGURE_FLAGS'
+  - how: ansible
+    playbook: playbooks/ovn-unit-test-deps.yml
+  - how: ansible
+    playbook: playbooks/ovn-system-test-deps.yml
+  - how: ansible
+    playbook: playbooks/dpdk-hugepages.yml
+  - how: ansible
+    playbook: playbooks/make-check.yml
+    extra-args: '-e make_check_source_dir=/usr/src/ovn -e make_check_target=check-system-dpdk -e make_check_testsuiteflags=$MAKE_CHECK_TESTSUITEFLAGS'
+
+discover:
+  how: fmf
+  test:
+    - /tests/ovn-make-check
+
+execute:
+  how: tmt

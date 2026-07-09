@@ -1,0 +1,19 @@
+summary: Test DPDK build on Fedora
+
+provision:
+  - how: virtual
+    image: fedora
+
+prepare:
+  - how: shell
+    script: ./tests/self/dpdk-build/pre.sh
+  - how: ansible
+    playbook: playbooks/dpdk-build.yml
+
+discover:
+  how: fmf
+  test:
+    - /tests/self/dpdk-build
+
+execute:
+  how: tmt

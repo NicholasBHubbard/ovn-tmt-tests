@@ -1,0 +1,9 @@
+- name: Allocate hugepages for DPDK
+  hosts: all
+  become: true
+  tasks:
+    - name: Reserve hugepages
+      ansible.posix.sysctl:
+        name: vm.nr_hugepages
+        value: "2048"
+        sysctl_set: true

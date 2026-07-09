@@ -1,0 +1,5 @@
+- name: Build and install DPDK
+  hosts: all
+  become: true
+  roles:
+    - dpdk_build
