@@ -1,4 +1,0 @@
-summary: Run OVN upstream CI test suite
-test: ./run-ci.sh
-framework: shell
-duration: 5h
