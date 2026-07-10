@@ -58,7 +58,3 @@
     cmd: ninja -C build install
     chdir: "{{ dpdk_source_dir }}"
   changed_when: true
-
-- name: Mark DPDK as installed
-  ansible.builtin.set_fact:
-    dpdk_installed: true
