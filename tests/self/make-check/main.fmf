@@ -1,4 +1,4 @@
-summary: Verify make_check role and result handling
+summary: Verify make_check role
 test: ./post.sh
 framework: shell
 duration: 5m

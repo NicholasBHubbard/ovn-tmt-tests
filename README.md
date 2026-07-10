@@ -59,23 +59,10 @@ tmt test metadata and verification scripts.
 
 [`tests/self/`](tests/self/) contains tests for this repository's own roles and topology examples.
 
-## Running make check
+## Role inputs
 
-The `make_check` role requires `make_check_source_dir`, the path to an already configured source tree:
+The `make_check` role requires `make_check_source_dir` to name an already configured source tree. Its target defaults
+to `check` and can be changed with `make_check_target`.
 
-```sh
-ansible-playbook -i host.example, playbooks/make-check.yml \
-    -e make_check_source_dir=/usr/src/ovn
-```
-
-Use `make_check_target` to select a target other than `check`.
-
-## Building DPDK
-
-The default DPDK version has a pinned SHA-256 checksum. When overriding `dpdk_version`, also set the matching checksum:
-
-```sh
-ansible-playbook -i host.example, playbooks/dpdk-build.yml \
-    -e dpdk_version=24.11.2 \
-    -e dpdk_checksum=sha256:CHECKSUM
-```
+The `dpdk_build` role pins the default DPDK archive checksum. Override `dpdk_checksum` whenever changing
+`dpdk_version`.

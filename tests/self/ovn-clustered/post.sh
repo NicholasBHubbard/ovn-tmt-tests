@@ -5,8 +5,8 @@ source "$TMT_TREE/tests/lib/assert.sh"
 source "$TMT_TREE/tests/lib/ovn.sh"
 cd_repo_root
 
-workdir=$(mktemp -d)
-trap 'rm -rf "$workdir"' EXIT
+inventory=$(mktemp)
+trap 'rm -f "$inventory"' EXIT
 
 echo "Checking ovsdb-server processes..."
 assert_process_present ovsdb-server
@@ -46,15 +46,10 @@ else
     record_failure "SB cluster status check failed: $sb_status"
 fi
 
-cat > "$workdir/inventory" <<'INVENTORY'
-[leader]
-leader-node ansible_connection=local
+printf '%s\n' '[leader]' 'leader-node ansible_connection=local' '' \
+    '[follower]' 'follower-node ansible_connection=local' > "$inventory"
 
-[follower]
-follower-node ansible_connection=local
-INVENTORY
-
-if ! clustered_output=$(ansible-playbook -v -i "$workdir/inventory" \
+if ! clustered_output=$(ansible-playbook -v -i "$inventory" \
     playbooks/ovn-clustered.yml --check --tags topology-resolution \
     -e ansible_become=false 2>&1); then
     record_failure "Cluster inventory-name fallback failed: $clustered_output"
