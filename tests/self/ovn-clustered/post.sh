@@ -3,6 +3,10 @@ set -euo pipefail
 
 source "$TMT_TREE/tests/lib/assert.sh"
 source "$TMT_TREE/tests/lib/ovn.sh"
+cd_repo_root
+
+workdir=$(mktemp -d)
+trap 'rm -rf "$workdir"' EXIT
 
 echo "Checking ovsdb-server processes..."
 assert_process_present ovsdb-server
@@ -40,6 +44,23 @@ if sb_status=$(ovn-appctl -t /var/run/ovn/ovnsb_db.ctl cluster/status OVN_Southb
     fi
 else
     record_failure "SB cluster status check failed: $sb_status"
+fi
+
+cat > "$workdir/inventory" <<'INVENTORY'
+[leader]
+leader-node ansible_connection=local
+
+[follower]
+follower-node ansible_connection=local
+INVENTORY
+
+if ! clustered_output=$(ansible-playbook -v -i "$workdir/inventory" \
+    playbooks/ovn-clustered.yml --check --tags topology-resolution \
+    -e ansible_become=false 2>&1); then
+    record_failure "Cluster inventory-name fallback failed: $clustered_output"
+elif ! grep -F -q '"ovn_cluster_members": ["leader-node", "follower-node"]' \
+    <<< "$clustered_output"; then
+    record_failure "Cluster topology did not fall back to inventory names"
 fi
 
 assert_finish

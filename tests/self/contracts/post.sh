@@ -46,4 +46,32 @@ if ! grep -R -F -q '$TMT_TREE/tests/lib/ovn.sh' tests/self; then
     record_failure "At least one self-test must use tests/lib/ovn.sh."
 fi
 
+if ! (
+    ASSERT_FAILURES=0
+    ss() {
+        if [[ "$*" == *'sport = :6641'* ]]; then
+            return
+        fi
+
+        printf '%s\n' 'LISTEN 0 128 0.0.0.0:66410 0.0.0.0:*'
+    }
+
+    assert_tcp_listening 6641 > /dev/null 2>&1
+    [ "$ASSERT_FAILURES" -ne 0 ]
+); then
+    record_failure "TCP assertion accepted port 66410 as port 6641"
+fi
+
+if ! (
+    ASSERT_FAILURES=0
+    ss() {
+        printf '%s\n' 'LISTEN 0 128 0.0.0.0:6641 0.0.0.0:*'
+    }
+
+    assert_tcp_listening 6641 > /dev/null 2>&1
+    [ "$ASSERT_FAILURES" -eq 0 ]
+); then
+    record_failure "TCP assertion rejected the exact port 6641"
+fi
+
 assert_finish

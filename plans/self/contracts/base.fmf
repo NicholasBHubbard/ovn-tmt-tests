@@ -1,4 +1,4 @@
-summary: Verify self-test contract
+summary: Verify repository test contracts
 
 prepare:
   - how: shell

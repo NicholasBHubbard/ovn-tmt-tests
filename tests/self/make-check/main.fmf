@@ -1,4 +1,7 @@
-summary: Verify make_check role runs make check
+summary: Verify make_check role and result handling
 test: ./post.sh
 framework: shell
 duration: 5m
+require:
+  - ansible-core
+  - ansible-collection-community-general

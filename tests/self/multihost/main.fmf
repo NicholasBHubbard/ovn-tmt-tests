@@ -3,4 +3,7 @@ test: ./post.sh
 framework: shell
 duration: 5m
 require:
+  - ansible-core
+  - ansible-collection-ansible-posix
+  - ansible-collection-community-general
   - procps-ng

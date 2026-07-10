@@ -1,4 +1,6 @@
-summary: Verify DPDK is built and installed
+summary: Verify DPDK build and integration checks
 test: ./post.sh
 framework: shell
 duration: 5m
+require:
+  - ansible-core
