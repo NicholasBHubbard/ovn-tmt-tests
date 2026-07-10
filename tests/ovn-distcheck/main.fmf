@@ -1,0 +1,4 @@
+summary: Verify OVN distcheck archive
+test: ./post.sh
+framework: shell
+duration: 1m

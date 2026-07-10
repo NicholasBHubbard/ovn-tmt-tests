@@ -1,7 +1,14 @@
+- name: Verify source directory is configured
+  ansible.builtin.assert:
+    that:
+      - make_check_source_dir is defined
+      - make_check_source_dir | default('') | length > 0
+    fail_msg: "Set make_check_source_dir to the configured source tree."
+
 - name: Build effective params
   ansible.builtin.set_fact:
     _make_check_params: >-
-      {{ make_check_params | combine(
+      {{ make_check_params | combine({'PWD': make_check_source_dir}) | combine(
          {'TESTSUITEFLAGS': make_check_testsuiteflags}
          if make_check_testsuiteflags else {}) }}
 

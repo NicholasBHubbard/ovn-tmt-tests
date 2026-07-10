@@ -1,7 +1,7 @@
 summary: OVN distcheck with gcc
 
 environment:
-    MAKE_CHECK_TESTSUITEFLAGS: ""
+    MAKE_CHECK_TESTSUITEFLAGS: "-l"
     OVN_CONFIGURE_FLAGS: ""
 
 provision:
@@ -21,7 +21,7 @@ prepare:
 discover:
   how: fmf
   test:
-    - /tests/ovn-make-check
+    - /tests/ovn-distcheck
 
 execute:
   how: tmt

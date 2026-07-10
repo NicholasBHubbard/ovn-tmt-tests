@@ -12,6 +12,7 @@ fi
 mkdir -p /tmp/make-check-workspace
 cat > /tmp/make-check-workspace/Makefile <<'MAKEFILE'
 check:
+	test "$(PWD)" = "/tmp/make-check-workspace"
 	touch /tmp/make-check-passed
 MAKEFILE
 

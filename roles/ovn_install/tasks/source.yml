@@ -84,6 +84,14 @@
     chdir: "{{ ovn_source_dir }}/ovs"
   changed_when: true
 
+- name: Restore DPDK-enabled ovs-vswitchd in source tree
+  when: ovn_dpdk | bool
+  ansible.builtin.copy:
+    src: "{{ ovn_source_dir }}/ovs/vswitchd/ovs-vswitchd_with_dpdk"
+    dest: "{{ ovn_source_dir }}/ovs/vswitchd/ovs-vswitchd"
+    remote_src: true
+    mode: "0755"
+
 - name: Swap in DPDK-enabled ovs-vswitchd
   when: ovn_dpdk | bool
   ansible.builtin.copy:

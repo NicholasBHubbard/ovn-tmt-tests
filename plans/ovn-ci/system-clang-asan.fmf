@@ -2,6 +2,7 @@ summary: OVN system tests with clang+ASAN
 
 environment:
     MAKE_CHECK_TESTSUITEFLAGS: ""
+    MAKE_CHECK_LOG: tests/system-kmod-testsuite.log
     OVN_CONFIGURE_FLAGS: "--enable-address-sanitizer"
 
 provision:

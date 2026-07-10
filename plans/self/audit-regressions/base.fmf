@@ -1,0 +1,16 @@
+summary: Verify audited regression cases
+
+prepare:
+  - how: shell
+    script: ./tests/self/audit-regressions/pre.sh
+
+provision:
+  how: local
+
+discover:
+  how: fmf
+  test:
+    - /tests/self/audit-regressions
+
+execute:
+  how: tmt

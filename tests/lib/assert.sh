@@ -122,7 +122,7 @@ assert_tcp_listening() {
         return
     fi
 
-    if ! ss -tlnp | grep -q ":$port"; then
+    if ! ss -H -ltn "sport = :$port" | grep -q .; then
         record_failure "Expected TCP port to be listening: $port"
     fi
 }

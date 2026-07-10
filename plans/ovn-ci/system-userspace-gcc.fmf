@@ -2,6 +2,7 @@ summary: OVN system-userspace tests with gcc
 
 environment:
     MAKE_CHECK_TESTSUITEFLAGS: ""
+    MAKE_CHECK_LOG: tests/system-userspace-testsuite.log
     OVN_CONFIGURE_FLAGS: ""
 
 provision:

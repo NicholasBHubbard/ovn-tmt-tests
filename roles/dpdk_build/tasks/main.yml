@@ -1,3 +1,9 @@
+- name: Verify DPDK checksum is configured
+  ansible.builtin.assert:
+    that:
+      - dpdk_checksum | length > 0
+    fail_msg: "Set dpdk_checksum to the SHA-256 checksum for DPDK {{ dpdk_version }}."
+
 - name: Install DPDK build dependencies
   ansible.builtin.include_role:
     name: distro_packages
@@ -15,6 +21,7 @@
   ansible.builtin.get_url:
     url: "https://fast.dpdk.org/rel/dpdk-{{ dpdk_version }}.tar.xz"
     dest: "/tmp/dpdk-{{ dpdk_version }}.tar.xz"
+    checksum: "{{ dpdk_checksum }}"
     mode: "0644"
 
 - name: Create DPDK source directory

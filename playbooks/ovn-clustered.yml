@@ -2,12 +2,18 @@
   hosts: leader,follower
   become: true
   pre_tasks:
+    - name: Initialize cluster member list
+      ansible.builtin.set_fact:
+        ovn_cluster_members: []
+      tags: topology-resolution
+
     - name: Build cluster member list from inventory
       ansible.builtin.set_fact:
         ovn_cluster_members: >-
-          {{ (groups['leader'] | default([]) + groups['follower'] | default([]))
-             | map('extract', hostvars, 'ansible_host')
-             | list }}
+          {{ ovn_cluster_members
+             + [hostvars[item]['ansible_host'] | default(item)] }}
+      loop: "{{ groups['leader'] | default([]) + groups['follower'] | default([]) }}"
+      tags: topology-resolution
   roles:
     - ovn_install
     - ovs_setup

@@ -10,9 +10,16 @@
   hosts: compute
   become: true
   pre_tasks:
+    - name: Resolve central address
+      ansible.builtin.set_fact:
+        ovn_central_address: >-
+          {{ hostvars[groups['central'][0]]['ansible_host']
+             | default(groups['central'][0]) }}
+      tags: topology-resolution
+
     - name: Wait for SB database to be reachable on central
       ansible.builtin.wait_for:
-        host: "{{ hostvars[groups['central'][0]]['ansible_host'] }}"
+        host: "{{ ovn_central_address }}"
         port: "{{ ovn_sb_port }}"
         timeout: 2700
   roles:
@@ -20,4 +27,4 @@
     - ovs_setup
     - ovn_host
   vars:
-    ovn_remote: "tcp:{{ hostvars[groups['central'][0]]['ansible_host'] }}:{{ ovn_sb_port }}"
+    ovn_remote: "tcp:{{ ovn_central_address }}:{{ ovn_sb_port }}"

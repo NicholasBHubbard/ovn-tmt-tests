@@ -1,0 +1,11 @@
+[central]
+central-node ansible_connection=local ansible_host=192.0.2.10
+
+[compute]
+compute-node ansible_connection=local ansible_host=192.0.2.20
+
+[leader]
+leader-node ansible_connection=local ansible_host=192.0.2.11
+
+[follower]
+follower-node ansible_connection=local ansible_host=192.0.2.12

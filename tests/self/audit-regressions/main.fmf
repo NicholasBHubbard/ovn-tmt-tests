@@ -1,0 +1,4 @@
+summary: Verify audited regression cases
+test: ./post.sh
+framework: shell
+duration: 2m

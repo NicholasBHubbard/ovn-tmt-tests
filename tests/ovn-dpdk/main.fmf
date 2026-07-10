@@ -1,0 +1,4 @@
+summary: Verify source-tree ovs-vswitchd has DPDK support
+test: ./post.sh
+framework: shell
+duration: 1m
