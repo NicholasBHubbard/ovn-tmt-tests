@@ -19,6 +19,14 @@ Install the collections with:
 ansible-galaxy collection install ansible.posix community.general
 ```
 
+## Running plans
+
+List available plans with `tmt plan ls`. Run one by its full name:
+
+```sh
+tmt run --all plan --name '^/plans/ovn-ci/unit-gcc$'
+```
+
 ## Directory Layout
 
 ```text
