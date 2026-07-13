@@ -66,11 +66,3 @@ Reusable Ansible roles.
 tmt test metadata and verification scripts.
 
 [`tests/self/`](tests/self/) contains tests for this repository's own roles and topology examples.
-
-## Role inputs
-
-The `make_check` role requires `make_check_source_dir` to name an already configured source tree. Its target defaults
-to `check` and can be changed with `make_check_target`.
-
-The `dpdk_build` role pins the default DPDK archive checksum. Override `dpdk_checksum` whenever changing
-`dpdk_version`.
