@@ -5,12 +5,16 @@
     ovn_unit_test_package_names:
       dnf:
         - openssl
+        - procps-ng
         - python3-pip
         - python3-packaging
+        - tcpdump
       apt:
         - openssl
+        - procps
         - python3-pip
         - python3-packaging
+        - tcpdump
     ovn_unit_test_pip_packages:
       - scapy>=2.6.1
       - pyftpdlib
