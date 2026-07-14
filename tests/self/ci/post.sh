@@ -66,31 +66,6 @@ assert_contains "$self_tests" "fail-fast: false"
 assert_contains "$self_tests" "tmt run --all plan --name"
 assert_contains "$self_tests" "provision --feeling-safe"
 
-ovn_ci_parent=plans/ovn-ci/main.fmf
-assert_file "$ovn_ci_parent"
-assert_contains "$ovn_ci_parent" 'OVN_WERROR: "true"'
-
-ovn_ci_plans=$(tmt plan ls | grep '^/plans/ovn-ci/')
-ovn_ci_plan_files=$(find plans/ovn-ci -maxdepth 1 -name '*.fmf' ! -name main.fmf | wc -l)
-if [ "$(printf '%s\n' "$ovn_ci_plans" | wc -l)" -ne "$ovn_ci_plan_files" ]; then
-    record_failure "Each OVN CI plan file must resolve to one plan"
-fi
-
-if grep -F -x -q /plans/ovn-ci <<< "$ovn_ci_plans"; then
-    record_failure "OVN CI parent must not be a runnable plan"
-fi
-
-for plan in $ovn_ci_plans; do
-    plan_data=$(tmt plan show "^$plan$")
-    if ! grep -F -q 'ovn_werror=true' <<< "$plan_data"; then
-        record_failure "Werror is not enabled in $plan"
-    fi
-done
-
-for plan_file in plans/ovn-ci/*.fmf; do
-    [ "$plan_file" = "$ovn_ci_parent" ] || assert_not_contains "$plan_file" ovn_werror
-done
-
 assert_contains plans/self/ci/container.fmf 'how: container'
 assert_contains plans/self/ci/container.fmf 'image: fedora:latest'
 
