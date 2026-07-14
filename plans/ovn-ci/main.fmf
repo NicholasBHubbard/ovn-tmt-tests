@@ -1,0 +1,12 @@
+environment:
+  OVN_CC: gcc
+  OVN_CONFIGURE_FLAGS: ""
+  OVN_DPDK: "false"
+  OVN_WERROR: "true"
+
+prepare:
+  - how: ansible
+    playbook: playbooks/ovn-install.yml
+    extra-args: >-
+      -e ovn_install_method=git -e ovn_cc=$OVN_CC -e ovn_werror=$OVN_WERROR
+      -e ovn_dpdk=$OVN_DPDK -e ovn_configure_flags=$OVN_CONFIGURE_FLAGS

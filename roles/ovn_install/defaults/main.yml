@@ -5,6 +5,7 @@ ovn_cc: ""
 ovn_source_dir: /usr/src/ovn
 ovn_configure_flags: ""
 ovn_make_flags: ""
+ovn_werror: false
 ovn_dpdk: false
 ovn_dpdk_dir: /usr/local/dpdk
 ovn_build_dependency_package_names:

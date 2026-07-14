@@ -1,6 +1,7 @@
 - name: Set build environment
   ansible.builtin.set_fact:
     _ovn_build_env: "{{ {'CC': ovn_cc} if ovn_cc else {} }}"
+    _ovn_werror_flag: "{{ '--enable-Werror' if ovn_werror | bool else '' }}"
 
 - name: Install selected compiler
   when: ovn_cc != "" and ovn_cc != "gcc"
@@ -33,7 +34,7 @@
   block:
     - name: Configure OVS with DPDK
       ansible.builtin.command:
-        cmd: ./configure --with-dpdk=static
+        cmd: "./configure --with-dpdk=static {{ _ovn_werror_flag }}"
         chdir: "{{ ovn_source_dir }}/ovs"
       environment: "{{ _ovn_build_env | combine({'PKG_CONFIG_PATH': ovn_dpdk_dir + '/lib64/pkgconfig'}) }}"
       changed_when: true
@@ -66,7 +67,7 @@
 
 - name: Configure OVS submodule
   ansible.builtin.command:
-    cmd: ./configure
+    cmd: "./configure {{ _ovn_werror_flag }}"
     chdir: "{{ ovn_source_dir }}/ovs"
   environment: "{{ _ovn_build_env }}"
   changed_when: true
@@ -108,7 +109,7 @@
 
 - name: Configure OVN
   ansible.builtin.command:
-    cmd: "./configure {{ ovn_configure_flags }}"
+    cmd: "./configure {{ ovn_configure_flags }} {{ _ovn_werror_flag }}"
     chdir: "{{ ovn_source_dir }}"
   environment: "{{ _ovn_build_env }}"
   changed_when: true

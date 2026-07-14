@@ -1,16 +1,11 @@
 summary: OVN compile test with gcc
 
-environment:
+environment+:
     OVN_CONFIGURE_FLAGS: "--disable-ssl"
 
 provision:
   - how: container
     image: fedora
-
-prepare:
-  - how: ansible
-    playbook: playbooks/ovn-install.yml
-    extra-args: '-e ovn_install_method=git -e ovn_cc=gcc -e ovn_configure_flags=$OVN_CONFIGURE_FLAGS'
 
 discover:
   how: fmf

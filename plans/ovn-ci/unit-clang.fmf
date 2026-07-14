@@ -1,17 +1,14 @@
 summary: OVN unit tests with clang
 
-environment:
+environment+:
     MAKE_CHECK_TESTSUITEFLAGS: ""
-    OVN_CONFIGURE_FLAGS: ""
+    OVN_CC: clang
 
 provision:
   - how: container
     image: fedora
 
-prepare:
-  - how: ansible
-    playbook: playbooks/ovn-install.yml
-    extra-args: '-e ovn_install_method=git -e ovn_cc=clang -e ovn_configure_flags=$OVN_CONFIGURE_FLAGS'
+prepare+:
   - how: ansible
     playbook: playbooks/ovn-unit-test-deps.yml
   - how: ansible
