@@ -33,6 +33,12 @@ assert_contains "$ci" 'sudo apt-get install -y shellcheck'
 assert_contains "$ci" 'shellcheck --severity=warning --shell=bash -x -e SC1091'
 assert_contains "$ci" '*.bash'
 
+assert_contains "$ci" 'name: GitHub Actions lint'
+assert_contains "$ci" 'github.com/rhysd/actionlint/cmd/actionlint@v1.7.12'
+assert_contains "$ci" '"$(go env GOPATH)/bin/actionlint"'
+assert_file .github/actionlint.yaml
+assert_contains .github/actionlint.yaml 'label "ubuntu-26\.04" is unknown'
+
 assert_contains "$ci" 'apt-get install -y yamllint'
 assert_contains "$ci" 'yamllint --strict'
 assert_file .yamllint
