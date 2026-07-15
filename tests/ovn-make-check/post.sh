@@ -3,14 +3,17 @@ set -uo pipefail
 
 source_dir=${OVN_SOURCE_DIR:-/usr/src/ovn}
 target=${MAKE_CHECK_TARGET:-check}
-make_args=(-C "$source_dir" -j "$(nproc)" "$target")
+make_args=(-j "$(nproc)" "$target")
 
 if [ -n "${MAKE_CHECK_TESTSUITEFLAGS:-}" ]; then
     make_args+=("TESTSUITEFLAGS=$MAKE_CHECK_TESTSUITEFLAGS")
 fi
 
 status=0
-make "${make_args[@]}" || status=$?
+(
+    cd "$source_dir" || exit
+    make "${make_args[@]}"
+) || status=$?
 
 copy_status=0
 (
@@ -23,6 +26,7 @@ copy_status=0
     # GitHub's artifact uploader rejects sockets left by failed tests.
     find "$TMT_TEST_DATA" ! -type f ! -type d ! -type l -delete || \
         artifact_status=$?
+    chmod -R a+rX "$TMT_TEST_DATA" || artifact_status=$?
     exit "$artifact_status"
 ) || copy_status=$?
 
