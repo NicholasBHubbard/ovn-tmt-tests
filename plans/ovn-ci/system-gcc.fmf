@@ -2,7 +2,7 @@ summary: OVN system tests with gcc
 
 environment+:
     MAKE_CHECK_TESTSUITEFLAGS: ""
-    MAKE_CHECK_LOG: tests/system-kmod-testsuite.log
+    MAKE_CHECK_TARGET: check-kernel
 
 provision:
   - how: virtual
@@ -13,9 +13,6 @@ prepare+:
     playbook: playbooks/ovn-unit-test-deps.yml
   - how: ansible
     playbook: playbooks/ovn-system-test-deps.yml
-  - how: ansible
-    playbook: playbooks/make-check.yml
-    extra-args: '-e make_check_source_dir=/usr/src/ovn -e make_check_target=check-kernel -e make_check_testsuiteflags=$MAKE_CHECK_TESTSUITEFLAGS'
 
 discover:
   how: fmf

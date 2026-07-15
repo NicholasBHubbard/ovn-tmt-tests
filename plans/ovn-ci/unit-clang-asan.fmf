@@ -12,9 +12,6 @@ provision:
 prepare+:
   - how: ansible
     playbook: playbooks/ovn-unit-test-deps.yml
-  - how: ansible
-    playbook: playbooks/make-check.yml
-    extra-args: '-e make_check_source_dir=/usr/src/ovn -e make_check_testsuiteflags=$MAKE_CHECK_TESTSUITEFLAGS'
 
 discover:
   how: fmf

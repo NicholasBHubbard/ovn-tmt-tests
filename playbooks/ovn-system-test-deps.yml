@@ -39,3 +39,9 @@
     - role: distro_packages
       vars:
         distro_package_names: "{{ ovn_system_test_package_names }}"
+  tasks:
+    - name: Select Ncat on Fedora
+      when: ansible_facts["distribution"] == "Fedora"
+      community.general.alternatives:
+        name: nc
+        path: /usr/bin/ncat

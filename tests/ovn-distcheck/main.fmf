@@ -1,4 +1,4 @@
-summary: Verify OVN distcheck archive
+summary: Run OVN distcheck
 test: ./post.sh
 framework: shell
-duration: 1m
+duration: 5h

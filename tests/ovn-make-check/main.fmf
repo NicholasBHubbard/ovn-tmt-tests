@@ -1,4 +1,4 @@
-summary: Verify OVN make check completed
+summary: Run OVN make check
 test: ./post.sh
 framework: shell
-duration: 1m
+duration: 5h
