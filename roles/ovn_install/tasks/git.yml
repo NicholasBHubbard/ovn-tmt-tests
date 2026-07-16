@@ -12,6 +12,7 @@
     version: "{{ ovn_git_version }}"
     depth: 1
     single_branch: true
+    refspec: "+{{ ovn_git_version }}:refs/ovn-tmt/{{ ovn_git_version }}"
     recursive: true
 
 - name: Build and install from cloned source
