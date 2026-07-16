@@ -12,6 +12,7 @@
     version: "{{ ovs_git_version }}"
     depth: 1
     single_branch: true
+    refspec: "+{{ ovs_git_version }}:refs/ovs-tmt/{{ ovs_git_version }}"
 
 - name: Build and install from cloned source
   ansible.builtin.include_tasks: source.yml

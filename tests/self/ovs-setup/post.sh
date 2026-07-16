@@ -3,6 +3,10 @@ set -euo pipefail
 
 source "$TMT_TREE/tests/lib/assert.sh"
 source "$TMT_TREE/tests/lib/ovn.sh"
+cd_repo_root
+
+assert_contains roles/ovs_setup/tasks/git.yml \
+    'refspec: "+{{ ovs_git_version }}:refs/ovs-tmt/{{ ovs_git_version }}"'
 
 echo "Checking ovs-vsctl..."
 assert_ovs_configured
