@@ -58,12 +58,8 @@ jobs:
             base=$(git rev-list --max-parents=0 HEAD)
           fi
 
-          pattern='^(plans/self/|tests/self/|tests/lib/|roles/|playbooks/|ansible\.cfg|\.github/workflows/)'
-          if git diff --name-only "$base" HEAD | grep -qE "$pattern"; then
-            echo "changed=true"
-          else
-            echo "changed=false"
-          fi >> "$GITHUB_OUTPUT"
+          changed=$(git diff --name-only "$base" HEAD | .github/scripts/self-test-changes.sh)
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
 
       - name: Discover self-test plans
         id: discover
@@ -87,7 +83,7 @@ jobs:
 
       - name: Run ShellCheck
         run: >-
-          find tests \( -name '*.sh' -o -name '*.bash' \)
+          find tests .github/scripts \( -name '*.sh' -o -name '*.bash' \)
           -exec shellcheck --severity=warning --shell=bash -x -e SC1091 {} +
 
   yaml:

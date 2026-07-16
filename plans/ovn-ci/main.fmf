@@ -11,5 +11,5 @@ prepare:
     playbook: playbooks/ovn-install.yml
     extra-args: >-
       -e ovn_install_method=git -e ovn_cc=$OVN_CC -e ovn_werror=$OVN_WERROR
-      -e ovn_dpdk=$OVN_DPDK -e ovn_configure_flags=$OVN_CONFIGURE_FLAGS
+      -e ovn_dpdk=$OVN_DPDK -e 'ovn_configure_flags=$OVN_CONFIGURE_FLAGS'
       -e ovn_git_repo=$OVN_GIT_REPO -e ovn_git_version=$OVN_GIT_VERSION

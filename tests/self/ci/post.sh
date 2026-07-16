@@ -6,9 +6,33 @@ cd_repo_root
 
 ci=.github/workflows/ci.yml
 self_tests=.github/workflows/self-tests.yml
+change_selector=.github/scripts/self-test-changes.sh
+
+assert_change_selection() {
+    local expected=$1
+    local description=$2
+    shift 2
+    local actual
+
+    actual=$(printf '%s\n' "$@" | "$change_selector")
+    if [ "$actual" != "$expected" ]; then
+        record_failure "Expected $description to select '$expected', got '$actual'"
+    fi
+}
 
 assert_file "$ci"
 assert_file "$self_tests"
+assert_file "$change_selector"
+assert_executable "$change_selector"
+
+assert_change_selection true "an OVN-CI plan change" plans/ovn-ci/main.fmf
+assert_change_selection true "an OVN workload test change" tests/ovn-make-check/post.sh
+assert_change_selection true "an unknown future code path" components/new/config.yml
+assert_change_selection true "mixed documentation and code changes" README.md roles/ovn_install/tasks/main.yml
+assert_change_selection false "non-functional changes" README.md Unified-OVN-Test-System-Proposal.md LICENSE LICENSE.txt COPYING COPYING.md .gitignore docs/guide.md
+if [ "$("$change_selector" </dev/null)" != false ]; then
+    record_failure "Expected an empty change list to select 'false'"
+fi
 
 assert_contains "$ci" 'actions/checkout@v5'
 assert_not_contains "$ci" 'actions/setup-python'
@@ -18,6 +42,7 @@ assert_not_contains "$ci" 'ubuntu-24.04'
 
 assert_contains "$ci" "changed: \${{ steps.self_test_changes.outputs.changed }}"
 assert_contains "$ci" "needs.self-test-changes.outputs.changed == 'true'"
+assert_contains "$ci" 'git diff --name-only "$base" HEAD | .github/scripts/self-test-changes.sh'
 assert_not_contains "$ci" "outputs.shell"
 assert_not_contains "$ci" "outputs.yaml"
 assert_not_contains "$ci" "outputs.tmt"
@@ -28,6 +53,7 @@ assert_not_contains "$ci" "outputs.provisioned"
 
 assert_contains "$ci" "*.sh"
 assert_contains "$ci" "*.bash"
+assert_contains "$ci" 'find tests .github/scripts'
 assert_not_contains "$ci" 'bash -n'
 assert_contains "$ci" 'sudo apt-get install -y shellcheck'
 assert_contains "$ci" 'shellcheck --severity=warning --shell=bash -x -e SC1091'

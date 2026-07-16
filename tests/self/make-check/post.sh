@@ -71,6 +71,8 @@ assert_contains plans/ovn-ci/main.fmf \
 assert_contains plans/ovn-ci/main.fmf 'OVN_GIT_VERSION: main'
 assert_contains plans/ovn-ci/main.fmf \
     '-e ovn_git_repo=$OVN_GIT_REPO -e ovn_git_version=$OVN_GIT_VERSION'
+assert_contains plans/ovn-ci/main.fmf \
+    "-e 'ovn_configure_flags=\$OVN_CONFIGURE_FLAGS'"
 
 if ! TMT_TEST_DATA=$data_dir \
     OVN_SOURCE_DIR=$source_dir \
