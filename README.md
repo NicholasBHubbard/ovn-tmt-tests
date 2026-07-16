@@ -19,6 +19,24 @@ Install the collections with:
 ansible-galaxy collection install ansible.posix community.general
 ```
 
+### Virtual guests
+
+Plans that provision virtual guests require QEMU/KVM, the system libvirt QEMU
+driver, and libvirt's default network. On Fedora, install them with:
+
+```sh
+sudo dnf install libvirt-client libvirt-daemon-config-network \
+    libvirt-daemon-kvm qemu-kvm
+sudo systemctl enable --now virtqemud.socket virtnetworkd.socket
+```
+
+Multihost plans use `qemu:///system` so their guests share a network. Grant the
+user running tmt access to it, then log out and back in:
+
+```sh
+sudo usermod -aG libvirt "$USER"
+```
+
 ## Running plans
 
 List available plans with `tmt plan ls`. Run one by its full name:

@@ -1,0 +1,11 @@
+summary: Base configuration for OVN multihost tests
+
+discover:
+  how: fmf
+  where:
+    - compute
+  test:
+    - /tests/ovn-multihost-connectivity
+
+execute:
+  how: tmt

@@ -1,0 +1,28 @@
+summary: Verify OVN connectivity across two compute hosts
+
+provision:
+  - name: central
+    role: central
+    how: virtual
+    image: fedora
+    connection: system
+  - name: compute-1
+    role: compute
+    how: virtual
+    image: fedora
+    connection: system
+  - name: compute-2
+    role: compute
+    how: virtual
+    image: fedora
+    connection: system
+
+prepare:
+  - name: Set up OVN topology
+    how: ansible
+    playbook: playbooks/multihost.yml
+
+  - name: Set up logical-switch test scenario
+    how: ansible
+    order: 80
+    playbook: tests/ovn-multihost-connectivity/setup.yml
