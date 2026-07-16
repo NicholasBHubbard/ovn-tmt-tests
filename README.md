@@ -45,24 +45,6 @@ List available plans with `tmt plan ls`. Run one by its full name:
 tmt run --all plan --name '^/plans/ovn-ci/unit-gcc$'
 ```
 
-### Build configuration
-
-OVN CI plans expose these shared build settings:
-
-- `OVN_SOURCE_DIR` sets the OVN checkout and workload directory. The default is `/usr/src/ovn`.
-- `OVN_MAKE_FLAGS` adds flags to each OVN and embedded OVS `make` command. The default is empty.
-- `OVN_DPDK_DIR` sets both the DPDK installation directory and the directory OVN uses to find DPDK. The default is `/usr/local/dpdk`.
-
-Override them with tmt environment options:
-
-```sh
-tmt run \
-    -e OVN_SOURCE_DIR=/var/tmp/ovn \
-    -e "OVN_MAKE_FLAGS='V=1 CFLAGS=-O0'" \
-    -e OVN_DPDK_DIR=/opt/dpdk \
-    --all plan --name '^/plans/ovn-ci/unit-gcc$'
-```
-
 ## Directory Layout
 
 ```text
