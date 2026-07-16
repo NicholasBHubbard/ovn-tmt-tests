@@ -1,8 +1,8 @@
 summary: OVN unit tests with gcc and jemalloc
 
 environment+:
-    MAKE_CHECK_TESTSUITEFLAGS: ""
-    OVN_CONFIGURE_FLAGS: "LIBS=-ljemalloc"
+  MAKE_CHECK_TESTSUITEFLAGS: ""
+  OVN_CONFIGURE_FLAGS: "LIBS=-ljemalloc"
 
 provision:
   - how: container

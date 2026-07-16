@@ -1,8 +1,8 @@
 summary: OVN system tests with gcc
 
 environment+:
-    MAKE_CHECK_TESTSUITEFLAGS: ""
-    MAKE_CHECK_TARGET: check-kernel
+  MAKE_CHECK_TESTSUITEFLAGS: ""
+  MAKE_CHECK_TARGET: check-kernel
 
 provision:
   - how: virtual

@@ -1,7 +1,7 @@
 summary: OVN unit tests with gcc
 
 environment+:
-    MAKE_CHECK_TESTSUITEFLAGS: ""
+  MAKE_CHECK_TESTSUITEFLAGS: ""
 
 provision:
   - how: container

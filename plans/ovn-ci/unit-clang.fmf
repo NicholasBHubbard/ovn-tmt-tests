@@ -1,8 +1,8 @@
 summary: OVN unit tests with clang
 
 environment+:
-    MAKE_CHECK_TESTSUITEFLAGS: ""
-    OVN_CC: clang
+  MAKE_CHECK_TESTSUITEFLAGS: ""
+  OVN_CC: clang
 
 provision:
   - how: container

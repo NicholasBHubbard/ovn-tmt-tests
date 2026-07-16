@@ -1,7 +1,7 @@
 summary: OVN distcheck with gcc
 
 environment+:
-    MAKE_CHECK_TESTSUITEFLAGS: "-l"
+  MAKE_CHECK_TESTSUITEFLAGS: "-l"
 
 provision:
   - how: container

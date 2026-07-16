@@ -1,10 +1,10 @@
 summary: OVN system tests with clang+ASAN
 
 environment+:
-    MAKE_CHECK_TESTSUITEFLAGS: ""
-    MAKE_CHECK_TARGET: check-kernel
-    OVN_CC: clang
-    OVN_CONFIGURE_FLAGS: "--enable-address-sanitizer"
+  MAKE_CHECK_TESTSUITEFLAGS: ""
+  MAKE_CHECK_TARGET: check-kernel
+  OVN_CC: clang
+  OVN_CONFIGURE_FLAGS: "--enable-address-sanitizer"
 
 provision:
   - how: virtual

@@ -1,8 +1,8 @@
 summary: OVN compile test with clang
 
 environment+:
-    OVN_CC: clang
-    OVN_CONFIGURE_FLAGS: "--disable-ssl"
+  OVN_CC: clang
+  OVN_CONFIGURE_FLAGS: "--disable-ssl"
 
 provision:
   - how: container

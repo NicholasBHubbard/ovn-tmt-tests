@@ -66,7 +66,8 @@ assert_file .github/actionlint.yaml
 assert_contains .github/actionlint.yaml 'label "ubuntu-26\.04" is unknown'
 
 assert_contains "$ci" 'apt-get install -y yamllint'
-assert_contains "$ci" 'yamllint --strict'
+assert_contains "$ci" "git ls-files -z -- '*.yaml' '*.yml' '*.fmf'"
+assert_contains "$ci" 'xargs -0 yamllint --strict'
 assert_file .yamllint
 
 assert_contains "$ci" 'pipx install tmt'

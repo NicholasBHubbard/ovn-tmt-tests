@@ -99,7 +99,9 @@ jobs:
           sudo apt-get install -y yamllint
 
       - name: Run yamllint
-        run: yamllint --strict .
+        run: >-
+          git ls-files -z -- '*.yaml' '*.yml' '*.fmf'
+          | xargs -0 yamllint --strict
 
   tmt-lint:
     name: tmt lint

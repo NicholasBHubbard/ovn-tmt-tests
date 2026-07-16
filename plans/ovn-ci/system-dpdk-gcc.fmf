@@ -1,9 +1,9 @@
 summary: OVN system-dpdk tests with gcc
 
 environment+:
-    MAKE_CHECK_TESTSUITEFLAGS: ""
-    MAKE_CHECK_TARGET: check-system-dpdk
-    OVN_DPDK: "true"
+  MAKE_CHECK_TESTSUITEFLAGS: ""
+  MAKE_CHECK_TARGET: check-system-dpdk
+  OVN_DPDK: "true"
 
 provision:
   - how: virtual
