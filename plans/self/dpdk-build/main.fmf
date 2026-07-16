@@ -1,5 +1,4 @@
-summary: Base plan for dpdk-build self-tests
-enabled: false
+summary: Base configuration for dpdk-build self-tests
 
 discover:
   how: fmf

@@ -3,15 +3,3 @@ summary: Verify CI container provisioning
 provision:
   how: container
   image: fedora:latest
-
-prepare:
-  - how: shell
-    script: ./tests/self/ci/pre.sh
-
-discover:
-  how: fmf
-  test:
-    - /tests/self/ci
-
-execute:
-  how: tmt

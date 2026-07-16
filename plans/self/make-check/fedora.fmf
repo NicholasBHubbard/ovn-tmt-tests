@@ -10,11 +10,3 @@ prepare:
   - how: ansible
     playbook: playbooks/make-check.yml
     extra-args: '-e make_check_source_dir=/tmp/make-check-workspace'
-
-discover:
-  how: fmf
-  test:
-    - /tests/self/make-check
-
-execute:
-  how: tmt

@@ -46,6 +46,49 @@ if ! grep -R -F -q '$TMT_TREE/tests/lib/ovn.sh' tests/self; then
     record_failure "At least one self-test must use tests/lib/ovn.sh."
 fi
 
+inherited_plan_dirs=(
+    brew-packages
+    ci
+    dpdk-build
+    make-check
+    multihost
+    ovn-central
+    ovn-central-ssl
+    ovn-clustered
+    ovn-host
+    ovn-install
+    ovn-system-test-deps
+    ovn-unit-test-deps
+    ovs-setup
+)
+
+for plan_dir in "${inherited_plan_dirs[@]}"; do
+    parent="plans/self/$plan_dir/main.fmf"
+    assert_file "$parent"
+
+    for plan in "plans/self/$plan_dir"/*.fmf; do
+        [ "$plan" = "$parent" ] && continue
+        if grep -q '^execute:' "$plan"; then
+            record_failure "Self-test plan repeats inherited execute configuration: $plan"
+        fi
+        if [ "$plan_dir" != multihost ] && [ "$plan_dir" != ovn-clustered ] && \
+            grep -q '^discover:' "$plan"; then
+            record_failure "Self-test plan repeats inherited discover configuration: $plan"
+        fi
+    done
+done
+
+if find plans/self -name base.fmf -print0 | xargs -0 grep -l '^enabled: false$'; then
+    record_failure "Disabled self-test parents must use main.fmf, not base.fmf."
+fi
+
+for plan in plans/ovn-ci/*.fmf; do
+    [ "$plan" = plans/ovn-ci/main.fmf ] && continue
+    if grep -q '^execute:' "$plan"; then
+        record_failure "OVN CI plan repeats inherited execute configuration: $plan"
+    fi
+done
+
 if (
     ASSERT_FAILURES=0
     ss() {

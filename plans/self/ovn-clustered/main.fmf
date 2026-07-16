@@ -1,5 +1,4 @@
-summary: Base plan for OVN clustered mode self-tests
-enabled: false
+summary: Base configuration for OVN clustered-mode self-tests
 
 discover:
   how: fmf

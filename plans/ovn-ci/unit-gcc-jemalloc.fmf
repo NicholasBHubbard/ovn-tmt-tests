@@ -1,7 +1,6 @@
 summary: OVN unit tests with gcc and jemalloc
 
 environment+:
-  MAKE_CHECK_TESTSUITEFLAGS: ""
   OVN_CONFIGURE_FLAGS: "LIBS=-ljemalloc"
 
 provision:
@@ -20,6 +19,3 @@ discover:
   how: fmf
   test:
     - /tests/ovn-make-check
-
-execute:
-  how: tmt

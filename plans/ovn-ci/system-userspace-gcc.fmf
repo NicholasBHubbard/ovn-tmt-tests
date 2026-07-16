@@ -1,7 +1,6 @@
 summary: OVN system-userspace tests with gcc
 
 environment+:
-  MAKE_CHECK_TESTSUITEFLAGS: ""
   MAKE_CHECK_TARGET: check-system-userspace
 
 provision:
@@ -18,6 +17,3 @@ discover:
   how: fmf
   test:
     - /tests/ovn-make-check
-
-execute:
-  how: tmt

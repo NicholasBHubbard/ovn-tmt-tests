@@ -1,7 +1,6 @@
 summary: OVN unit tests with clang+ASAN
 
 environment+:
-  MAKE_CHECK_TESTSUITEFLAGS: ""
   OVN_CC: clang
   OVN_CONFIGURE_FLAGS: "--enable-address-sanitizer"
 
@@ -17,6 +16,3 @@ discover:
   how: fmf
   test:
     - /tests/ovn-make-check
-
-execute:
-  how: tmt

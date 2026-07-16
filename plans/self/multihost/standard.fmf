@@ -41,6 +41,3 @@ discover:
       - central
     test:
       - /tests/self/multihost
-
-execute:
-  how: tmt

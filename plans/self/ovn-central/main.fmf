@@ -1,5 +1,4 @@
-summary: Base plan for ovn-central role self-tests
-enabled: false
+summary: Base configuration for ovn-central self-tests
 
 discover:
   how: fmf

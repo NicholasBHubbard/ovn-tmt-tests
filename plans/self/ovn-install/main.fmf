@@ -1,0 +1,9 @@
+summary: Base configuration for ovn-install self-tests
+
+discover:
+  how: fmf
+  test:
+    - /tests/self/ovn-install
+
+execute:
+  how: tmt

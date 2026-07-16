@@ -13,11 +13,3 @@ prepare:
   - how: ansible
     playbook: playbooks/ovn-install.yml
     extra-args: '-e ovn_install_method=git -e ovn_werror=true'
-
-discover:
-  how: fmf
-  test:
-    - /tests/self/ovn-install
-
-execute:
-  how: tmt

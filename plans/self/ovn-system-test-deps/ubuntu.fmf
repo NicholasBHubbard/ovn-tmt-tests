@@ -9,11 +9,3 @@ prepare:
     script: ./tests/self/ovn-system-test-deps/pre.sh
   - how: ansible
     playbook: playbooks/ovn-system-test-deps.yml
-
-discover:
-  how: fmf
-  test:
-    - /tests/self/ovn-system-test-deps
-
-execute:
-  how: tmt

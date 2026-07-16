@@ -1,0 +1,13 @@
+summary: Base configuration for GitHub CI self-tests
+
+prepare:
+  - how: shell
+    script: ./tests/self/ci/pre.sh
+
+discover:
+  how: fmf
+  test:
+    - /tests/self/ci
+
+execute:
+  how: tmt

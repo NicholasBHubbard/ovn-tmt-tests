@@ -16,11 +16,3 @@ prepare:
     how: ansible
     playbook: playbooks/ovn-host.yml
     extra-args: '-e install_method=distro'
-
-discover:
-  how: fmf
-  test:
-    - /tests/self/ovn-host
-
-execute:
-  how: tmt

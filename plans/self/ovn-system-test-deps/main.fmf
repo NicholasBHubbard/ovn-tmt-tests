@@ -1,5 +1,4 @@
-summary: Base plan for ovn-system-test-deps self-tests
-enabled: false
+summary: Base configuration for OVN system-test dependency self-tests
 
 discover:
   how: fmf

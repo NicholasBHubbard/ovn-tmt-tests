@@ -1,7 +1,6 @@
 summary: OVN system-dpdk tests with gcc
 
 environment+:
-  MAKE_CHECK_TESTSUITEFLAGS: ""
   MAKE_CHECK_TARGET: check-system-dpdk
   OVN_DPDK: "true"
 
@@ -13,6 +12,7 @@ provision:
 prepare+<:
   - how: ansible
     playbook: playbooks/dpdk-build.yml
+    extra-args: "-e 'dpdk_install_dir=$OVN_DPDK_DIR'"
 
 prepare+:
   - how: ansible
@@ -27,6 +27,3 @@ discover:
   test:
     - /tests/ovn-make-check
     - /tests/ovn-dpdk
-
-execute:
-  how: tmt

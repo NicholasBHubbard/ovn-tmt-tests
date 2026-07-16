@@ -11,6 +11,3 @@ discover:
   how: fmf
   test:
     - /tests/ovn-compile
-
-execute:
-  how: tmt

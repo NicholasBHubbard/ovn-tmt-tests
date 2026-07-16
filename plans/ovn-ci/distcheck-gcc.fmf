@@ -15,6 +15,3 @@ discover:
   how: fmf
   test:
     - /tests/ovn-distcheck
-
-execute:
-  how: tmt

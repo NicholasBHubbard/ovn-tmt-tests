@@ -1,7 +1,6 @@
 summary: OVN unit tests with clang
 
 environment+:
-  MAKE_CHECK_TESTSUITEFLAGS: ""
   OVN_CC: clang
 
 provision:
@@ -16,6 +15,3 @@ discover:
   how: fmf
   test:
     - /tests/ovn-make-check
-
-execute:
-  how: tmt

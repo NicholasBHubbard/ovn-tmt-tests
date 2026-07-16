@@ -1,5 +1,4 @@
-summary: Base plan for multi-host OVN topology self-tests
-enabled: false
+summary: Base configuration for multi-host OVN topology self-tests
 
 discover:
   how: fmf

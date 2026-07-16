@@ -1,5 +1,4 @@
-summary: Base plan for make_check role self-tests
-enabled: false
+summary: Base configuration for make_check self-tests
 
 discover:
   how: fmf

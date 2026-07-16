@@ -1,9 +1,15 @@
+summary: Base configuration for OVN CI plans
+
 environment:
+  MAKE_CHECK_TESTSUITEFLAGS: ""
   OVN_CC: gcc
   OVN_CONFIGURE_FLAGS: ""
   OVN_DPDK: "false"
+  OVN_DPDK_DIR: /usr/local/dpdk
   OVN_GIT_REPO: https://github.com/ovn-org/ovn.git
   OVN_GIT_VERSION: main
+  OVN_MAKE_FLAGS: ""
+  OVN_SOURCE_DIR: /usr/src/ovn
   OVN_WERROR: "true"
 
 prepare:
@@ -13,3 +19,8 @@ prepare:
       -e ovn_install_method=git -e ovn_cc=$OVN_CC -e ovn_werror=$OVN_WERROR
       -e ovn_dpdk=$OVN_DPDK -e 'ovn_configure_flags=$OVN_CONFIGURE_FLAGS'
       -e ovn_git_repo=$OVN_GIT_REPO -e ovn_git_version=$OVN_GIT_VERSION
+      -e 'ovn_source_dir=$OVN_SOURCE_DIR' -e 'ovn_make_flags=$OVN_MAKE_FLAGS'
+      -e 'ovn_dpdk_dir=$OVN_DPDK_DIR'
+
+execute:
+  how: tmt

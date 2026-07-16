@@ -1,5 +1,4 @@
-summary: Base plan for ovn-unit-test-deps self-tests
-enabled: false
+summary: Base configuration for OVN unit-test dependency self-tests
 
 discover:
   how: fmf
