@@ -1,0 +1,57 @@
+- name: Create network namespace for {{ ovn_endpoint.name }}
+  ansible.builtin.command:
+    cmd: "ip netns add {{ ovn_endpoint.name }}"
+    creates: "/var/run/netns/{{ ovn_endpoint.name }}"
+
+- name: Check for host interface for {{ ovn_endpoint.name }}
+  ansible.builtin.command:
+    cmd: "ip link show {{ ovn_endpoint.name }}-p"
+  register: ovn_endpoint_host_interface
+  failed_when: false
+  changed_when: false
+
+- name: Create veth pair for {{ ovn_endpoint.name }}
+  when: ovn_endpoint_host_interface.rc != 0
+  ansible.builtin.command:
+    cmd: >-
+      ip link add {{ ovn_endpoint.name }}-p type veth
+      peer name {{ ovn_endpoint.name }}
+  changed_when: true
+
+- name: Move interface into namespace for {{ ovn_endpoint.name }}
+  when: ovn_endpoint_host_interface.rc != 0
+  ansible.builtin.command:
+    cmd: >-
+      ip link set {{ ovn_endpoint.name }} netns {{ ovn_endpoint.name }}
+  changed_when: true
+
+- name: Attach to the integration bridge for {{ ovn_endpoint.name }}
+  ansible.builtin.command:
+    cmd: >-
+      ovs-vsctl --may-exist add-port {{ ovn_endpoint_bridge }}
+      {{ ovn_endpoint.name }}-p
+      -- set Interface {{ ovn_endpoint.name }}-p
+      external_ids:iface-id={{ ovn_endpoint.iface_id }}
+  changed_when: true
+
+- name: Bring up host interface for {{ ovn_endpoint.name }}
+  ansible.builtin.command:
+    cmd: "ip link set {{ ovn_endpoint.name }}-p up"
+  changed_when: true
+
+- name: Configure interface for {{ ovn_endpoint.name }}
+  ansible.builtin.command:
+    cmd: "ip netns exec {{ ovn_endpoint.name }} {{ item }}"
+  loop:
+    - ip link set lo up
+    - "ip link set {{ ovn_endpoint.name }} address {{ ovn_endpoint.mac }}"
+    - "ip link set {{ ovn_endpoint.name }} up"
+  changed_when: true
+
+- name: Configure addresses for {{ ovn_endpoint.name }}
+  ansible.builtin.command:
+    cmd: >-
+      ip netns exec {{ ovn_endpoint.name }} ip address replace
+      {{ item }} dev {{ ovn_endpoint.name }}
+  loop: "{{ ovn_endpoint.addresses }}"
+  changed_when: true

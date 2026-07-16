@@ -1,0 +1,12 @@
+- name: Create logical switch port for {{ ovn_endpoint.iface_id }}
+  ansible.builtin.command:
+    cmd: >-
+      ovn-nbctl --may-exist lsp-add
+      {{ ovn_endpoint.switch }} {{ ovn_endpoint.iface_id }}
+      -- lsp-set-addresses {{ ovn_endpoint.iface_id }}
+      "{{ ([ovn_endpoint.mac]
+            + (ovn_endpoint.addresses
+               | map('regex_replace', '/.*$', '')
+               | list))
+           | join(' ') }}"
+  changed_when: true

@@ -1,0 +1,37 @@
+- name: Create the endpoint test switch
+  hosts: all
+  become: true
+  tasks:
+    - name: Create the logical switch
+      ansible.builtin.command:
+        cmd: ovn-nbctl --may-exist ls-add self-sw
+      changed_when: true
+
+- name: Apply the top-down endpoint configuration
+  ansible.builtin.import_playbook: ../../../playbooks/ovn-endpoints.yml
+  vars:
+    ovn_endpoint_central_hosts: all
+    ovn_endpoint_compute_hosts: all
+    ovn_endpoints:
+      - name: self-vm1
+        host: default-0
+        switch: self-sw
+        iface_id: self-port1
+        mac: "02:00:00:00:01:01"
+        addresses:
+          - 192.0.2.1/24
+          - 192.0.2.11/24
+      - name: self-vm2
+        host: default-0
+        switch: self-sw
+        iface_id: self-port2
+        mac: "02:00:00:00:02:01"
+        addresses:
+          - 192.0.2.2/24
+      - name: self-remote
+        host: another-host
+        switch: self-sw
+        iface_id: self-port3
+        mac: "02:00:00:00:03:01"
+        addresses:
+          - 192.0.2.3/24

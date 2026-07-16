@@ -16,3 +16,7 @@ prepare:
     how: ansible
     playbook: playbooks/ovn-host.yml
     extra-args: '-e install_method=distro'
+  - name: Set up OVN namespace endpoints
+    how: ansible
+    order: 80
+    playbook: tests/self/ovn-host/endpoints.yml

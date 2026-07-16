@@ -1,0 +1,13 @@
+- name: Configure OVN logical switch ports
+  hosts: "{{ ovn_endpoint_central_hosts | default('central') }}"
+  become: true
+  roles:
+    - role: ovn_endpoints
+      ovn_endpoint_mode: ports
+
+- name: Configure OVN namespace endpoints
+  hosts: "{{ ovn_endpoint_compute_hosts | default('compute') }}"
+  become: true
+  roles:
+    - role: ovn_endpoints
+      ovn_endpoint_mode: local

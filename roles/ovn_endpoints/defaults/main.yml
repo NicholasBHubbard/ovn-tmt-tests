@@ -1,0 +1,3 @@
+ovn_endpoints: []
+ovn_endpoint_bridge: br-int
+ovn_endpoint_mode: local

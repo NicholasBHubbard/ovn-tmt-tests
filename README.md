@@ -79,6 +79,32 @@ Ansible playbooks used by tmt [prepare](https://tmt.readthedocs.io/en/stable/plu
 
 Reusable Ansible roles.
 
+#### `ovn_endpoints`
+
+[`playbooks/ovn-endpoints.yml`](playbooks/ovn-endpoints.yml) creates logical
+switch ports and their network-namespace endpoints from one list:
+
+```yaml
+- name: Apply endpoint configuration
+  ansible.builtin.import_playbook: playbooks/ovn-endpoints.yml
+  vars:
+    ovn_endpoints:
+      - name: vm1
+        host: compute-1
+        switch: sw0
+        iface_id: sw0-vm1
+        mac: "02:00:00:00:00:01"
+        addresses:
+          - 10.0.0.1/24
+```
+
+`host` must match the compute inventory name, and `switch` must already exist.
+Endpoint names may contain at most 13 characters because the host interface adds
+the `-p` suffix. The playbook targets the `central` and `compute` inventory
+groups by default. Override these with `ovn_endpoint_central_hosts` and
+`ovn_endpoint_compute_hosts`. The integration bridge defaults to `br-int`; set
+`ovn_endpoint_bridge` to use another bridge.
+
 ### [`tests/`](tests/)
 
 tmt test metadata and verification scripts.

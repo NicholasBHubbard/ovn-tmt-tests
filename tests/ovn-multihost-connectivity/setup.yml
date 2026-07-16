@@ -1,4 +1,4 @@
-- name: Create the logical switch and ports
+- name: Create the logical switch
   hosts: central
   become: true
   tasks:
@@ -7,78 +7,21 @@
         cmd: ovn-nbctl --may-exist ls-add tmt-sw0
       changed_when: true
 
-    - name: Create the logical switch ports
-      ansible.builtin.command:
-        cmd: >-
-          ovn-nbctl --may-exist lsp-add tmt-sw0 {{ item.name }}
-          -- lsp-set-addresses {{ item.name }} "{{ item.mac }} {{ item.ip }}"
-      loop:
-        - name: tmt-vm1
-          mac: "02:00:00:00:00:01"
-          ip: 10.0.0.1
-        - name: tmt-vm2
-          mac: "02:00:00:00:00:02"
-          ip: 10.0.0.2
-      changed_when: true
-
-- name: Attach an endpoint to each compute host
-  hosts: compute
-  become: true
+- name: Apply the top-down endpoint configuration
+  ansible.builtin.import_playbook: ../../playbooks/ovn-endpoints.yml
   vars:
-    ovn_test_endpoints:
-      compute-1:
-        name: tmt-vm1
+    ovn_endpoints:
+      - name: tmt-vm1
+        host: compute-1
+        switch: tmt-sw0
+        iface_id: tmt-vm1
         mac: "02:00:00:00:00:01"
-        address: 10.0.0.1/24
-      compute-2:
-        name: tmt-vm2
+        addresses:
+          - 10.0.0.1/24
+      - name: tmt-vm2
+        host: compute-2
+        switch: tmt-sw0
+        iface_id: tmt-vm2
         mac: "02:00:00:00:00:02"
-        address: 10.0.0.2/24
-    endpoint: "{{ ovn_test_endpoints[inventory_hostname] }}"
-  tasks:
-    - name: Create the network namespace
-      ansible.builtin.command:
-        cmd: "ip netns add {{ endpoint.name }}"
-        creates: "/var/run/netns/{{ endpoint.name }}"
-
-    - name: Check for the host veth interface
-      ansible.builtin.command:
-        cmd: "ip link show {{ endpoint.name }}-p"
-      register: host_veth
-      failed_when: false
-      changed_when: false
-
-    - name: Create the veth pair
-      when: host_veth.rc != 0
-      ansible.builtin.command:
-        cmd: "ip link add {{ endpoint.name }}-p type veth peer name {{ endpoint.name }}"
-      changed_when: true
-
-    - name: Move the endpoint interface into its namespace
-      when: host_veth.rc != 0
-      ansible.builtin.command:
-        cmd: "ip link set {{ endpoint.name }} netns {{ endpoint.name }}"
-      changed_when: true
-
-    - name: Attach the host interface to the integration bridge
-      ansible.builtin.command:
-        cmd: >-
-          ovs-vsctl --may-exist add-port br-int {{ endpoint.name }}-p
-          -- set Interface {{ endpoint.name }}-p
-          external_ids:iface-id={{ endpoint.name }}
-      changed_when: true
-
-    - name: Bring up the host interface
-      ansible.builtin.command:
-        cmd: "ip link set {{ endpoint.name }}-p up"
-      changed_when: true
-
-    - name: Configure the endpoint interface
-      ansible.builtin.command:
-        cmd: "ip netns exec {{ endpoint.name }} {{ item }}"
-      loop:
-        - ip link set lo up
-        - "ip link set {{ endpoint.name }} address {{ endpoint.mac }}"
-        - "ip address replace {{ endpoint.address }} dev {{ endpoint.name }}"
-        - "ip link set {{ endpoint.name }} up"
-      changed_when: true
+        addresses:
+          - 10.0.0.2/24

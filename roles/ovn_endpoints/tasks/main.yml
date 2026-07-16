@@ -1,0 +1,18 @@
+- name: Configure OVN logical switch ports
+  when: ovn_endpoint_mode == "ports"
+  ansible.builtin.include_tasks: port.yml
+  loop: "{{ ovn_endpoints }}"
+  loop_control:
+    loop_var: ovn_endpoint
+    label: "{{ ovn_endpoint.iface_id }}"
+
+- name: Configure OVN namespace endpoints
+  when: ovn_endpoint_mode == "local"
+  ansible.builtin.include_tasks: endpoint.yml
+  loop: >-
+    {{ ovn_endpoints
+       | selectattr('host', 'equalto', inventory_hostname)
+       | list }}
+  loop_control:
+    loop_var: ovn_endpoint
+    label: "{{ ovn_endpoint.name }}"
