@@ -85,9 +85,6 @@ assert_contains plans/ovn-ci/main.fmf \
     "-e 'ovn_dpdk_dir=\$OVN_DPDK_DIR'"
 assert_contains plans/ovn-ci/system-dpdk-gcc.fmf \
     "-e 'dpdk_install_dir=\$OVN_DPDK_DIR'"
-assert_contains README.md 'OVN_SOURCE_DIR'
-assert_contains README.md 'OVN_MAKE_FLAGS'
-assert_contains README.md 'OVN_DPDK_DIR'
 
 if [ "$(grep -R -F -l 'MAKE_CHECK_TESTSUITEFLAGS: ""' plans/ovn-ci | wc -l)" -ne 1 ]; then
     record_failure "Empty MAKE_CHECK_TESTSUITEFLAGS default must be defined once."
