@@ -2,4 +2,5 @@
   hosts: "{{ ovn_topology_central_hosts | default('central') }}"
   become: true
   roles:
-    - ovn_topology
+    - ovn_switches
+    - ovn_routers

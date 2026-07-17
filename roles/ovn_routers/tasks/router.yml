@@ -1,0 +1,27 @@
+- name: Create logical router {{ ovn_router.name }}
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - --may-exist
+      - lr-add
+      - "{{ ovn_router.name }}"
+  changed_when: true
+
+- name: Configure options for logical router {{ ovn_router.name }}
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - set
+      - Logical_Router
+      - "{{ ovn_router.name }}"
+      - "options:{{ ovn_router_option.key }}={{ ovn_router_option_value }}"
+  loop: "{{ ovn_router.options | default({}) | dict2items }}"
+  loop_control:
+    loop_var: ovn_router_option
+    label: "{{ ovn_router_option.key }}"
+  vars:
+    ovn_router_option_value: >-
+      {{ (ovn_router_option.value | string | lower)
+         if ovn_router_option.value is boolean
+         else (ovn_router_option.value | string) }}
+  changed_when: true

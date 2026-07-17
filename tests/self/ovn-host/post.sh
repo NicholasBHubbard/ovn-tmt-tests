@@ -33,6 +33,40 @@ check_logical_switch() {
 check_logical_switch self-sw
 check_logical_switch self-unused
 
+check_logical_router() {
+    local router=$1
+    local actual
+
+    actual=$(ovn-nbctl --bare --columns=name find Logical_Router \
+        name="$router" 2>/dev/null || true)
+    if [ "$actual" != "$router" ]; then
+        record_failure "Expected logical router to exist: $router"
+    fi
+}
+
+check_router_option() {
+    local router=$1
+    local option=$2
+    local expected=$3
+    local actual
+
+    actual=$(ovn-nbctl get Logical_Router "$router" \
+        "options:$option" 2>/dev/null | tr -d '"' || true)
+    if [ "$actual" != "$expected" ]; then
+        record_failure "Expected $router option $option=$expected, found $actual"
+    fi
+}
+
+check_logical_router self-r1
+check_logical_router self-r2
+check_router_option self-r1 chassis self-chassis
+check_router_option self-r1 dynamic_neigh_routers true
+check_router_option self-r1 mac_binding_age_threshold 5
+
+if [ "$(ovn-nbctl get Logical_Router self-r2 options 2>/dev/null || true)" != "{}" ]; then
+    record_failure "Expected self-r2 to have no router options"
+fi
+
 check_logical_port() {
     local iface_id=$1
     local switch=$2

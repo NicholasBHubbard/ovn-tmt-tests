@@ -1,0 +1,6 @@
+- name: Configure OVN logical routers
+  ansible.builtin.include_tasks: router.yml
+  loop: "{{ ovn_routers }}"
+  loop_control:
+    loop_var: ovn_router
+    label: "{{ ovn_router.name }}"

@@ -5,6 +5,13 @@
     ovn_switches:
       - name: self-sw
       - name: self-unused
+    ovn_routers:
+      - name: self-r1
+        options:
+          chassis: self-chassis
+          dynamic_neigh_routers: true
+          mac_binding_age_threshold: 5
+      - name: self-r2
 
 - name: Apply the top-down endpoint configuration
   ansible.builtin.import_playbook: ../../../playbooks/ovn-endpoints.yml
