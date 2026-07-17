@@ -6,36 +6,15 @@ DISCLAIMER: This project is currently under development and is not ready for rea
 
 ## Requirements
 
-- [tmt](https://tmt.readthedocs.io/) with `provision-container` and `provision-virtual` plugins
-- [Ansible](https://docs.ansible.com/)
+- Ansible
 - Ansible collections:
-  - [`ansible.posix`](https://docs.ansible.com/ansible/latest/collections/ansible/posix/)
-  - [`community.general`](https://docs.ansible.com/ansible/latest/collections/community/general/)
+  - `ansible.posix`
+  - `community.general`
 - Bash
-
-Install the collections with:
-
-```sh
-ansible-galaxy collection install ansible.posix community.general
-```
-
-### Virtual guests
-
-Plans that provision virtual guests require QEMU/KVM, the system libvirt QEMU
-driver, and libvirt's default network. On Fedora, install them with:
-
-```sh
-sudo dnf install libvirt-client libvirt-daemon-config-network \
-    libvirt-daemon-kvm qemu-kvm
-sudo systemctl enable --now virtqemud.socket virtnetworkd.socket
-```
-
-Multihost plans use `qemu:///system` so their guests share a network. Grant the
-user running tmt access to it, then log out and back in:
-
-```sh
-sudo usermod -aG libvirt "$USER"
-```
+- libvirt
+- Podman
+- QEMU/KVM
+- tmt with the `provision-container` and `provision-virtual` plugins
 
 ## Running plans
 
@@ -78,32 +57,6 @@ Ansible playbooks used by tmt [prepare](https://tmt.readthedocs.io/en/stable/plu
 ### [`roles/`](roles/)
 
 Reusable Ansible roles.
-
-#### `ovn_endpoints`
-
-[`playbooks/ovn-endpoints.yml`](playbooks/ovn-endpoints.yml) creates logical
-switch ports and their network-namespace endpoints from one list:
-
-```yaml
-- name: Apply endpoint configuration
-  ansible.builtin.import_playbook: playbooks/ovn-endpoints.yml
-  vars:
-    ovn_endpoints:
-      - name: vm1
-        host: compute-1
-        switch: sw0
-        iface_id: sw0-vm1
-        mac: "02:00:00:00:00:01"
-        addresses:
-          - 10.0.0.1/24
-```
-
-`host` must match the compute inventory name, and `switch` must already exist.
-Endpoint names may contain at most 13 characters because the host interface adds
-the `-p` suffix. The playbook targets the `central` and `compute` inventory
-groups by default. Override these with `ovn_endpoint_central_hosts` and
-`ovn_endpoint_compute_hosts`. The integration bridge defaults to `br-int`; set
-`ovn_endpoint_bridge` to use another bridge.
 
 ### [`tests/`](tests/)
 
