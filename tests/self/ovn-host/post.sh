@@ -94,10 +94,43 @@ check_endpoint() {
 }
 
 check_endpoint self-vm1 self-port1 self-sw 02:00:00:00:01:01 \
-    192.0.2.1/24 192.0.2.11/24
+    192.0.2.1/24 192.0.2.11/24 2001:db8:1::1/64
 check_endpoint self-vm2 self-port2 self-sw 02:00:00:00:02:01 \
     192.0.2.2/24
 check_logical_port self-port3 self-sw 02:00:00:00:03:01 192.0.2.3/24
+
+check_route() {
+    local namespace=$1
+    local family=$2
+    local table=$3
+    local destination=$4
+    local via=$5
+    local metric=$6
+    local actual expected=$destination
+
+    actual=$(ip -n "$namespace" "-$family" route show \
+        table "$table" "$destination" 2>/dev/null || true)
+    if [ -n "$via" ]; then
+        expected+=" via $via"
+    fi
+    expected+=" dev $namespace"
+    if [ -n "$metric" ]; then
+        expected+=" metric $metric"
+    fi
+
+    if [[ "$actual" != "$expected"* ]]; then
+        record_failure "Expected route '$expected', found '$actual'"
+    fi
+}
+
+check_route self-vm1 4 main default 192.0.2.254 ""
+check_route self-vm1 4 100 198.51.100.0/24 192.0.2.253 100
+check_route self-vm1 6 main default 2001:db8:1::ff 50
+check_route self-vm1 6 200 default "" ""
+
+if ip -n self-vm2 -4 route show default | grep -q .; then
+    record_failure "Unexpected default route on endpoint without routes: self-vm2"
+fi
 
 if ip netns list | grep -q '^self-remote\b'; then
     record_failure "Unexpected endpoint namespace on this host: self-remote"

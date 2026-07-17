@@ -20,6 +20,20 @@
         addresses:
           - 192.0.2.1/24
           - 192.0.2.11/24
+          - 2001:db8:1::1/64
+        routes:
+          - to: default
+            via: 192.0.2.254
+          - to: 198.51.100.0/24
+            via: 192.0.2.253
+            metric: 100
+            table: 100
+          - to: default
+            via: 2001:db8:1::ff
+            metric: 50
+          - to: default
+            family: 6
+            table: 200
       - name: self-vm2
         host: default-0
         switch: self-sw

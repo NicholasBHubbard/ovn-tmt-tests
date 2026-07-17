@@ -55,3 +55,23 @@
       {{ item }} dev {{ ovn_endpoint.name }}
   loop: "{{ ovn_endpoint.addresses }}"
   changed_when: true
+
+- name: Configure routes for {{ ovn_endpoint.name }}
+  ansible.builtin.command:
+    cmd: >-
+      ip netns exec {{ ovn_endpoint.name }}
+      ip -{{ ovn_route.family
+              | default(6 if ':' in
+                ((ovn_route.to | string)
+                 ~ (ovn_route.via | default('') | string))
+                else 4) }}
+      route replace {{ ovn_route.to }}
+      {% if ovn_route.via is defined %}via {{ ovn_route.via }}{% endif %}
+      dev {{ ovn_endpoint.name }}
+      {% if ovn_route.metric is defined %}metric {{ ovn_route.metric }}{% endif %}
+      {% if ovn_route.table is defined %}table {{ ovn_route.table }}{% endif %}
+  loop: "{{ ovn_endpoint.routes | default([]) }}"
+  loop_control:
+    loop_var: ovn_route
+    label: "{{ ovn_route.to }}"
+  changed_when: true
