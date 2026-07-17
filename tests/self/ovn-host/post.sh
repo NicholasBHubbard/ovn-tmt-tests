@@ -19,6 +19,20 @@ echo "Checking chassis is registered in SB database..."
 assert_ovn_chassis_present
 
 echo "Checking namespace endpoints..."
+check_logical_switch() {
+    local switch=$1
+    local actual
+
+    actual=$(ovn-nbctl --bare --columns=name find Logical_Switch \
+        name="$switch" 2>/dev/null || true)
+    if [ "$actual" != "$switch" ]; then
+        record_failure "Expected logical switch to exist: $switch"
+    fi
+}
+
+check_logical_switch self-sw
+check_logical_switch self-unused
+
 check_logical_port() {
     local iface_id=$1
     local switch=$2

@@ -1,0 +1,8 @@
+- name: Create OVN logical switches
+  ansible.builtin.command:
+    cmd: "ovn-nbctl --may-exist ls-add {{ ovn_switch.name }}"
+  loop: "{{ ovn_switches }}"
+  loop_control:
+    loop_var: ovn_switch
+    label: "{{ ovn_switch.name }}"
+  changed_when: true

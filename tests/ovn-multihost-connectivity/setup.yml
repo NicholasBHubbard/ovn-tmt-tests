@@ -1,11 +1,8 @@
-- name: Create the logical switch
-  hosts: central
-  become: true
-  tasks:
-    - name: Create the logical switch
-      ansible.builtin.command:
-        cmd: ovn-nbctl --may-exist ls-add tmt-sw0
-      changed_when: true
+- name: Apply the top-down topology configuration
+  ansible.builtin.import_playbook: ../../playbooks/ovn-topology.yml
+  vars:
+    ovn_switches:
+      - name: tmt-sw0
 
 - name: Apply the top-down endpoint configuration
   ansible.builtin.import_playbook: ../../playbooks/ovn-endpoints.yml
