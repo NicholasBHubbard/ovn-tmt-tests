@@ -1,0 +1,156 @@
+- name: Delete logical switch port {{ ovn_router_port.switch_port }}
+  when: ovn_router_port.state | default('present') == 'absent'
+  ansible.builtin.command:
+    cmd: >-
+      ovn-nbctl --if-exists lsp-del
+      {{ ovn_router_port.switch_port | quote }}
+  changed_when: true
+
+- name: Delete logical router port {{ ovn_router_port.name }}
+  when: ovn_router_port.state | default('present') == 'absent'
+  ansible.builtin.command:
+    cmd: "ovn-nbctl --if-exists lrp-del {{ ovn_router_port.name | quote }}"
+  changed_when: true
+
+- name: Find logical router port {{ ovn_router_port.name }}
+  when: ovn_router_port.state | default('present') == 'present'
+  ansible.builtin.command:
+    cmd: >-
+      ovn-nbctl --bare --columns=_uuid find Logical_Router_Port
+      name={{ ovn_router_port.name | quote }}
+  register: ovn_router_port_row
+  changed_when: false
+
+- name: Find current router for {{ ovn_router_port.name }}
+  when:
+    - ovn_router_port.state | default('present') == 'present'
+    - ovn_router_port_row.stdout | length > 0
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - --bare
+      - --columns=name
+      - find
+      - Logical_Router
+      - "ports{>=}{{ ovn_router_port_row.stdout }}"
+  register: ovn_router_port_current_router
+  changed_when: false
+
+- name: Move logical router port {{ ovn_router_port.name }}
+  when:
+    - ovn_router_port.state | default('present') == 'present'
+    - ovn_router_port_row.stdout | length > 0
+    - ovn_router_port_current_router.stdout != ovn_router_port.router
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - remove
+      - Logical_Router
+      - "{{ ovn_router_port_current_router.stdout }}"
+      - ports
+      - "{{ ovn_router_port_row.stdout }}"
+      - --
+      - add
+      - Logical_Router
+      - "{{ ovn_router_port.router }}"
+      - ports
+      - "{{ ovn_router_port_row.stdout }}"
+  changed_when: true
+
+- name: Create logical router port {{ ovn_router_port.name }}
+  when:
+    - ovn_router_port.state | default('present') == 'present'
+    - ovn_router_port_row.stdout | length == 0
+  ansible.builtin.command:
+    argv: >-
+      {{ ['ovn-nbctl', 'lrp-add', ovn_router_port.router,
+          ovn_router_port.name, ovn_router_port.mac]
+         + (ovn_router_port.networks | default([])) }}
+  changed_when: true
+
+- name: Configure logical router port {{ ovn_router_port.name }}
+  when: ovn_router_port.state | default('present') == 'present'
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - set
+      - Logical_Router_Port
+      - "{{ ovn_router_port.name }}"
+      - "mac={{ ovn_router_port.mac | to_json }}"
+      - "networks={{ ovn_router_port.networks | default([]) | to_json }}"
+  changed_when: true
+
+- name: Find logical switch port {{ ovn_router_port.switch_port }}
+  when: ovn_router_port.state | default('present') == 'present'
+  ansible.builtin.command:
+    cmd: >-
+      ovn-nbctl --bare --columns=_uuid find Logical_Switch_Port
+      name={{ ovn_router_port.switch_port | quote }}
+  register: ovn_router_switch_port_row
+  changed_when: false
+
+- name: Find current switch for {{ ovn_router_port.switch_port }}
+  when:
+    - ovn_router_port.state | default('present') == 'present'
+    - ovn_router_switch_port_row.stdout | length > 0
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - --bare
+      - --columns=name
+      - find
+      - Logical_Switch
+      - "ports{>=}{{ ovn_router_switch_port_row.stdout }}"
+  register: ovn_router_port_current_switch
+  changed_when: false
+
+- name: Move logical switch port {{ ovn_router_port.switch_port }}
+  when:
+    - ovn_router_port.state | default('present') == 'present'
+    - ovn_router_switch_port_row.stdout | length > 0
+    - ovn_router_port_current_switch.stdout != ovn_router_port.switch
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - remove
+      - Logical_Switch
+      - "{{ ovn_router_port_current_switch.stdout }}"
+      - ports
+      - "{{ ovn_router_switch_port_row.stdout }}"
+      - --
+      - add
+      - Logical_Switch
+      - "{{ ovn_router_port.switch }}"
+      - ports
+      - "{{ ovn_router_switch_port_row.stdout }}"
+  changed_when: true
+
+- name: Create logical switch port {{ ovn_router_port.switch_port }}
+  when:
+    - ovn_router_port.state | default('present') == 'present'
+    - ovn_router_switch_port_row.stdout | length == 0
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - lsp-add
+      - "{{ ovn_router_port.switch }}"
+      - "{{ ovn_router_port.switch_port }}"
+  changed_when: true
+
+- name: Configure logical switch port {{ ovn_router_port.switch_port }}
+  when: ovn_router_port.state | default('present') == 'present'
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - lsp-set-type
+      - "{{ ovn_router_port.switch_port }}"
+      - router
+      - --
+      - lsp-set-addresses
+      - "{{ ovn_router_port.switch_port }}"
+      - router
+      - --
+      - lsp-set-options
+      - "{{ ovn_router_port.switch_port }}"
+      - "router-port={{ ovn_router_port.name }}"
+  changed_when: true

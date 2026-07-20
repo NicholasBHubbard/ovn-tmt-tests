@@ -4,3 +4,4 @@
   roles:
     - ovn_switches
     - ovn_routers
+    - ovn_router_ports

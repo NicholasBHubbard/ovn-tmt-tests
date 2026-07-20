@@ -20,17 +20,37 @@ prepare:
     how: ansible
     order: 80
     playbook: tests/self/ovn-host/endpoints.yml
+  - name: Record router port identity
+    how: shell
+    order: 81
+    script: >-
+      ovn-nbctl --bare --columns=_uuid find Logical_Router_Port name=self-rp
+      > /tmp/self-rp-id
+      && ovn-nbctl --bare --columns=_uuid find Logical_Switch_Port name=self-rp-sw
+      > /tmp/self-rp-sw-id
+      && ovn-nbctl --bare --columns=_uuid find Logical_Router_Port name=self-rp-delete
+      > /tmp/self-rp-delete-id
+      && ovn-nbctl --bare --columns=_uuid find Logical_Switch_Port name=self-rp-delete-sw
+      > /tmp/self-rp-delete-sw-id
+      && test -s /tmp/self-rp-id
+      && test -s /tmp/self-rp-sw-id
+      && test -s /tmp/self-rp-delete-id
+      && test -s /tmp/self-rp-delete-sw-id
+      && test "$(ovn-nbctl --bare --columns=name find Logical_Router
+      "ports{>=}$(cat /tmp/self-rp-id)")" = self-r1
+      && test "$(ovn-nbctl --bare --columns=name find Logical_Switch
+      "ports{>=}$(cat /tmp/self-rp-sw-id)")" = self-sw
   - name: Reconfigure OVN namespace endpoints
     how: ansible
-    order: 81
+    order: 82
     playbook: tests/self/ovn-host/reconfigure.yml
   - name: Record endpoint identity
     how: shell
-    order: 82
+    order: 83
     script: >-
       stat -Lc '%i' /var/run/netns/self-vm1 > /tmp/self-vm1-ns-id
       && cat /sys/class/net/self-vm1-p/ifindex > /tmp/self-vm1-ifindex
   - name: Reapply OVN namespace endpoint configuration
     how: ansible
-    order: 83
+    order: 84
     playbook: tests/self/ovn-host/reconfigure.yml

@@ -15,6 +15,20 @@
       - name: self-r3
         options:
           chassis: clear-me
+    ovn_router_ports:
+      - name: self-rp
+        router: self-r1
+        switch: self-sw
+        switch_port: self-rp-sw
+        mac: "02:00:00:00:10:01"
+        networks:
+          - 192.0.2.254/24
+          - 2001:db8:1::ff/64
+      - name: self-rp-delete
+        router: self-r3
+        switch: self-sw
+        switch_port: self-rp-delete-sw
+        mac: "02:00:00:00:10:02"
 
 - name: Apply the top-down endpoint configuration
   ansible.builtin.import_playbook: ../../../playbooks/ovn-endpoints.yml

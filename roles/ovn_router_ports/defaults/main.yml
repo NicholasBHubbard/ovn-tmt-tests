@@ -1,0 +1,2 @@
+# Listed attachments default to present; absent removes them. Unlisted attachments are untouched.
+ovn_router_ports: []

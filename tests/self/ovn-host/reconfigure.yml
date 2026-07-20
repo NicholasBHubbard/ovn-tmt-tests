@@ -23,6 +23,18 @@
       - name: self-r2
         state: absent
       - name: self-r3
+    ovn_router_ports:
+      - name: self-rp
+        router: self-r3
+        switch: self-moved
+        switch_port: self-rp-sw
+        mac: "02:00:00:00:10:03"
+        networks:
+          - 203.0.113.1/24
+          - 2001:db8:2::ff/64
+      - name: self-rp-delete
+        switch_port: self-rp-delete-sw
+        state: absent
 
 - name: Reapply changed top-down endpoint configuration
   ansible.builtin.import_playbook: ../../../playbooks/ovn-endpoints.yml

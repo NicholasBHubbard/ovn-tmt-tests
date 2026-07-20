@@ -62,6 +62,77 @@ if [ "$(ovn-nbctl get Logical_Router self-r3 options 2>/dev/null || true)" != "{
     record_failure "Expected self-r3 to have no router options"
 fi
 
+check_router_attachment() {
+    local router_port=$1
+    local switch_port=$2
+    local router=$3
+    local switch=$4
+    local mac=$5
+    local actual_mac actual_networks actual_router actual_switch
+    local expected_networks router_port_uuid switch_port_uuid
+    shift 5
+
+    router_port_uuid=$(ovn-nbctl --bare --columns=_uuid find \
+        Logical_Router_Port name="$router_port" 2>/dev/null || true)
+    switch_port_uuid=$(ovn-nbctl --bare --columns=_uuid find \
+        Logical_Switch_Port name="$switch_port" 2>/dev/null || true)
+    if [ -z "$router_port_uuid" ] || [ -z "$switch_port_uuid" ]; then
+        record_failure "Expected router attachment $router_port/$switch_port"
+        return
+    fi
+
+    actual_router=$(ovn-nbctl --bare --columns=name find Logical_Router \
+        "ports{>=}$router_port_uuid" 2>/dev/null || true)
+    actual_switch=$(ovn-nbctl --bare --columns=name find Logical_Switch \
+        "ports{>=}$switch_port_uuid" 2>/dev/null || true)
+    if [ "$actual_router" != "$router" ]; then
+        record_failure "Expected $router_port on $router, found $actual_router"
+    fi
+    if [ "$actual_switch" != "$switch" ]; then
+        record_failure "Expected $switch_port on $switch, found $actual_switch"
+    fi
+
+    actual_mac=$(ovn-nbctl get Logical_Router_Port "$router_port" mac \
+        2>/dev/null | tr -d '"' || true)
+    if [ "$actual_mac" != "$mac" ]; then
+        record_failure "Expected $router_port MAC $mac, found $actual_mac"
+    fi
+
+    actual_networks=$(ovn-nbctl get Logical_Router_Port "$router_port" networks \
+        2>/dev/null | tr -d '[],"' | tr ' ' '\n' | sed '/^$/d' | sort)
+    expected_networks=$(printf '%s\n' "$@" | sort)
+    if [ "$actual_networks" != "$expected_networks" ]; then
+        record_failure "Expected $router_port networks '$expected_networks', found '$actual_networks'"
+    fi
+
+    if [ "$(ovn-nbctl get Logical_Switch_Port "$switch_port" type \
+        2>/dev/null | tr -d '"' || true)" != "router" ]; then
+        record_failure "Expected $switch_port type router"
+    fi
+    if [ "$(ovn-nbctl get Logical_Switch_Port "$switch_port" \
+        options:router-port 2>/dev/null | tr -d '"' || true)" != "$router_port" ]; then
+        record_failure "Expected $switch_port to reference $router_port"
+    fi
+    if [ "$(ovn-nbctl get Logical_Switch_Port "$switch_port" addresses \
+        2>/dev/null | tr -d '[]," ' || true)" != "router" ]; then
+        record_failure "Expected $switch_port addresses router"
+    fi
+}
+
+check_router_attachment self-rp self-rp-sw self-r3 self-moved \
+    02:00:00:00:10:03 203.0.113.1/24 2001:db8:2::ff/64
+check_ovn_row Logical_Router_Port self-rp-delete ""
+check_ovn_row Logical_Switch_Port self-rp-delete-sw ""
+
+if [ "$(</tmp/self-rp-id)" != "$(ovn-nbctl --bare --columns=_uuid find \
+    Logical_Router_Port name=self-rp)" ]; then
+    record_failure "Expected router port identity to survive reconfiguration"
+fi
+if [ "$(</tmp/self-rp-sw-id)" != "$(ovn-nbctl --bare --columns=_uuid find \
+    Logical_Switch_Port name=self-rp-sw)" ]; then
+    record_failure "Expected router switch port identity to survive reconfiguration"
+fi
+
 check_logical_port() {
     local iface_id=$1
     local switch=$2
