@@ -1,0 +1,30 @@
+- name: Verify endpoint placement
+  hosts: compute
+  become: true
+  tasks:
+    - name: Find endpoint namespace
+      ansible.builtin.command:
+        cmd: ip netns exec self-move true
+      register: ovn_test_endpoint_namespace
+      failed_when: false
+      changed_when: false
+
+    - name: Find endpoint host interface
+      ansible.builtin.command:
+        cmd: ip link show self-move-p
+      register: ovn_test_endpoint_interface
+      failed_when: false
+      changed_when: false
+
+    - name: Check endpoint placement
+      ansible.builtin.assert:
+        that:
+          - >-
+            (inventory_hostname == ovn_test_endpoint_host)
+            == (ovn_test_endpoint_namespace.rc == 0)
+          - >-
+            (inventory_hostname == ovn_test_endpoint_host)
+            == (ovn_test_endpoint_interface.rc == 0)
+        fail_msg: >-
+          self-move placement is wrong on {{ inventory_hostname }};
+          expected host is {{ ovn_test_endpoint_host }}

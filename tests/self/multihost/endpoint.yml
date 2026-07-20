@@ -1,0 +1,17 @@
+- name: Create the endpoint logical switch
+  ansible.builtin.import_playbook: ../../../playbooks/ovn-topology.yml
+  vars:
+    ovn_switches:
+      - name: self-move-sw
+
+- name: Place the endpoint on the selected compute host
+  ansible.builtin.import_playbook: ../../../playbooks/ovn-endpoints.yml
+  vars:
+    ovn_endpoints:
+      - name: self-move
+        host: "{{ ovn_test_endpoint_host }}"
+        switch: self-move-sw
+        iface_id: self-move
+        mac: "02:00:00:00:10:01"
+        addresses:
+          - 192.0.2.10/24

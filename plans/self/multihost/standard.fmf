@@ -35,6 +35,30 @@ prepare:
     how: ansible
     playbook: playbooks/multihost.yml
 
+  - name: Create endpoint on compute-1
+    how: ansible
+    order: 80
+    playbook: tests/self/multihost/endpoint.yml
+    extra-args: '-e ovn_test_endpoint_host=compute-1'
+
+  - name: Verify endpoint on compute-1
+    how: ansible
+    order: 81
+    playbook: tests/self/multihost/verify-endpoint.yml
+    extra-args: '-e ovn_test_endpoint_host=compute-1'
+
+  - name: Move endpoint to compute-2
+    how: ansible
+    order: 82
+    playbook: tests/self/multihost/endpoint.yml
+    extra-args: '-e ovn_test_endpoint_host=compute-2'
+
+  - name: Verify endpoint moved to compute-2
+    how: ansible
+    order: 83
+    playbook: tests/self/multihost/verify-endpoint.yml
+    extra-args: '-e ovn_test_endpoint_host=compute-2'
+
 discover:
   - how: fmf
     where:
