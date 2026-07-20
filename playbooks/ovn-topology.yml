@@ -3,6 +3,7 @@
   become: true
   roles:
     - ovn_switches
+    - ovn_dhcp_options
     - ovn_localnet_ports
     - ovn_routers
     - ovn_router_ports

@@ -1,0 +1,88 @@
+- name: Verify DHCP options {{ ovn_dhcp.id }}
+  ansible.builtin.assert:
+    that:
+      - >-
+        ovn_dhcp.state | default('present') == 'absent'
+        or ovn_dhcp.cidr is defined
+    fail_msg: "Present DHCP options need cidr."
+
+- name: Find DHCP options {{ ovn_dhcp.id }}
+  ansible.builtin.command:
+    cmd: >-
+      ovn-nbctl --bare --columns=_uuid find DHCP_Options
+      external_ids:ovn-tmt-tests-id={{ ovn_dhcp.id | quote }}
+  register: ovn_dhcp_row
+  changed_when: false
+
+- name: Verify DHCP options ID is unambiguous {{ ovn_dhcp.id }}
+  ansible.builtin.assert:
+    that:
+      - ovn_dhcp_row.stdout_lines | length <= 1
+    fail_msg: "DHCP options ID {{ ovn_dhcp.id }} matches multiple rows."
+
+- name: Delete DHCP options {{ ovn_dhcp.id }}
+  when:
+    - ovn_dhcp.state | default('present') == 'absent'
+    - ovn_dhcp_row.stdout | length > 0
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - destroy
+      - DHCP_Options
+      - "{{ ovn_dhcp_row.stdout }}"
+  changed_when: true
+
+- name: Create DHCP options {{ ovn_dhcp.id }}
+  when:
+    - ovn_dhcp.state | default('present') == 'present'
+    - ovn_dhcp_row.stdout | length == 0
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - create
+      - DHCP_Options
+      - "cidr={{ ovn_dhcp.cidr | to_json }}"
+      - "external_ids:ovn-tmt-tests-id={{ ovn_dhcp.id | to_json }}"
+  changed_when: true
+
+- name: Find configured DHCP options {{ ovn_dhcp.id }}
+  when: ovn_dhcp.state | default('present') == 'present'
+  ansible.builtin.command:
+    cmd: >-
+      ovn-nbctl --bare --columns=_uuid find DHCP_Options
+      external_ids:ovn-tmt-tests-id={{ ovn_dhcp.id | quote }}
+  register: ovn_dhcp_configured_row
+  changed_when: false
+
+- name: Configure DHCP options {{ ovn_dhcp.id }}
+  when: ovn_dhcp.state | default('present') == 'present'
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - set
+      - DHCP_Options
+      - "{{ ovn_dhcp_configured_row.stdout }}"
+      - "cidr={{ ovn_dhcp.cidr | to_json }}"
+      - "options={}"
+      - "external_ids:ovn-tmt-tests-id={{ ovn_dhcp.id | to_json }}"
+  changed_when: true
+
+- name: Configure DHCP option
+  when: ovn_dhcp.state | default('present') == 'present'
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - set
+      - DHCP_Options
+      - "{{ ovn_dhcp_configured_row.stdout }}"
+      - "options:{{ ovn_dhcp_option.key }}={{ ovn_dhcp_option_value }}"
+  loop: "{{ ovn_dhcp.options | default({}) | dict2items }}"
+  loop_control:
+    loop_var: ovn_dhcp_option
+    label: "{{ ovn_dhcp_option.key }}"
+  vars:
+    ovn_dhcp_option_value: >-
+      {{ ('1' if ovn_dhcp_option.value else '0')
+         if ovn_dhcp_option.value is boolean
+         else (ovn_dhcp_option.value | string) }}
+  changed_when: true

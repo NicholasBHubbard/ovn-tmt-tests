@@ -5,6 +5,22 @@
     ovn_switches:
       - name: self-sw
       - name: self-unused
+    ovn_dhcp_options:
+      - id: self-dhcp
+        cidr: 192.0.2.0/24
+        options:
+          server_id: 192.0.2.254
+          server_mac: "02:00:00:00:10:01"
+          lease_time: 3600
+          router: 192.0.2.254
+          ip_forward_enable: false
+      - id: self-dhcp-v6
+        cidr: 2001:db8:1::/64
+        options:
+          server_id: "02:00:00:00:10:01"
+          dns_server: 2001:db8::53
+      - id: self-dhcp-delete
+        cidr: 203.0.113.0/24
     ovn_localnet_ports:
       - name: self-localnet
         switch: self-sw
@@ -124,6 +140,11 @@
         cmd: >-
           ovn-nbctl --may-exist lr-nat-add
           self-r3 snat 203.0.113.20 10.0.0.0/24
+      changed_when: true
+
+    - name: Add unmanaged DHCP options for preservation test
+      ansible.builtin.command:
+        cmd: ovn-nbctl dhcp-options-create 10.10.0.0/24
       changed_when: true
 
 - name: Apply the top-down endpoint configuration

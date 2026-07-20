@@ -1,0 +1,24 @@
+- name: Verify DHCP options states
+  ansible.builtin.assert:
+    that:
+      - >-
+        ovn_dhcp_options
+        | map(attribute='state', default='present')
+        | difference(['present', 'absent'])
+        | length == 0
+    fail_msg: "DHCP options states must be present or absent."
+
+- name: Verify DHCP options IDs are unique
+  ansible.builtin.assert:
+    that:
+      - >-
+        ovn_dhcp_options | map(attribute='id') | unique | length
+        == ovn_dhcp_options | length
+    fail_msg: "DHCP options IDs must be unique."
+
+- name: Configure OVN DHCP options
+  ansible.builtin.include_tasks: options.yml
+  loop: "{{ ovn_dhcp_options }}"
+  loop_control:
+    loop_var: ovn_dhcp
+    label: "{{ ovn_dhcp.id }}"

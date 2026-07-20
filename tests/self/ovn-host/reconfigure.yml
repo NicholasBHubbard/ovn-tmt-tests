@@ -15,6 +15,17 @@
       - name: self-moved
       - name: self-unused
         state: absent
+    ovn_dhcp_options:
+      - id: self-dhcp
+        cidr: 198.51.100.0/24
+        options:
+          server_id: 198.51.100.1
+          lease_time: 7200
+          dns_server: 198.51.100.53
+          ip_forward_enable: true
+          classless_static_route: "{0.0.0.0/0, 198.51.100.1}"
+      - id: self-dhcp-delete
+        state: absent
     ovn_localnet_ports:
       - name: self-localnet
         switch: self-moved

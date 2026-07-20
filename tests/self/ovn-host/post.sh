@@ -230,6 +230,63 @@ if [ "$(</tmp/self-gateway-id)" != "$gateway_chassis_id" ] || \
     record_failure "Expected gateway chassis identity to survive reconfiguration and reapply"
 fi
 
+check_dhcp_option() {
+    local id=$1
+    local option=$2
+    local expected=$3
+    local row=$4
+    local actual
+
+    actual=$(ovn-nbctl --if-exists get DHCP_Options "$row" \
+        "options:$option" 2>/dev/null | tr -d '"' || true)
+    if [ "$actual" != "$expected" ]; then
+        record_failure "Expected DHCP options $id $option=$expected, found $actual"
+    fi
+}
+
+dhcp_uuid=$(ovn-nbctl --bare --columns=_uuid find DHCP_Options \
+    external_ids:ovn-tmt-tests-id=self-dhcp)
+if [ -z "$dhcp_uuid" ]; then
+    record_failure "Expected managed DHCP options self-dhcp"
+else
+    if [ "$(ovn-nbctl get DHCP_Options "$dhcp_uuid" cidr | tr -d '"')" != \
+        198.51.100.0/24 ]; then
+        record_failure "Expected DHCP options self-dhcp CIDR 198.51.100.0/24"
+    fi
+    check_dhcp_option self-dhcp server_id 198.51.100.1 "$dhcp_uuid"
+    check_dhcp_option self-dhcp lease_time 7200 "$dhcp_uuid"
+    check_dhcp_option self-dhcp dns_server 198.51.100.53 "$dhcp_uuid"
+    check_dhcp_option self-dhcp ip_forward_enable 1 "$dhcp_uuid"
+    check_dhcp_option self-dhcp classless_static_route \
+        "{0.0.0.0/0, 198.51.100.1}" "$dhcp_uuid"
+    check_dhcp_option self-dhcp server_mac "" "$dhcp_uuid"
+    check_dhcp_option self-dhcp router "" "$dhcp_uuid"
+    if [ "$(</tmp/self-dhcp-id)" != "$dhcp_uuid" ] || \
+        [ "$(</tmp/self-dhcp-moved-id)" != "$dhcp_uuid" ]; then
+        record_failure "Expected DHCP options identity to survive reconfiguration and reapply"
+    fi
+fi
+if ovn-nbctl --bare --columns=_uuid find DHCP_Options \
+    external_ids:ovn-tmt-tests-id=self-dhcp-delete | grep -q .; then
+    record_failure "Expected deleted managed DHCP options to be absent"
+fi
+dhcp_v6_uuid=$(ovn-nbctl --bare --columns=_uuid find DHCP_Options \
+    external_ids:ovn-tmt-tests-id=self-dhcp-v6)
+if [ "$dhcp_v6_uuid" != "$(</tmp/self-dhcp-v6-id)" ]; then
+    record_failure "Expected unlisted managed DHCP options to remain"
+else
+    if [ "$(ovn-nbctl get DHCP_Options "$dhcp_v6_uuid" cidr | tr -d '"')" != \
+        2001:db8:1::/64 ]; then
+        record_failure "Expected unlisted DHCP options CIDR 2001:db8:1::/64"
+    fi
+    check_dhcp_option self-dhcp-v6 server_id 02:00:00:00:10:01 "$dhcp_v6_uuid"
+    check_dhcp_option self-dhcp-v6 dns_server 2001:db8::53 "$dhcp_v6_uuid"
+fi
+if ! ovn-nbctl --bare --columns=_uuid find DHCP_Options \
+    cidr=10.10.0.0/24 | grep -q .; then
+    record_failure "Expected unmanaged DHCP options to remain"
+fi
+
 check_nat_field() {
     local id=$1
     local field=$2

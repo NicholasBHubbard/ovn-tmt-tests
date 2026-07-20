@@ -1,0 +1,3 @@
+# Each row needs a stable id; present rows also need cidr.
+# Omitted options are cleared. Listed rows default to present; absent removes them; unlisted rows are untouched.
+ovn_dhcp_options: []
