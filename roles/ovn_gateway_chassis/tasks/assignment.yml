@@ -1,0 +1,91 @@
+- name: Find gateway chassis assignment {{ ovn_gateway_assignment.id }}
+  ansible.builtin.command:
+    cmd: >-
+      ovn-nbctl --bare --columns=_uuid find Gateway_Chassis
+      name={{ ovn_gateway_assignment.id | quote }}
+  register: ovn_gateway_chassis_row
+  changed_when: false
+
+- name: Find current router port for gateway chassis {{ ovn_gateway_assignment.id }}
+  when: ovn_gateway_chassis_row.stdout | length > 0
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - --bare
+      - --columns=name
+      - find
+      - Logical_Router_Port
+      - "gateway_chassis{>=}{{ ovn_gateway_chassis_row.stdout }}"
+  register: ovn_gateway_chassis_current_port
+  changed_when: false
+
+- name: Delete gateway chassis assignment {{ ovn_gateway_assignment.id }}
+  when:
+    - ovn_gateway_assignment.state | default('present') == 'absent'
+    - ovn_gateway_chassis_row.stdout | length > 0
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - remove
+      - Logical_Router_Port
+      - "{{ ovn_gateway_chassis_current_port.stdout }}"
+      - gateway_chassis
+      - "{{ ovn_gateway_chassis_row.stdout }}"
+  changed_when: true
+
+- name: Move gateway chassis assignment {{ ovn_gateway_assignment.id }}
+  when:
+    - ovn_gateway_assignment.state | default('present') == 'present'
+    - ovn_gateway_chassis_row.stdout | length > 0
+    - ovn_gateway_chassis_current_port.stdout != ovn_gateway_assignment.router_port
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - remove
+      - Logical_Router_Port
+      - "{{ ovn_gateway_chassis_current_port.stdout }}"
+      - gateway_chassis
+      - "{{ ovn_gateway_chassis_row.stdout }}"
+      - --
+      - add
+      - Logical_Router_Port
+      - "{{ ovn_gateway_assignment.router_port }}"
+      - gateway_chassis
+      - "{{ ovn_gateway_chassis_row.stdout }}"
+  changed_when: true
+
+- name: Create gateway chassis assignment {{ ovn_gateway_assignment.id }}
+  when:
+    - ovn_gateway_assignment.state | default('present') == 'present'
+    - ovn_gateway_chassis_row.stdout | length == 0
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - --id=@gateway
+      - create
+      - Gateway_Chassis
+      - "name={{ ovn_gateway_assignment.id | to_json }}"
+      - "chassis_name={{ ovn_gateway_assignment.chassis | to_json }}"
+      - "priority={{ ovn_gateway_assignment.priority | default(0) }}"
+      - --
+      - add
+      - Logical_Router_Port
+      - "{{ ovn_gateway_assignment.router_port }}"
+      - gateway_chassis
+      - "@gateway"
+  changed_when: true
+
+- name: Configure gateway chassis assignment {{ ovn_gateway_assignment.id }}
+  when:
+    - ovn_gateway_assignment.state | default('present') == 'present'
+    - ovn_gateway_chassis_row.stdout | length > 0
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - set
+      - Gateway_Chassis
+      - "{{ ovn_gateway_chassis_row.stdout }}"
+      - "name={{ ovn_gateway_assignment.id | to_json }}"
+      - "chassis_name={{ ovn_gateway_assignment.chassis | to_json }}"
+      - "priority={{ ovn_gateway_assignment.priority | default(0) }}"
+  changed_when: true

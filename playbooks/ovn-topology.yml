@@ -6,4 +6,5 @@
     - ovn_localnet_ports
     - ovn_routers
     - ovn_router_ports
+    - ovn_gateway_chassis
     - ovn_static_routes

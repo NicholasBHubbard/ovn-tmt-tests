@@ -37,6 +37,25 @@
         switch: self-sw
         switch_port: self-rp-delete-sw
         mac: "02:00:00:00:10:02"
+      - name: self-rp-gateway
+        router: self-r3
+        switch: self-sw
+        switch_port: self-rp-gateway-sw
+        mac: "02:00:00:00:10:04"
+        networks:
+          - 203.0.113.254/24
+    ovn_gateway_chassis:
+      - id: self-gateway
+        router_port: self-rp-gateway
+        chassis: self-gateway-1
+        priority: 20
+      - id: self-gateway-secondary
+        router_port: self-rp
+        chassis: self-gateway-backup
+      - id: self-gateway-delete
+        router_port: self-rp-gateway
+        chassis: self-gateway-delete
+        priority: 1
     ovn_static_routes:
       - id: self-route
         router: self-r1
@@ -66,6 +85,13 @@
         cmd: >-
           ovn-nbctl lsp-add-localnet-port
           self-sw self-localnet-unmanaged unmanaged-provider
+      changed_when: true
+
+    - name: Add unmanaged gateway chassis for preservation test
+      ansible.builtin.command:
+        cmd: >-
+          ovn-nbctl lrp-set-gateway-chassis
+          self-rp-gateway self-gateway-unmanaged 5
       changed_when: true
 
 - name: Apply the top-down endpoint configuration

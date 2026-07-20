@@ -1,0 +1,24 @@
+- name: Verify gateway chassis states
+  ansible.builtin.assert:
+    that:
+      - >-
+        ovn_gateway_chassis
+        | map(attribute='state', default='present')
+        | difference(['present', 'absent'])
+        | length == 0
+    fail_msg: "Gateway chassis states must be present or absent."
+
+- name: Verify gateway chassis IDs are unique
+  ansible.builtin.assert:
+    that:
+      - >-
+        ovn_gateway_chassis | map(attribute='id') | unique | length
+        == ovn_gateway_chassis | length
+    fail_msg: "Gateway chassis IDs must be unique."
+
+- name: Configure OVN gateway chassis assignments
+  ansible.builtin.include_tasks: assignment.yml
+  loop: "{{ ovn_gateway_chassis }}"
+  loop_control:
+    loop_var: ovn_gateway_assignment
+    label: "{{ ovn_gateway_assignment.id }}"

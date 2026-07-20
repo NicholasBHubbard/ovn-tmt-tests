@@ -41,6 +41,17 @@
       - name: self-rp-delete
         switch_port: self-rp-delete-sw
         state: absent
+    ovn_gateway_chassis:
+      - id: self-gateway
+        router_port: self-rp
+        chassis: self-gateway-2
+        priority: 30
+      - id: self-gateway-secondary
+        router_port: self-rp
+        chassis: self-gateway-backup
+        priority: 10
+      - id: self-gateway-delete
+        state: absent
     ovn_static_routes:
       - id: self-route
         router: self-r3

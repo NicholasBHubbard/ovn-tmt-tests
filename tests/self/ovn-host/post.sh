@@ -182,6 +182,54 @@ if [ "$(</tmp/self-localnet-id)" != "$localnet_port_id" ] || \
     record_failure "Expected localnet port identity to survive reconfiguration and reapply"
 fi
 
+check_gateway_chassis() {
+    local id=$1
+    local router_port=$2
+    local chassis=$3
+    local priority=$4
+    local actual gateway_uuid
+
+    gateway_uuid=$(ovn-nbctl --bare --columns=_uuid find \
+        Gateway_Chassis name="$id" 2>/dev/null || true)
+    if [ -z "$gateway_uuid" ]; then
+        record_failure "Expected gateway chassis assignment $id"
+        return
+    fi
+
+    actual=$(ovn-nbctl --bare --columns=name find Logical_Router_Port \
+        "gateway_chassis{>=}$gateway_uuid" 2>/dev/null || true)
+    if [ "$actual" != "$router_port" ]; then
+        record_failure "Expected gateway chassis $id on $router_port, found $actual"
+    fi
+    actual=$(ovn-nbctl get Gateway_Chassis "$gateway_uuid" chassis_name \
+        2>/dev/null | tr -d '\"' || true)
+    if [ "$actual" != "$chassis" ]; then
+        record_failure "Expected gateway chassis $id chassis $chassis, found $actual"
+    fi
+    actual=$(ovn-nbctl get Gateway_Chassis "$gateway_uuid" priority \
+        2>/dev/null || true)
+    if [ "$actual" != "$priority" ]; then
+        record_failure "Expected gateway chassis $id priority $priority, found $actual"
+    fi
+}
+
+check_gateway_chassis self-gateway self-rp self-gateway-2 30
+check_gateway_chassis self-gateway-secondary self-rp self-gateway-backup 10
+check_ovn_row Gateway_Chassis self-gateway-delete ""
+unmanaged_gateway_id=$(ovn-nbctl --bare --columns=_uuid find \
+    Gateway_Chassis chassis_name=self-gateway-unmanaged)
+if [ -z "$unmanaged_gateway_id" ] || \
+    [ "$(ovn-nbctl --bare --columns=name find Logical_Router_Port \
+        "gateway_chassis{>=}$unmanaged_gateway_id")" != "self-rp-gateway" ]; then
+    record_failure "Expected unmanaged gateway chassis assignment to remain"
+fi
+gateway_chassis_id=$(ovn-nbctl --bare --columns=_uuid find \
+    Gateway_Chassis name=self-gateway)
+if [ "$(</tmp/self-gateway-id)" != "$gateway_chassis_id" ] || \
+    [ "$(</tmp/self-gateway-moved-id)" != "$gateway_chassis_id" ]; then
+    record_failure "Expected gateway chassis identity to survive reconfiguration and reapply"
+fi
+
 check_static_route() {
     local id=$1
     local router=$2
