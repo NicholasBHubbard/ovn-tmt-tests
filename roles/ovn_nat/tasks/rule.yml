@@ -1,0 +1,185 @@
+- name: Verify NAT rule {{ ovn_nat_rule.id }}
+  ansible.builtin.assert:
+    that:
+      - >-
+        ovn_nat_rule.state | default('present') == 'absent'
+        or ovn_nat_rule.type in ['snat', 'dnat', 'dnat_and_snat']
+      - >-
+        ovn_nat_rule.state | default('present') == 'absent'
+        or ovn_nat_rule.router is defined
+      - >-
+        ovn_nat_rule.state | default('present') == 'absent'
+        or ovn_nat_rule.external_ip is defined
+      - >-
+        ovn_nat_rule.state | default('present') == 'absent'
+        or ovn_nat_rule.logical_ip is defined
+    fail_msg: >-
+      Present NAT rules need router, a supported type, external_ip and logical_ip.
+
+- name: Find NAT rule {{ ovn_nat_rule.id }}
+  ansible.builtin.command:
+    cmd: >-
+      ovn-nbctl --bare --columns=_uuid find NAT
+      external_ids:ovn-tmt-tests-id={{ ovn_nat_rule.id | quote }}
+  register: ovn_nat_row
+  changed_when: false
+
+- name: Verify NAT rule ID is unambiguous {{ ovn_nat_rule.id }}
+  ansible.builtin.assert:
+    that:
+      - ovn_nat_row.stdout_lines | length <= 1
+    fail_msg: "NAT rule ID {{ ovn_nat_rule.id }} matches multiple rows."
+
+- name: Find current router for NAT rule {{ ovn_nat_rule.id }}
+  when: ovn_nat_row.stdout | length > 0
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - --bare
+      - --columns=name
+      - find
+      - Logical_Router
+      - "nat{>=}{{ ovn_nat_row.stdout }}"
+  register: ovn_nat_current_router
+  changed_when: false
+
+- name: Verify NAT rule has one router {{ ovn_nat_rule.id }}
+  when: ovn_nat_row.stdout | length > 0
+  ansible.builtin.assert:
+    that:
+      - ovn_nat_current_router.stdout_lines | length == 1
+    fail_msg: "NAT rule {{ ovn_nat_rule.id }} must belong to exactly one router."
+
+- name: Delete NAT rule {{ ovn_nat_rule.id }}
+  when:
+    - ovn_nat_rule.state | default('present') == 'absent'
+    - ovn_nat_row.stdout | length > 0
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - remove
+      - Logical_Router
+      - "{{ ovn_nat_current_router.stdout }}"
+      - nat
+      - "{{ ovn_nat_row.stdout }}"
+  changed_when: true
+
+- name: Move NAT rule {{ ovn_nat_rule.id }}
+  when:
+    - ovn_nat_rule.state | default('present') == 'present'
+    - ovn_nat_row.stdout | length > 0
+    - ovn_nat_current_router.stdout != ovn_nat_rule.router
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - remove
+      - Logical_Router
+      - "{{ ovn_nat_current_router.stdout }}"
+      - nat
+      - "{{ ovn_nat_row.stdout }}"
+      - --
+      - add
+      - Logical_Router
+      - "{{ ovn_nat_rule.router }}"
+      - nat
+      - "{{ ovn_nat_row.stdout }}"
+  changed_when: true
+
+- name: Resolve gateway port for NAT rule {{ ovn_nat_rule.id }}
+  when:
+    - ovn_nat_rule.state | default('present') == 'present'
+    - ovn_nat_rule.gateway_port is defined
+  ansible.builtin.command:
+    cmd: >-
+      ovn-nbctl --bare --columns=_uuid find Logical_Router_Port
+      name={{ ovn_nat_rule.gateway_port | quote }}
+  register: ovn_nat_gateway_port
+  changed_when: false
+
+- name: Verify gateway port for NAT rule {{ ovn_nat_rule.id }}
+  when:
+    - ovn_nat_rule.state | default('present') == 'present'
+    - ovn_nat_rule.gateway_port is defined
+  ansible.builtin.assert:
+    that:
+      - ovn_nat_gateway_port.stdout_lines | length == 1
+    fail_msg: >-
+      NAT rule {{ ovn_nat_rule.id }} gateway port
+      {{ ovn_nat_rule.gateway_port }} was not found unambiguously.
+
+- name: Create NAT rule {{ ovn_nat_rule.id }}
+  when:
+    - ovn_nat_rule.state | default('present') == 'present'
+    - ovn_nat_row.stdout | length == 0
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - --id=@nat
+      - create
+      - NAT
+      - "type={{ ovn_nat_rule.type | to_json }}"
+      - "external_ip={{ ovn_nat_rule.external_ip | to_json }}"
+      - "logical_ip={{ ovn_nat_rule.logical_ip | to_json }}"
+      - "external_ids:ovn-tmt-tests-id={{ ovn_nat_rule.id | to_json }}"
+      - --
+      - add
+      - Logical_Router
+      - "{{ ovn_nat_rule.router }}"
+      - nat
+      - "@nat"
+  changed_when: true
+
+- name: Find configured NAT rule {{ ovn_nat_rule.id }}
+  when: ovn_nat_rule.state | default('present') == 'present'
+  ansible.builtin.command:
+    cmd: >-
+      ovn-nbctl --bare --columns=_uuid find NAT
+      external_ids:ovn-tmt-tests-id={{ ovn_nat_rule.id | quote }}
+  register: ovn_nat_configured_row
+  changed_when: false
+
+- name: Configure NAT rule {{ ovn_nat_rule.id }}
+  when: ovn_nat_rule.state | default('present') == 'present'
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - set
+      - NAT
+      - "{{ ovn_nat_configured_row.stdout }}"
+      - "type={{ ovn_nat_rule.type | to_json }}"
+      - "external_ip={{ ovn_nat_rule.external_ip | to_json }}"
+      - "logical_ip={{ ovn_nat_rule.logical_ip | to_json }}"
+      - "logical_port={{ ovn_nat_rule.logical_port | default([]) | to_json }}"
+      - "external_mac={{ ovn_nat_rule.external_mac | default([]) | to_json }}"
+      - "external_port_range={{ ovn_nat_rule.external_port_range | default('') | to_json }}"
+      - >-
+        gateway_port={{
+          ovn_nat_gateway_port.stdout
+          if ovn_nat_rule.gateway_port is defined
+          else '[]'
+        }}
+      - "match={{ ovn_nat_rule.match | default('') | to_json }}"
+      - "priority={{ ovn_nat_rule.priority | default(0) }}"
+      - "options={}"
+      - "external_ids:ovn-tmt-tests-id={{ ovn_nat_rule.id | to_json }}"
+  changed_when: true
+
+- name: Configure options for NAT rule {{ ovn_nat_rule.id }}
+  when: ovn_nat_rule.state | default('present') == 'present'
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - set
+      - NAT
+      - "{{ ovn_nat_configured_row.stdout }}"
+      - "options:{{ ovn_nat_option.key }}={{ ovn_nat_option_value }}"
+  loop: "{{ ovn_nat_rule.options | default({}) | dict2items }}"
+  loop_control:
+    loop_var: ovn_nat_option
+    label: "{{ ovn_nat_option.key }}"
+  vars:
+    ovn_nat_option_value: >-
+      {{ (ovn_nat_option.value | string | lower)
+         if ovn_nat_option.value is boolean
+         else (ovn_nat_option.value | string) }}
+  changed_when: true

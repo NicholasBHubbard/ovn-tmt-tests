@@ -1,0 +1,4 @@
+# Each rule needs a stable id; present rules also need router, type, external_ip and logical_ip.
+# Optional logical_port, external_mac, external_port_range, gateway_port, match and options are cleared when omitted.
+# Priority defaults to 0. Listed rules default to present; absent removes them; unlisted rules are untouched.
+ovn_nat_rules: []

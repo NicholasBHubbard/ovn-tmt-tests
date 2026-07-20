@@ -42,6 +42,12 @@ prepare:
       > /tmp/self-gateway-secondary-id
       && ovn-nbctl --bare --columns=_uuid find Gateway_Chassis name=self-gateway-delete
       > /tmp/self-gateway-delete-id
+      && ovn-nbctl --bare --columns=_uuid find NAT
+      external_ids:ovn-tmt-tests-id=self-nat > /tmp/self-nat-id
+      && ovn-nbctl --bare --columns=_uuid find NAT
+      external_ids:ovn-tmt-tests-id=self-nat-snat > /tmp/self-nat-snat-id
+      && ovn-nbctl --bare --columns=_uuid find NAT
+      external_ids:ovn-tmt-tests-id=self-nat-delete > /tmp/self-nat-delete-id
       && ovn-nbctl --bare --columns=_uuid find Logical_Router_Static_Route
       external_ids:ovn-tmt-tests-id=self-route > /tmp/self-route-id
       && ovn-nbctl --bare --columns=_uuid find Logical_Router_Static_Route
@@ -55,6 +61,9 @@ prepare:
       && test -s /tmp/self-gateway-id
       && test -s /tmp/self-gateway-secondary-id
       && test -s /tmp/self-gateway-delete-id
+      && test -s /tmp/self-nat-id
+      && test -s /tmp/self-nat-snat-id
+      && test -s /tmp/self-nat-delete-id
       && test -s /tmp/self-route-id
       && test -s /tmp/self-route-delete-id
       && test "$(ovn-nbctl get Logical_Router_Static_Route
@@ -94,8 +103,38 @@ prepare:
       "$(cat /tmp/self-gateway-id)" priority)" = 20
       && test "$(ovn-nbctl get Gateway_Chassis
       "$(cat /tmp/self-gateway-secondary-id)" priority)" = 0
+      && test "$(ovn-nbctl get NAT "$(cat /tmp/self-nat-id)" type
+      | tr -d '\"')" = dnat_and_snat
+      && test "$(ovn-nbctl get NAT "$(cat /tmp/self-nat-id)" external_ip
+      | tr -d '\"')" = 198.51.100.10
+      && test "$(ovn-nbctl get NAT "$(cat /tmp/self-nat-id)" logical_ip
+      | tr -d '\"')" = 192.0.2.1
+      && test "$(ovn-nbctl get NAT "$(cat /tmp/self-nat-id)" logical_port
+      | tr -d '[]\"')" = self-port1
+      && test "$(ovn-nbctl get NAT "$(cat /tmp/self-nat-id)" external_mac
+      | tr -d '[]\"')" = 02:00:00:00:01:01
+      && test "$(ovn-nbctl get NAT "$(cat /tmp/self-nat-id)" external_port_range
+      | tr -d '\"')" = 10000-20000
+      && test "$(ovn-nbctl get NAT "$(cat /tmp/self-nat-id)" gateway_port
+      | tr -d '[]')" = "$(cat /tmp/self-rp-id)"
+      && test "$(ovn-nbctl get NAT "$(cat /tmp/self-nat-id)" match
+      | tr -d '\"')" = 'ip4.src == 192.0.2.0/24'
+      && test "$(ovn-nbctl get NAT "$(cat /tmp/self-nat-id)" priority)" = 100
+      && test "$(ovn-nbctl get NAT "$(cat /tmp/self-nat-id)" options:stateless
+      | tr -d '\"')" = true
+      && test "$(ovn-nbctl get NAT "$(cat /tmp/self-nat-id)" options:add_route
+      | tr -d '\"')" = true
+      && test "$(ovn-nbctl get NAT "$(cat /tmp/self-nat-snat-id)" type
+      | tr -d '\"')" = snat
+      && test "$(ovn-nbctl get NAT "$(cat /tmp/self-nat-snat-id)" external_ip
+      | tr -d '\"')" = 198.51.100.20
+      && test "$(ovn-nbctl get NAT "$(cat /tmp/self-nat-snat-id)" logical_ip
+      | tr -d '\"')" = 192.0.2.0/24
+      && test "$(ovn-nbctl get NAT "$(cat /tmp/self-nat-snat-id)" priority)" = 0
       && test "$(ovn-nbctl --bare --columns=name find Logical_Router
       "static_routes{>=}$(cat /tmp/self-route-id)")" = self-r1
+      && test "$(ovn-nbctl --bare --columns=name find Logical_Router
+      "nat{>=}$(cat /tmp/self-nat-id)")" = self-r1
   - name: Reconfigure OVN namespace endpoints
     how: ansible
     order: 82
@@ -112,6 +151,8 @@ prepare:
       name=self-localnet > /tmp/self-localnet-moved-id
       && ovn-nbctl --bare --columns=_uuid find Gateway_Chassis
       name=self-gateway > /tmp/self-gateway-moved-id
+      && ovn-nbctl --bare --columns=_uuid find NAT
+      external_ids:ovn-tmt-tests-id=self-nat > /tmp/self-nat-moved-id
   - name: Reapply OVN namespace endpoint configuration
     how: ansible
     order: 84

@@ -230,6 +230,63 @@ if [ "$(</tmp/self-gateway-id)" != "$gateway_chassis_id" ] || \
     record_failure "Expected gateway chassis identity to survive reconfiguration and reapply"
 fi
 
+check_nat_field() {
+    local id=$1
+    local field=$2
+    local expected=$3
+    local nat_uuid=$4
+    local actual
+
+    actual=$(ovn-nbctl get NAT "$nat_uuid" "$field" 2>/dev/null | \
+        tr -d '[]"' || true)
+    if [ "$actual" != "$expected" ]; then
+        record_failure "Expected NAT rule $id $field=$expected, found $actual"
+    fi
+}
+
+nat_uuid=$(ovn-nbctl --bare --columns=_uuid find NAT \
+    external_ids:ovn-tmt-tests-id=self-nat)
+if [ -z "$nat_uuid" ]; then
+    record_failure "Expected managed NAT rule self-nat"
+else
+    check_nat_field self-nat type dnat "$nat_uuid"
+    check_nat_field self-nat external_ip 2001:db8:ffff::10 "$nat_uuid"
+    check_nat_field self-nat logical_ip 2001:db8:2::1 "$nat_uuid"
+    for field in logical_port external_mac external_port_range gateway_port match; do
+        check_nat_field self-nat "$field" "" "$nat_uuid"
+    done
+    check_nat_field self-nat options "{}" "$nat_uuid"
+    check_nat_field self-nat priority 0 "$nat_uuid"
+    if [ "$(ovn-nbctl --bare --columns=name find Logical_Router \
+        "nat{>=}$nat_uuid")" != self-r3 ]; then
+        record_failure "Expected NAT rule self-nat on self-r3"
+    fi
+    if [ "$(</tmp/self-nat-id)" != "$nat_uuid" ] || \
+        [ "$(</tmp/self-nat-moved-id)" != "$nat_uuid" ]; then
+        record_failure "Expected NAT rule identity to survive reconfiguration and reapply"
+    fi
+fi
+if ovn-nbctl --bare --columns=_uuid find NAT \
+    external_ids:ovn-tmt-tests-id=self-nat-delete | grep -q .; then
+    record_failure "Expected deleted managed NAT rule to be absent"
+fi
+unlisted_nat_uuid=$(ovn-nbctl --bare --columns=_uuid find NAT \
+    external_ids:ovn-tmt-tests-id=self-nat-snat)
+if [ "$unlisted_nat_uuid" != "$(</tmp/self-nat-snat-id)" ]; then
+    record_failure "Expected unlisted managed NAT rule to remain"
+else
+    check_nat_field self-nat-snat type snat "$unlisted_nat_uuid"
+    check_nat_field self-nat-snat external_ip 198.51.100.20 "$unlisted_nat_uuid"
+    check_nat_field self-nat-snat logical_ip 192.0.2.0/24 "$unlisted_nat_uuid"
+    if [ "$(ovn-nbctl --bare --columns=name find Logical_Router \
+        "nat{>=}$unlisted_nat_uuid")" != self-r1 ]; then
+        record_failure "Expected unlisted NAT rule self-nat-snat on self-r1"
+    fi
+fi
+if ! ovn-nbctl lr-nat-list self-r3 | grep -F -q '203.0.113.20'; then
+    record_failure "Expected unmanaged NAT rule to remain"
+fi
+
 check_static_route() {
     local id=$1
     local router=$2

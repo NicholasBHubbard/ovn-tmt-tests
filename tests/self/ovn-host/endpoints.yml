@@ -56,6 +56,31 @@
         router_port: self-rp-gateway
         chassis: self-gateway-delete
         priority: 1
+    ovn_nat_rules:
+      - id: self-nat
+        router: self-r1
+        type: dnat_and_snat
+        external_ip: 198.51.100.10
+        logical_ip: 192.0.2.1
+        logical_port: self-port1
+        external_mac: "02:00:00:00:01:01"
+        external_port_range: 10000-20000
+        gateway_port: self-rp
+        match: ip4.src == 192.0.2.0/24
+        priority: 100
+        options:
+          stateless: true
+          add_route: true
+      - id: self-nat-snat
+        router: self-r1
+        type: snat
+        external_ip: 198.51.100.20
+        logical_ip: 192.0.2.0/24
+      - id: self-nat-delete
+        router: self-r3
+        type: dnat
+        external_ip: 203.0.113.10
+        logical_ip: 192.0.2.10
     ovn_static_routes:
       - id: self-route
         router: self-r1
@@ -92,6 +117,13 @@
         cmd: >-
           ovn-nbctl lrp-set-gateway-chassis
           self-rp-gateway self-gateway-unmanaged 5
+      changed_when: true
+
+    - name: Add unmanaged NAT rule for preservation test
+      ansible.builtin.command:
+        cmd: >-
+          ovn-nbctl --may-exist lr-nat-add
+          self-r3 snat 203.0.113.20 10.0.0.0/24
       changed_when: true
 
 - name: Apply the top-down endpoint configuration

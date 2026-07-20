@@ -52,6 +52,14 @@
         priority: 10
       - id: self-gateway-delete
         state: absent
+    ovn_nat_rules:
+      - id: self-nat
+        router: self-r3
+        type: dnat
+        external_ip: 2001:db8:ffff::10
+        logical_ip: 2001:db8:2::1
+      - id: self-nat-delete
+        state: absent
     ovn_static_routes:
       - id: self-route
         router: self-r3
