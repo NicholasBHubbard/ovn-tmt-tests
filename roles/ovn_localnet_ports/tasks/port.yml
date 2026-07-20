@@ -1,0 +1,99 @@
+- name: Delete localnet port {{ ovn_localnet_port.name }}
+  when: ovn_localnet_port.state | default('present') == 'absent'
+  ansible.builtin.command:
+    cmd: "ovn-nbctl --if-exists lsp-del {{ ovn_localnet_port.name | quote }}"
+  changed_when: true
+
+- name: Find localnet port {{ ovn_localnet_port.name }}
+  when: ovn_localnet_port.state | default('present') == 'present'
+  ansible.builtin.command:
+    cmd: >-
+      ovn-nbctl --bare --columns=_uuid find Logical_Switch_Port
+      name={{ ovn_localnet_port.name | quote }}
+  register: ovn_localnet_port_row
+  changed_when: false
+
+- name: Find current switch for localnet port {{ ovn_localnet_port.name }}
+  when:
+    - ovn_localnet_port.state | default('present') == 'present'
+    - ovn_localnet_port_row.stdout | length > 0
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - --bare
+      - --columns=name
+      - find
+      - Logical_Switch
+      - "ports{>=}{{ ovn_localnet_port_row.stdout }}"
+  register: ovn_localnet_port_current_switch
+  changed_when: false
+
+- name: Move localnet port {{ ovn_localnet_port.name }}
+  when:
+    - ovn_localnet_port.state | default('present') == 'present'
+    - ovn_localnet_port_row.stdout | length > 0
+    - ovn_localnet_port_current_switch.stdout != ovn_localnet_port.switch
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - remove
+      - Logical_Switch
+      - "{{ ovn_localnet_port_current_switch.stdout }}"
+      - ports
+      - "{{ ovn_localnet_port_row.stdout }}"
+      - --
+      - add
+      - Logical_Switch
+      - "{{ ovn_localnet_port.switch }}"
+      - ports
+      - "{{ ovn_localnet_port_row.stdout }}"
+  changed_when: true
+
+- name: Create localnet port {{ ovn_localnet_port.name }}
+  when:
+    - ovn_localnet_port.state | default('present') == 'present'
+    - ovn_localnet_port_row.stdout | length == 0
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - lsp-add-localnet-port
+      - "{{ ovn_localnet_port.switch }}"
+      - "{{ ovn_localnet_port.name }}"
+      - "{{ ovn_localnet_port.network }}"
+  changed_when: true
+
+- name: Configure localnet port {{ ovn_localnet_port.name }}
+  when: ovn_localnet_port.state | default('present') == 'present'
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - lsp-set-type
+      - "{{ ovn_localnet_port.name }}"
+      - localnet
+      - --
+      - lsp-set-addresses
+      - "{{ ovn_localnet_port.name }}"
+      - unknown
+      - --
+      - lsp-set-options
+      - "{{ ovn_localnet_port.name }}"
+      - "network_name={{ ovn_localnet_port.network }}"
+      - --
+      - set
+      - Logical_Switch_Port
+      - "{{ ovn_localnet_port.name }}"
+      - "tag_request={{ ovn_localnet_port_tag }}"
+  changed_when: true
+
+- name: Clear derived VLAN tag for localnet port {{ ovn_localnet_port.name }}
+  when:
+    - ovn_localnet_port.state | default('present') == 'present'
+    - ovn_localnet_port.tag is undefined
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - clear
+      - Logical_Switch_Port
+      - "{{ ovn_localnet_port.name }}"
+      - tag
+  changed_when: true

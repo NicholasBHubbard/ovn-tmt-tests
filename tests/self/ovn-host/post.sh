@@ -133,6 +133,55 @@ if [ "$(</tmp/self-rp-sw-id)" != "$(ovn-nbctl --bare --columns=_uuid find \
     record_failure "Expected router switch port identity to survive reconfiguration"
 fi
 
+check_localnet_port() {
+    local name=$1
+    local switch=$2
+    local network=$3
+    local tag=$4
+    local actual port_uuid
+
+    port_uuid=$(ovn-nbctl --bare --columns=_uuid find \
+        Logical_Switch_Port name="$name" 2>/dev/null || true)
+    if [ -z "$port_uuid" ]; then
+        record_failure "Expected localnet port $name"
+        return
+    fi
+
+    actual=$(ovn-nbctl --bare --columns=name find Logical_Switch \
+        "ports{>=}$port_uuid" 2>/dev/null || true)
+    if [ "$actual" != "$switch" ]; then
+        record_failure "Expected localnet port $name on $switch, found $actual"
+    fi
+    if [ "$(ovn-nbctl get Logical_Switch_Port "$name" type | tr -d '\"')" != \
+        "localnet" ]; then
+        record_failure "Expected $name type localnet"
+    fi
+
+    actual=$(ovn-nbctl get Logical_Switch_Port "$name" \
+        options:network_name 2>/dev/null | tr -d '\"' || true)
+    if [ "$actual" != "$network" ]; then
+        record_failure "Expected localnet port $name network $network, found $actual"
+    fi
+    if [ "$(ovn-nbctl lsp-get-addresses "$name" | tr -d '\"')" != "unknown" ]; then
+        record_failure "Expected localnet port $name addresses unknown"
+    fi
+
+    actual=$(ovn-nbctl lsp-get-tag "$name" 2>/dev/null || true)
+    if [ "$actual" != "$tag" ]; then
+        record_failure "Expected localnet port $name tag $tag, found $actual"
+    fi
+}
+
+check_localnet_port self-localnet self-moved self-provider-moved ""
+check_ovn_row Logical_Switch_Port self-localnet-delete ""
+check_ovn_row Logical_Switch_Port self-localnet-unmanaged self-localnet-unmanaged
+localnet_port_id=$(ovn-nbctl --bare --columns=_uuid find \
+    Logical_Switch_Port name=self-localnet)
+if [ "$(</tmp/self-localnet-id)" != "$localnet_port_id" ] || \
+    [ "$(</tmp/self-localnet-moved-id)" != "$localnet_port_id" ]; then
+    record_failure "Expected localnet port identity to survive reconfiguration and reapply"
+fi
+
 check_static_route() {
     local id=$1
     local router=$2

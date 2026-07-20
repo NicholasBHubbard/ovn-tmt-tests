@@ -32,6 +32,10 @@ prepare:
       > /tmp/self-rp-delete-id
       && ovn-nbctl --bare --columns=_uuid find Logical_Switch_Port name=self-rp-delete-sw
       > /tmp/self-rp-delete-sw-id
+      && ovn-nbctl --bare --columns=_uuid find Logical_Switch_Port name=self-localnet
+      > /tmp/self-localnet-id
+      && ovn-nbctl --bare --columns=_uuid find Logical_Switch_Port name=self-localnet-delete
+      > /tmp/self-localnet-delete-id
       && ovn-nbctl --bare --columns=_uuid find Logical_Router_Static_Route
       external_ids:ovn-tmt-tests-id=self-route > /tmp/self-route-id
       && ovn-nbctl --bare --columns=_uuid find Logical_Router_Static_Route
@@ -40,6 +44,8 @@ prepare:
       && test -s /tmp/self-rp-sw-id
       && test -s /tmp/self-rp-delete-id
       && test -s /tmp/self-rp-delete-sw-id
+      && test -s /tmp/self-localnet-id
+      && test -s /tmp/self-localnet-delete-id
       && test -s /tmp/self-route-id
       && test -s /tmp/self-route-delete-id
       && test "$(ovn-nbctl get Logical_Router_Static_Route
@@ -62,6 +68,15 @@ prepare:
       "ports{>=}$(cat /tmp/self-rp-id)")" = self-r1
       && test "$(ovn-nbctl --bare --columns=name find Logical_Switch
       "ports{>=}$(cat /tmp/self-rp-sw-id)")" = self-sw
+      && test "$(ovn-nbctl --bare --columns=name find Logical_Switch
+      "ports{>=}$(cat /tmp/self-localnet-id)")" = self-sw
+      && test "$(ovn-nbctl get Logical_Switch_Port self-localnet type
+      | tr -d '\"')" = localnet
+      && test "$(ovn-nbctl get Logical_Switch_Port self-localnet
+      options:network_name | tr -d '\"')" = self-provider
+      && test "$(ovn-nbctl lsp-get-addresses self-localnet
+      | tr -d '\"')" = unknown
+      && test "$(ovn-nbctl lsp-get-tag self-localnet)" = 100
       && test "$(ovn-nbctl --bare --columns=name find Logical_Router
       "static_routes{>=}$(cat /tmp/self-route-id)")" = self-r1
   - name: Reconfigure OVN namespace endpoints
@@ -76,6 +91,8 @@ prepare:
       && cat /sys/class/net/self-vm1-p/ifindex > /tmp/self-vm1-ifindex
       && ovn-nbctl --bare --columns=_uuid find Logical_Router_Static_Route
       external_ids:ovn-tmt-tests-id=self-route > /tmp/self-route-moved-id
+      && ovn-nbctl --bare --columns=_uuid find Logical_Switch_Port
+      name=self-localnet > /tmp/self-localnet-moved-id
   - name: Reapply OVN namespace endpoint configuration
     how: ansible
     order: 84

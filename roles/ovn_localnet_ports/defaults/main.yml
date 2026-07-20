@@ -1,0 +1,3 @@
+# Present ports need name, switch and network. Omitted tags are cleared.
+# Listed ports default to present; absent removes them. Unlisted ports are untouched.
+ovn_localnet_ports: []

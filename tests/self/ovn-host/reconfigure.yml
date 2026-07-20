@@ -15,6 +15,12 @@
       - name: self-moved
       - name: self-unused
         state: absent
+    ovn_localnet_ports:
+      - name: self-localnet
+        switch: self-moved
+        network: self-provider-moved
+      - name: self-localnet-delete
+        state: absent
     ovn_routers:
       - name: self-r1
         options:

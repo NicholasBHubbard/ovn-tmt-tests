@@ -1,0 +1,19 @@
+- name: Verify localnet port states
+  ansible.builtin.assert:
+    that:
+      - >-
+        ovn_localnet_ports
+        | map(attribute='state', default='present')
+        | difference(['present', 'absent'])
+        | length == 0
+    fail_msg: "Localnet port states must be present or absent."
+
+- name: Configure OVN localnet ports
+  ansible.builtin.include_tasks: port.yml
+  loop: "{{ ovn_localnet_ports }}"
+  loop_control:
+    loop_var: ovn_localnet_port
+    label: "{{ ovn_localnet_port.name }}"
+  vars:
+    ovn_localnet_port_tag: >-
+      {{ ovn_localnet_port.tag | default([]) | to_json }}
