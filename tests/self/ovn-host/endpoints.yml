@@ -12,6 +12,9 @@
           dynamic_neigh_routers: true
           mac_binding_age_threshold: 5
       - name: self-r2
+      - name: self-r3
+        options:
+          chassis: clear-me
 
 - name: Apply the top-down endpoint configuration
   ansible.builtin.import_playbook: ../../../playbooks/ovn-endpoints.yml
@@ -55,3 +58,10 @@
         mac: "02:00:00:00:03:01"
         addresses:
           - 192.0.2.3/24
+      - name: self-delete
+        host: default-0
+        switch: self-sw
+        iface_id: self-port4
+        mac: "02:00:00:00:04:01"
+        addresses:
+          - 192.0.2.4/24

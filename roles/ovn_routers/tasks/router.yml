@@ -1,20 +1,17 @@
-- name: Create logical router {{ ovn_router.name }}
+- name: Create logical router and reset options {{ ovn_router.name }}
+  when: ovn_router.state | default('present') == 'present'
   ansible.builtin.command:
-    argv:
-      - ovn-nbctl
-      - --may-exist
-      - lr-add
-      - "{{ ovn_router.name }}"
+    cmd: >-
+      ovn-nbctl --may-exist lr-add {{ ovn_router.name | quote }}
+      -- clear Logical_Router {{ ovn_router.name | quote }} options
   changed_when: true
 
 - name: Configure options for logical router {{ ovn_router.name }}
+  when: ovn_router.state | default('present') == 'present'
   ansible.builtin.command:
-    argv:
-      - ovn-nbctl
-      - set
-      - Logical_Router
-      - "{{ ovn_router.name }}"
-      - "options:{{ ovn_router_option.key }}={{ ovn_router_option_value }}"
+    cmd: >-
+      ovn-nbctl set Logical_Router {{ ovn_router.name | quote }}
+      {{ ('options:' ~ ovn_router_option.key ~ '=' ~ ovn_router_option_value) | quote }}
   loop: "{{ ovn_router.options | default({}) | dict2items }}"
   loop_control:
     loop_var: ovn_router_option
@@ -24,4 +21,10 @@
       {{ (ovn_router_option.value | string | lower)
          if ovn_router_option.value is boolean
          else (ovn_router_option.value | string) }}
+  changed_when: true
+
+- name: Delete logical router {{ ovn_router.name }}
+  when: ovn_router.state | default('present') == 'absent'
+  ansible.builtin.command:
+    cmd: "ovn-nbctl --if-exists lr-del {{ ovn_router.name | quote }}"
   changed_when: true

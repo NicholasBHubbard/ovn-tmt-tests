@@ -1,1 +1,2 @@
+# Listed switches default to present; absent removes them. Unlisted switches are untouched.
 ovn_switches: []

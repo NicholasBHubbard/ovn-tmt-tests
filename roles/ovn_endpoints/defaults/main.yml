@@ -1,3 +1,4 @@
+# Listed endpoints default to present; absent removes them. Unlisted endpoints are untouched.
 ovn_endpoints: []
 ovn_endpoint_bridge: br-int
 ovn_endpoint_mode: local

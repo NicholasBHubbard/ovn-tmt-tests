@@ -1,3 +1,13 @@
+- name: Verify endpoint states
+  ansible.builtin.assert:
+    that:
+      - >-
+        ovn_endpoints
+        | map(attribute='state', default='present')
+        | difference(['present', 'absent'])
+        | length == 0
+    fail_msg: "Endpoint states must be present or absent."
+
 - name: Configure OVN logical switch ports
   when: ovn_endpoint_mode == "ports"
   ansible.builtin.include_tasks: port.yml
@@ -6,13 +16,25 @@
     loop_var: ovn_endpoint
     label: "{{ ovn_endpoint.iface_id }}"
 
+- name: Remove absent or moved local endpoints
+  when:
+    - ovn_endpoint_mode == "local"
+    - >-
+      ovn_endpoint.state | default('present') == 'absent'
+      or ovn_endpoint.host | default('') != inventory_hostname
+  ansible.builtin.include_tasks: cleanup.yml
+  loop: "{{ ovn_endpoints }}"
+  loop_control:
+    loop_var: ovn_endpoint
+    label: "{{ ovn_endpoint.name }}"
+
 - name: Configure OVN namespace endpoints
-  when: ovn_endpoint_mode == "local"
+  when:
+    - ovn_endpoint_mode == "local"
+    - ovn_endpoint.state | default('present') == 'present'
+    - ovn_endpoint.host == inventory_hostname
   ansible.builtin.include_tasks: endpoint.yml
-  loop: >-
-    {{ ovn_endpoints
-       | selectattr('host', 'equalto', inventory_hostname)
-       | list }}
+  loop: "{{ ovn_endpoints }}"
   loop_control:
     loop_var: ovn_endpoint
     label: "{{ ovn_endpoint.name }}"

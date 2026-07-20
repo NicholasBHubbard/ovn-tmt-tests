@@ -1,3 +1,13 @@
+- name: Verify logical router states
+  ansible.builtin.assert:
+    that:
+      - >-
+        ovn_routers
+        | map(attribute='state', default='present')
+        | difference(['present', 'absent'])
+        | length == 0
+    fail_msg: "Logical router states must be present or absent."
+
 - name: Configure OVN logical routers
   ansible.builtin.include_tasks: router.yml
   loop: "{{ ovn_routers }}"

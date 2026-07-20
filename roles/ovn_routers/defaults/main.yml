@@ -1,1 +1,2 @@
+# Listed routers default to present; absent removes them. Unlisted routers are untouched.
 ovn_routers: []

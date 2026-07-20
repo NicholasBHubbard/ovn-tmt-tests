@@ -20,3 +20,17 @@ prepare:
     how: ansible
     order: 80
     playbook: tests/self/ovn-host/endpoints.yml
+  - name: Reconfigure OVN namespace endpoints
+    how: ansible
+    order: 81
+    playbook: tests/self/ovn-host/reconfigure.yml
+  - name: Record endpoint identity
+    how: shell
+    order: 82
+    script: >-
+      stat -Lc '%i' /var/run/netns/self-vm1 > /tmp/self-vm1-ns-id
+      && cat /sys/class/net/self-vm1-p/ifindex > /tmp/self-vm1-ifindex
+  - name: Reapply OVN namespace endpoint configuration
+    how: ansible
+    order: 83
+    playbook: tests/self/ovn-host/reconfigure.yml

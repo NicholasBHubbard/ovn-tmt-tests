@@ -11,7 +11,7 @@ for key in ovn-remote ovn-encap-type ovn-encap-ip; do
     assert_ovs_external_id_absent "$key"
 done
 
-for endpoint in self-vm1 self-vm2 self-remote; do
+for endpoint in self-vm1 self-vm2 self-remote self-delete; do
     if ip netns list | grep -q "^${endpoint}\\b"; then
         record_failure "Precondition failed: network namespace already exists: $endpoint"
     fi

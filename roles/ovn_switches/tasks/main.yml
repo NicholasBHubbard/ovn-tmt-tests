@@ -1,6 +1,21 @@
-- name: Create OVN logical switches
+- name: Verify logical switch states
+  ansible.builtin.assert:
+    that:
+      - >-
+        ovn_switches
+        | map(attribute='state', default='present')
+        | difference(['present', 'absent'])
+        | length == 0
+    fail_msg: "Logical switch states must be present or absent."
+
+- name: Configure OVN logical switches
   ansible.builtin.command:
-    cmd: "ovn-nbctl --may-exist ls-add {{ ovn_switch.name }}"
+    cmd: >-
+      ovn-nbctl
+      {{ '--if-exists ls-del'
+         if ovn_switch.state | default('present') == 'absent'
+         else '--may-exist ls-add' }}
+      {{ ovn_switch.name | quote }}
   loop: "{{ ovn_switches }}"
   loop_control:
     loop_var: ovn_switch

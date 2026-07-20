@@ -1,12 +1,43 @@
+- name: Find current logical switch for {{ ovn_endpoint.iface_id }}
+  when: ovn_endpoint.state | default('present') == 'present'
+  ansible.builtin.command:
+    cmd: "ovn-nbctl lsp-get-ls {{ ovn_endpoint.iface_id | quote }}"
+  register: ovn_endpoint_current_switch
+  failed_when: false
+  changed_when: false
+
+- name: Find desired logical switch for {{ ovn_endpoint.iface_id }}
+  when: ovn_endpoint.state | default('present') == 'present'
+  ansible.builtin.command:
+    cmd: "ovn-nbctl get Logical_Switch {{ ovn_endpoint.switch | quote }} _uuid"
+  register: ovn_endpoint_desired_switch
+  changed_when: false
+
+- name: Detach logical switch port from its old switch {{ ovn_endpoint.iface_id }}
+  when:
+    - ovn_endpoint.state | default('present') == 'present'
+    - ovn_endpoint_current_switch.stdout | length > 0
+    - ovn_endpoint_current_switch.stdout.split(' ') | first != ovn_endpoint_desired_switch.stdout
+  ansible.builtin.command:
+    cmd: "ovn-nbctl --if-exists lsp-del {{ ovn_endpoint.iface_id | quote }}"
+  changed_when: true
+
 - name: Create logical switch port for {{ ovn_endpoint.iface_id }}
+  when: ovn_endpoint.state | default('present') == 'present'
   ansible.builtin.command:
     cmd: >-
       ovn-nbctl --may-exist lsp-add
-      {{ ovn_endpoint.switch }} {{ ovn_endpoint.iface_id }}
-      -- lsp-set-addresses {{ ovn_endpoint.iface_id }}
+      {{ ovn_endpoint.switch | quote }} {{ ovn_endpoint.iface_id | quote }}
+      -- lsp-set-addresses {{ ovn_endpoint.iface_id | quote }}
       "{{ ([ovn_endpoint.mac]
             + (ovn_endpoint.addresses
                | map('regex_replace', '/.*$', '')
                | list))
            | join(' ') }}"
+  changed_when: true
+
+- name: Delete logical switch port {{ ovn_endpoint.iface_id }}
+  when: ovn_endpoint.state | default('present') == 'absent'
+  ansible.builtin.command:
+    cmd: "ovn-nbctl --if-exists lsp-del {{ ovn_endpoint.iface_id | quote }}"
   changed_when: true

@@ -19,30 +19,22 @@ echo "Checking chassis is registered in SB database..."
 assert_ovn_chassis_present
 
 echo "Checking namespace endpoints..."
-check_logical_switch() {
-    local switch=$1
+check_ovn_row() {
+    local table=$1
+    local name=$2
+    local expected=$3
     local actual
 
-    actual=$(ovn-nbctl --bare --columns=name find Logical_Switch \
-        name="$switch" 2>/dev/null || true)
-    if [ "$actual" != "$switch" ]; then
-        record_failure "Expected logical switch to exist: $switch"
+    actual=$(ovn-nbctl --bare --columns=name find "$table" \
+        name="$name" 2>/dev/null || true)
+    if [ "$actual" != "$expected" ]; then
+        record_failure "Expected $table $name result '$expected', found '$actual'"
     fi
 }
 
-check_logical_switch self-sw
-check_logical_switch self-unused
-
-check_logical_router() {
-    local router=$1
-    local actual
-
-    actual=$(ovn-nbctl --bare --columns=name find Logical_Router \
-        name="$router" 2>/dev/null || true)
-    if [ "$actual" != "$router" ]; then
-        record_failure "Expected logical router to exist: $router"
-    fi
-}
+check_ovn_row Logical_Switch self-sw self-sw
+check_ovn_row Logical_Switch self-moved self-moved
+check_ovn_row Logical_Switch self-unused ""
 
 check_router_option() {
     local router=$1
@@ -57,14 +49,17 @@ check_router_option() {
     fi
 }
 
-check_logical_router self-r1
-check_logical_router self-r2
-check_router_option self-r1 chassis self-chassis
-check_router_option self-r1 dynamic_neigh_routers true
-check_router_option self-r1 mac_binding_age_threshold 5
-
-if [ "$(ovn-nbctl get Logical_Router self-r2 options 2>/dev/null || true)" != "{}" ]; then
-    record_failure "Expected self-r2 to have no router options"
+check_ovn_row Logical_Router self-r1 self-r1
+check_ovn_row Logical_Router self-r2 ""
+check_ovn_row Logical_Router self-r3 self-r3
+check_router_option self-r1 chassis moved-chassis
+check_router_option self-r1 mac_binding_age_threshold 10
+if [ -n "$(ovn-nbctl --if-exists get Logical_Router self-r1 \
+    options:dynamic_neigh_routers 2>/dev/null)" ]; then
+    record_failure "Expected removed self-r1 option dynamic_neigh_routers to be absent"
+fi
+if [ "$(ovn-nbctl get Logical_Router self-r3 options 2>/dev/null || true)" != "{}" ]; then
+    record_failure "Expected self-r3 to have no router options"
 fi
 
 check_logical_port() {
@@ -98,16 +93,17 @@ check_endpoint() {
     local name=$1
     local iface_id=$2
     local switch=$3
-    local mac=$4
-    local actual_iface_id address
-    shift 4
+    local bridge=$4
+    local mac=$5
+    local actual_addresses actual_iface_id address expected_addresses
+    shift 5
 
     check_logical_port "$iface_id" "$switch" "$mac" "$@"
     assert_command_runs "network namespace $name" ip netns exec "$name" true
     assert_command_runs "host interface ${name}-p" ip link show "${name}-p"
 
-    if [ "$(ovs-vsctl port-to-br "${name}-p" 2>/dev/null)" != br-int ]; then
-        record_failure "Expected ${name}-p to be attached to br-int"
+    if [ "$(ovs-vsctl port-to-br "${name}-p" 2>/dev/null)" != "$bridge" ]; then
+        record_failure "Expected ${name}-p to be attached to $bridge"
     fi
 
     actual_iface_id=$(ovs-vsctl get Interface "${name}-p" \
@@ -120,18 +116,26 @@ check_endpoint() {
         record_failure "Expected $name MAC address $mac"
     fi
 
-    for address in "$@"; do
-        if ! ip -n "$name" -o address show dev "$name" | grep -F -q "$address"; then
-            record_failure "Expected $name address $address"
-        fi
-    done
+    actual_addresses=$(ip -n "$name" -o address show dev "$name" \
+        scope global | awk '{print $4}' | sort)
+    expected_addresses=$(printf '%s\n' "$@" | sort)
+    if [ "$actual_addresses" != "$expected_addresses" ]; then
+        record_failure "Expected $name addresses '$expected_addresses', found '$actual_addresses'"
+    fi
 }
 
-check_endpoint self-vm1 self-port1 self-sw 02:00:00:00:01:01 \
-    192.0.2.1/24 192.0.2.11/24 2001:db8:1::1/64
-check_endpoint self-vm2 self-port2 self-sw 02:00:00:00:02:01 \
-    192.0.2.2/24
-check_logical_port self-port3 self-sw 02:00:00:00:03:01 192.0.2.3/24
+check_endpoint self-vm1 self-port1 self-moved self-br 02:00:00:00:01:02 \
+    192.0.2.10/24 2001:db8:2::1/64
+check_logical_port self-port2 self-moved 02:00:00:00:02:01 192.0.2.2/24
+check_endpoint self-remote self-port3 self-moved self-br 02:00:00:00:03:02
+check_ovn_row Logical_Switch_Port self-port4 ""
+
+if [ "$(stat -Lc '%i' /var/run/netns/self-vm1)" != "$(</tmp/self-vm1-ns-id)" ]; then
+    record_failure "Expected reapply to preserve the self-vm1 namespace"
+fi
+if [ "$(</sys/class/net/self-vm1-p/ifindex)" != "$(</tmp/self-vm1-ifindex)" ]; then
+    record_failure "Expected reapply to preserve the self-vm1 veth"
+fi
 
 check_route() {
     local namespace=$1
@@ -157,20 +161,31 @@ check_route() {
     fi
 }
 
-check_route self-vm1 4 main default 192.0.2.254 ""
-check_route self-vm1 4 100 198.51.100.0/24 192.0.2.253 100
-check_route self-vm1 6 main default 2001:db8:1::ff 50
-check_route self-vm1 6 200 default "" ""
+check_no_route() {
+    local namespace=$1
+    local family=$2
+    local table=$3
+    local destination=$4
 
-if ip -n self-vm2 -4 route show default | grep -q .; then
-    record_failure "Unexpected default route on endpoint without routes: self-vm2"
-fi
+    if ip -n "$namespace" "-$family" route show \
+        table "$table" "$destination" 2>/dev/null | grep -q .; then
+        record_failure "Expected route to be absent: $namespace table $table $destination"
+    fi
+}
 
-if ip netns list | grep -q '^self-remote\b'; then
-    record_failure "Unexpected endpoint namespace on this host: self-remote"
-fi
-if ip link show self-remote-p >/dev/null 2>&1; then
-    record_failure "Unexpected endpoint veth on this host: self-remote-p"
-fi
+check_route self-vm1 4 main default 192.0.2.1 ""
+check_route self-vm1 4 101 203.0.113.0/24 192.0.2.2 ""
+check_no_route self-vm1 4 100 198.51.100.0/24
+check_no_route self-vm1 6 main default
+check_no_route self-vm1 6 200 default
+
+for endpoint in self-vm2 self-delete; do
+    if ip netns list | grep -q "^${endpoint}\\b"; then
+        record_failure "Expected endpoint namespace to be absent: $endpoint"
+    fi
+    if ip link show "${endpoint}-p" >/dev/null 2>&1; then
+        record_failure "Expected endpoint veth to be absent: ${endpoint}-p"
+    fi
+done
 
 assert_finish

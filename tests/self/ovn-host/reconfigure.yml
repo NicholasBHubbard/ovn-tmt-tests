@@ -1,0 +1,63 @@
+- name: Create the destination OVS bridge
+  hosts: all
+  become: true
+  tasks:
+    - name: Create self-test OVS bridge
+      ansible.builtin.command:
+        cmd: ovs-vsctl --may-exist add-br self-br
+      changed_when: true
+
+- name: Reapply changed top-down topology configuration
+  ansible.builtin.import_playbook: ../../../playbooks/ovn-topology.yml
+  vars:
+    ovn_topology_central_hosts: all
+    ovn_switches:
+      - name: self-moved
+      - name: self-unused
+        state: absent
+    ovn_routers:
+      - name: self-r1
+        options:
+          chassis: moved-chassis
+          mac_binding_age_threshold: 10
+      - name: self-r2
+        state: absent
+      - name: self-r3
+
+- name: Reapply changed top-down endpoint configuration
+  ansible.builtin.import_playbook: ../../../playbooks/ovn-endpoints.yml
+  vars:
+    ovn_endpoint_central_hosts: all
+    ovn_endpoint_compute_hosts: all
+    ovn_endpoint_bridge: self-br
+    ovn_endpoints:
+      - name: self-vm1
+        host: default-0
+        switch: self-moved
+        iface_id: self-port1
+        mac: "02:00:00:00:01:02"
+        addresses:
+          - 192.0.2.10/24
+          - 2001:db8:2::1/64
+        routes:
+          - to: default
+            via: 192.0.2.1
+          - to: 203.0.113.0/24
+            via: 192.0.2.2
+            table: 101
+      - name: self-vm2
+        host: another-host
+        switch: self-moved
+        iface_id: self-port2
+        mac: "02:00:00:00:02:01"
+        addresses:
+          - 192.0.2.2/24
+      - name: self-remote
+        host: default-0
+        switch: self-moved
+        iface_id: self-port3
+        mac: "02:00:00:00:03:02"
+        addresses: []
+      - name: self-delete
+        iface_id: self-port4
+        state: absent

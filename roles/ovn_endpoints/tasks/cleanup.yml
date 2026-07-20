@@ -1,0 +1,14 @@
+- name: Detach host interface for {{ ovn_endpoint.name }}
+  ansible.builtin.command:
+    cmd: "ovs-vsctl --if-exists del-port {{ ovn_endpoint.name }}-p"
+    removes: "/sys/class/net/{{ ovn_endpoint.name }}-p"
+
+- name: Delete host interface for {{ ovn_endpoint.name }}
+  ansible.builtin.command:
+    cmd: "ip link delete {{ ovn_endpoint.name }}-p"
+    removes: "/sys/class/net/{{ ovn_endpoint.name }}-p"
+
+- name: Delete network namespace for {{ ovn_endpoint.name }}
+  ansible.builtin.command:
+    cmd: "ip netns delete {{ ovn_endpoint.name }}"
+    removes: "/var/run/netns/{{ ovn_endpoint.name }}"
