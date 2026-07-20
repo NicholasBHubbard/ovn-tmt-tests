@@ -63,3 +63,11 @@ Reusable Ansible roles.
 tmt test metadata and verification scripts.
 
 [`tests/self/`](tests/self/) contains tests for this repository's own roles and topology examples.
+
+## AI Usage
+
+This code was developed in part with AI tooling such as Claude Code and Codex.
+
+## License
+
+This repository is licensed under the Apache 2.0 license.
