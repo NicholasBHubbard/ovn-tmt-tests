@@ -29,6 +29,29 @@
         switch: self-sw
         switch_port: self-rp-delete-sw
         mac: "02:00:00:00:10:02"
+    ovn_static_routes:
+      - id: self-route
+        router: self-r1
+        prefix: 198.51.100.0/24
+        nexthop: 192.0.2.1
+        policy: src-ip
+        route_table: blue
+        output_port: self-rp
+      - id: self-route-delete
+        router: self-r3
+        prefix: 203.0.113.0/24
+        nexthop: 192.0.2.2
+
+- name: Create an unmanaged logical route
+  hosts: all
+  become: true
+  tasks:
+    - name: Add unmanaged route for preservation test
+      ansible.builtin.command:
+        cmd: >-
+          ovn-nbctl --may-exist lr-route-add
+          self-r3 192.0.2.0/24 203.0.113.2
+      changed_when: true
 
 - name: Apply the top-down endpoint configuration
   ansible.builtin.import_playbook: ../../../playbooks/ovn-endpoints.yml

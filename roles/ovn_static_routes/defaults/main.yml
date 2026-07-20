@@ -1,0 +1,4 @@
+# Each route needs a unique id; present routes also need router, prefix and nexthop.
+# Policy defaults to dst-ip. Omitted route_table and output_port values are cleared.
+# Listed routes default to present; absent removes them. Unlisted routes are untouched.
+ovn_static_routes: []

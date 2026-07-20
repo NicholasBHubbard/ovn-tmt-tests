@@ -5,3 +5,4 @@
     - ovn_switches
     - ovn_routers
     - ovn_router_ports
+    - ovn_static_routes

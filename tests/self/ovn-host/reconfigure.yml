@@ -35,6 +35,13 @@
       - name: self-rp-delete
         switch_port: self-rp-delete-sw
         state: absent
+    ovn_static_routes:
+      - id: self-route
+        router: self-r3
+        prefix: 2001:db8:ffff::/64
+        nexthop: 2001:db8:2::1
+      - id: self-route-delete
+        state: absent
 
 - name: Reapply changed top-down endpoint configuration
   ansible.builtin.import_playbook: ../../../playbooks/ovn-endpoints.yml

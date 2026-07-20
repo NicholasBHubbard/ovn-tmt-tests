@@ -1,0 +1,103 @@
+- name: Find logical static route {{ ovn_static_route.id }}
+  ansible.builtin.command:
+    cmd: >-
+      ovn-nbctl --bare --columns=_uuid find Logical_Router_Static_Route
+      external_ids:ovn-tmt-tests-id={{ ovn_static_route.id | quote }}
+  register: ovn_static_route_row
+  changed_when: false
+
+- name: Verify logical static route ID is unambiguous {{ ovn_static_route.id }}
+  ansible.builtin.assert:
+    that:
+      - ovn_static_route_row.stdout_lines | length <= 1
+    fail_msg: "Logical static route ID {{ ovn_static_route.id }} matches multiple rows."
+
+- name: Find current router for static route {{ ovn_static_route.id }}
+  when: ovn_static_route_row.stdout | length > 0
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - --bare
+      - --columns=name
+      - find
+      - Logical_Router
+      - "static_routes{>=}{{ ovn_static_route_row.stdout }}"
+  register: ovn_static_route_current_router
+  changed_when: false
+
+- name: Delete logical static route {{ ovn_static_route.id }}
+  when:
+    - ovn_static_route.state | default('present') == 'absent'
+    - ovn_static_route_row.stdout | length > 0
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - remove
+      - Logical_Router
+      - "{{ ovn_static_route_current_router.stdout }}"
+      - static_routes
+      - "{{ ovn_static_route_row.stdout }}"
+  changed_when: true
+
+- name: Move logical static route {{ ovn_static_route.id }}
+  when:
+    - ovn_static_route.state | default('present') == 'present'
+    - ovn_static_route_row.stdout | length > 0
+    - ovn_static_route_current_router.stdout != ovn_static_route.router
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - remove
+      - Logical_Router
+      - "{{ ovn_static_route_current_router.stdout }}"
+      - static_routes
+      - "{{ ovn_static_route_row.stdout }}"
+      - --
+      - add
+      - Logical_Router
+      - "{{ ovn_static_route.router }}"
+      - static_routes
+      - "{{ ovn_static_route_row.stdout }}"
+  changed_when: true
+
+- name: Create logical static route {{ ovn_static_route.id }}
+  when:
+    - ovn_static_route.state | default('present') == 'present'
+    - ovn_static_route_row.stdout | length == 0
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - --id=@route
+      - create
+      - Logical_Router_Static_Route
+      - "ip_prefix={{ ovn_static_route.prefix | to_json }}"
+      - "nexthop={{ ovn_static_route.nexthop | to_json }}"
+      - "policy={{ ovn_static_route.policy | default('dst-ip') | to_json }}"
+      - "route_table={{ ovn_static_route.route_table | default('') | to_json }}"
+      - "output_port={{ ovn_static_route_output_port }}"
+      - "external_ids:ovn-tmt-tests-id={{ ovn_static_route.id | to_json }}"
+      - --
+      - add
+      - Logical_Router
+      - "{{ ovn_static_route.router }}"
+      - static_routes
+      - "@route"
+  changed_when: true
+
+- name: Configure logical static route {{ ovn_static_route.id }}
+  when:
+    - ovn_static_route.state | default('present') == 'present'
+    - ovn_static_route_row.stdout | length > 0
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - set
+      - Logical_Router_Static_Route
+      - "{{ ovn_static_route_row.stdout }}"
+      - "ip_prefix={{ ovn_static_route.prefix | to_json }}"
+      - "nexthop={{ ovn_static_route.nexthop | to_json }}"
+      - "policy={{ ovn_static_route.policy | default('dst-ip') | to_json }}"
+      - "route_table={{ ovn_static_route.route_table | default('') | to_json }}"
+      - "output_port={{ ovn_static_route_output_port }}"
+      - "external_ids:ovn-tmt-tests-id={{ ovn_static_route.id | to_json }}"
+  changed_when: true

@@ -20,7 +20,7 @@ prepare:
     how: ansible
     order: 80
     playbook: tests/self/ovn-host/endpoints.yml
-  - name: Record router port identity
+  - name: Record topology identity
     how: shell
     order: 81
     script: >-
@@ -32,24 +32,50 @@ prepare:
       > /tmp/self-rp-delete-id
       && ovn-nbctl --bare --columns=_uuid find Logical_Switch_Port name=self-rp-delete-sw
       > /tmp/self-rp-delete-sw-id
+      && ovn-nbctl --bare --columns=_uuid find Logical_Router_Static_Route
+      external_ids:ovn-tmt-tests-id=self-route > /tmp/self-route-id
+      && ovn-nbctl --bare --columns=_uuid find Logical_Router_Static_Route
+      external_ids:ovn-tmt-tests-id=self-route-delete > /tmp/self-route-delete-id
       && test -s /tmp/self-rp-id
       && test -s /tmp/self-rp-sw-id
       && test -s /tmp/self-rp-delete-id
       && test -s /tmp/self-rp-delete-sw-id
+      && test -s /tmp/self-route-id
+      && test -s /tmp/self-route-delete-id
+      && test "$(ovn-nbctl get Logical_Router_Static_Route
+      "$(cat /tmp/self-route-id)" ip_prefix | tr -d '\"')" = 198.51.100.0/24
+      && test "$(ovn-nbctl get Logical_Router_Static_Route
+      "$(cat /tmp/self-route-id)" nexthop | tr -d '\"')" = 192.0.2.1
+      && test "$(ovn-nbctl get Logical_Router_Static_Route
+      "$(cat /tmp/self-route-id)" policy | tr -d '[]\"')" = src-ip
+      && test "$(ovn-nbctl get Logical_Router_Static_Route
+      "$(cat /tmp/self-route-id)" route_table | tr -d '\"')" = blue
+      && test "$(ovn-nbctl get Logical_Router_Static_Route
+      "$(cat /tmp/self-route-id)" output_port | tr -d '[]\"')" = self-rp
+      && test "$(ovn-nbctl get Logical_Router_Static_Route
+      "$(cat /tmp/self-route-delete-id)" policy | tr -d '[]\"')" = dst-ip
+      && test -z "$(ovn-nbctl get Logical_Router_Static_Route
+      "$(cat /tmp/self-route-delete-id)" route_table | tr -d '[]\"')"
+      && test -z "$(ovn-nbctl get Logical_Router_Static_Route
+      "$(cat /tmp/self-route-delete-id)" output_port | tr -d '[]\"')"
       && test "$(ovn-nbctl --bare --columns=name find Logical_Router
       "ports{>=}$(cat /tmp/self-rp-id)")" = self-r1
       && test "$(ovn-nbctl --bare --columns=name find Logical_Switch
       "ports{>=}$(cat /tmp/self-rp-sw-id)")" = self-sw
+      && test "$(ovn-nbctl --bare --columns=name find Logical_Router
+      "static_routes{>=}$(cat /tmp/self-route-id)")" = self-r1
   - name: Reconfigure OVN namespace endpoints
     how: ansible
     order: 82
     playbook: tests/self/ovn-host/reconfigure.yml
-  - name: Record endpoint identity
+  - name: Record reconfigured identity
     how: shell
     order: 83
     script: >-
       stat -Lc '%i' /var/run/netns/self-vm1 > /tmp/self-vm1-ns-id
       && cat /sys/class/net/self-vm1-p/ifindex > /tmp/self-vm1-ifindex
+      && ovn-nbctl --bare --columns=_uuid find Logical_Router_Static_Route
+      external_ids:ovn-tmt-tests-id=self-route > /tmp/self-route-moved-id
   - name: Reapply OVN namespace endpoint configuration
     how: ansible
     order: 84

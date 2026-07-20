@@ -133,6 +133,69 @@ if [ "$(</tmp/self-rp-sw-id)" != "$(ovn-nbctl --bare --columns=_uuid find \
     record_failure "Expected router switch port identity to survive reconfiguration"
 fi
 
+check_static_route() {
+    local id=$1
+    local router=$2
+    local prefix=$3
+    local nexthop=$4
+    local policy=$5
+    local route_table=$6
+    local output_port=$7
+    local route_uuid
+
+    route_uuid=$(ovn-nbctl --bare --columns=_uuid find \
+        Logical_Router_Static_Route \
+        external_ids:ovn-tmt-tests-id="$id" 2>/dev/null || true)
+    if [ -z "$route_uuid" ]; then
+        record_failure "Expected managed static route $id"
+        return
+    fi
+
+    check_static_route_field "$id" parent "$router" \
+        ovn-nbctl --bare --columns=name find Logical_Router \
+        "static_routes{>=}$route_uuid"
+    check_static_route_field "$id" ip_prefix "$prefix" \
+        ovn-nbctl get Logical_Router_Static_Route "$route_uuid" ip_prefix
+    check_static_route_field "$id" nexthop "$nexthop" \
+        ovn-nbctl get Logical_Router_Static_Route "$route_uuid" nexthop
+    check_static_route_field "$id" policy "$policy" \
+        ovn-nbctl get Logical_Router_Static_Route "$route_uuid" policy
+    check_static_route_field "$id" route_table "$route_table" \
+        ovn-nbctl get Logical_Router_Static_Route "$route_uuid" route_table
+    check_static_route_field "$id" output_port "$output_port" \
+        ovn-nbctl get Logical_Router_Static_Route "$route_uuid" output_port
+}
+
+check_static_route_field() {
+    local id=$1
+    local field=$2
+    local expected=$3
+    local actual
+    shift 3
+
+    actual=$("$@" 2>/dev/null | tr -d '[]"' || true)
+    if [ "$actual" != "$expected" ]; then
+        record_failure "Expected static route $id $field=$expected, found $actual"
+    fi
+}
+
+check_static_route self-route self-r3 2001:db8:ffff::/64 \
+    2001:db8:2::1 dst-ip "" ""
+check_static_route_id=$(ovn-nbctl --bare --columns=_uuid find \
+    Logical_Router_Static_Route external_ids:ovn-tmt-tests-id=self-route)
+if [ "$(</tmp/self-route-id)" != "$check_static_route_id" ] || \
+    [ "$(</tmp/self-route-moved-id)" != "$check_static_route_id" ]; then
+    record_failure "Expected static route identity to survive reconfiguration and reapply"
+fi
+if ovn-nbctl --bare --columns=_uuid find Logical_Router_Static_Route \
+    external_ids:ovn-tmt-tests-id=self-route-delete | grep -q .; then
+    record_failure "Expected deleted managed static route to be absent"
+fi
+if ! ovn-nbctl lr-route-list self-r3 | \
+    grep -F -q '192.0.2.0/24'; then
+    record_failure "Expected unmanaged static route to remain"
+fi
+
 check_logical_port() {
     local iface_id=$1
     local switch=$2
