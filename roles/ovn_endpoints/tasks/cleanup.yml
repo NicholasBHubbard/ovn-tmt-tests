@@ -1,3 +1,6 @@
+- name: Clean managed DHCP state for {{ ovn_endpoint.name }}
+  ansible.builtin.include_tasks: dhcp_cleanup.yml
+
 - name: Detach host interface for {{ ovn_endpoint.name }}
   ansible.builtin.command:
     cmd: "ovs-vsctl --if-exists del-port {{ ovn_endpoint.name }}-p"

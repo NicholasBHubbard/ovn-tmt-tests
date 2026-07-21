@@ -1,6 +1,10 @@
 # Listed endpoints default to present; absent removes them. Unlisted endpoints are untouched.
 # address_mode defaults to static; dynamic configures the logical port as "MAC dynamic".
 # dhcpv4_options and dhcpv6_options refer to ovn_dhcp_options IDs.
+# dhcp4 defaults to false and manages an IPv4 DHCP client in a local endpoint namespace.
+# dhcp_timeout overrides ovn_endpoint_dhcp_timeout for one endpoint.
 ovn_endpoints: []
 ovn_endpoint_bridge: br-int
+ovn_endpoint_dhcp_timeout: 30
 ovn_endpoint_mode: local
+ovn_endpoint_runtime_dir: /run/ovn-tmt-tests

@@ -567,4 +567,21 @@ for endpoint in self-vm2 self-delete; do
     fi
 done
 
+if ps -p "$(</tmp/self-vm2-dhclient4-pid)" -o args= 2>/dev/null \
+    | grep -F -q dhclient; then
+    record_failure "Expected the self-vm2 DHCP client to be stopped"
+fi
+for path in /run/ovn-tmt-tests/self-vm2-dhclient4.* /etc/netns/self-vm2; do
+    if compgen -G "$path" >/dev/null; then
+        record_failure "Expected DHCP state to be absent: $path"
+    fi
+done
+if [ "$(sha256sum /etc/resolv.conf | awk '{print $1}')" != \
+    "$(</tmp/self-resolver-hash)" ]; then
+    record_failure "Expected DHCP to leave the host resolver unchanged"
+fi
+if [ ! -f /etc/netns/self-vm1/preserve ]; then
+    record_failure "Expected static endpoint namespace configuration to remain"
+fi
+
 assert_finish

@@ -18,6 +18,20 @@
         | length == 0
     fail_msg: "Endpoint address modes must be static or dynamic."
 
+- name: Verify endpoint DHCP client settings
+  ansible.builtin.assert:
+    that:
+      - (ovn_endpoint.dhcp4 | default(false)) is boolean
+      - >-
+        not (ovn_endpoint.dhcp4 | default(false))
+        or (ovn_endpoint.dhcp_timeout
+            | default(ovn_endpoint_dhcp_timeout) | int) > 0
+    fail_msg: "Endpoint dhcp4 must be boolean and its DHCP timeout must be positive."
+  loop: "{{ ovn_endpoints }}"
+  loop_control:
+    loop_var: ovn_endpoint
+    label: "{{ ovn_endpoint.name | default(ovn_endpoint.iface_id) }}"
+
 - name: Configure OVN logical switch ports
   when: ovn_endpoint_mode == "ports"
   ansible.builtin.include_tasks: port.yml

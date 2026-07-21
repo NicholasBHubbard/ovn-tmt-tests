@@ -16,6 +16,12 @@ prepare:
     how: ansible
     playbook: playbooks/ovn-host.yml
     extra-args: '-e install_method=distro'
+  - name: Record host state
+    how: shell
+    order: 79
+    script: >-
+      sha256sum /etc/resolv.conf | awk '{print $1}' > /tmp/self-resolver-hash
+      && install -D /dev/null /etc/netns/self-vm1/preserve
   - name: Set up OVN namespace endpoints
     how: ansible
     order: 80
@@ -32,6 +38,8 @@ prepare:
       > /tmp/self-rp-sw-id
       && ovn-nbctl --bare --columns=_uuid find Logical_Switch_Port name=self-port3
       > /tmp/self-port3-id
+      && ovn-nbctl get Logical_Switch_Port self-port2 dynamic_addresses
+      | tr -d '"' | awk '{print $2}' > /tmp/self-port2-dynamic-address
       && ovn-nbctl --bare --columns=_uuid find Logical_Router_Port name=self-rp-delete
       > /tmp/self-rp-delete-id
       && ovn-nbctl --bare --columns=_uuid find Logical_Switch_Port name=self-rp-delete-sw
@@ -66,6 +74,7 @@ prepare:
       && test -s /tmp/self-moved-id
       && test -s /tmp/self-rp-sw-id
       && test -s /tmp/self-port3-id
+      && test -s /tmp/self-port2-dynamic-address
       && test -s /tmp/self-rp-delete-id
       && test -s /tmp/self-rp-delete-sw-id
       && test -s /tmp/self-localnet-id
@@ -93,6 +102,25 @@ prepare:
       | tr -d '[]')" = "$(cat /tmp/self-dhcp-id)"
       && test "$(ovn-nbctl get Logical_Switch_Port self-port3 dhcpv6_options
       | tr -d '[]')" = "$(cat /tmp/self-dhcp-v6-id)"
+      && test "$(ip -n self-vm2 -4 -o address show dev self-vm2 scope global
+      | awk '{print $4}')" = "$(cat /tmp/self-port2-dynamic-address)/24"
+      && ip -n self-vm2 -4 route show default
+      | grep -F -q 'default via 192.0.2.254 dev self-vm2'
+      && test -s /run/ovn-tmt-tests/self-vm2-dhclient4.pid
+      && test -s /run/ovn-tmt-tests/self-vm2-dhclient4.leases
+      && cat /run/ovn-tmt-tests/self-vm2-dhclient4.pid
+      > /tmp/self-vm2-dhclient4-pid
+      && test "$(cat /tmp/self-vm2-initial-dhclient4-pid)"
+      != "$(cat /tmp/self-vm2-dhclient4-pid)"
+      && ! ps -p "$(cat /tmp/self-vm2-initial-dhclient4-pid)" -o args= 2>/dev/null
+      | grep -F -q dhclient
+      && kill -0 "$(cat /tmp/self-vm2-dhclient4-pid)"
+      && ps -p "$(cat /tmp/self-vm2-dhclient4-pid)" -o args=
+      | grep -F -q -- '--timeout 10'
+      && test -f /etc/netns/self-vm2/resolv.conf
+      && grep -F -q 'nameserver 192.0.2.53' /etc/netns/self-vm2/resolv.conf
+      && test "$(sha256sum /etc/resolv.conf | awk '{print $1}')"
+      = "$(cat /tmp/self-resolver-hash)"
       && test "$(ovn-nbctl get Logical_Router_Static_Route
       "$(cat /tmp/self-route-id)" ip_prefix | tr -d '\"')" = 198.51.100.0/24
       && test "$(ovn-nbctl get Logical_Router_Static_Route

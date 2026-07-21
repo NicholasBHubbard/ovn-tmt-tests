@@ -21,6 +21,7 @@
           server_mac: "02:00:00:00:10:01"
           lease_time: 3600
           router: 192.0.2.254
+          dns_server: 192.0.2.53
           ip_forward_enable: false
       - id: self-dhcp-v6
         cidr: 2001:db8:1::/64
@@ -160,6 +161,7 @@
   vars:
     ovn_endpoint_central_hosts: all
     ovn_endpoint_compute_hosts: all
+    ovn_endpoint_dhcp_timeout: 10
     ovn_endpoints:
       - name: self-vm1
         host: default-0
@@ -188,8 +190,10 @@
         switch: self-sw
         iface_id: self-port2
         mac: "02:00:00:00:02:01"
-        addresses:
-          - 192.0.2.2/24
+        address_mode: dynamic
+        dhcpv4_options: self-dhcp
+        dhcp4: true
+        addresses: []
       - name: self-remote
         host: another-host
         switch: self-sw
@@ -205,4 +209,32 @@
         iface_id: self-port4
         mac: "02:00:00:00:04:01"
         addresses:
-          - 192.0.2.4/24
+          - 192.0.2.2/24
+
+- name: Record initial DHCP client
+  hosts: all
+  become: true
+  tasks:
+    - name: Record self-vm2 DHCP client PID
+      ansible.builtin.copy:
+        src: /run/ovn-tmt-tests/self-vm2-dhclient4.pid
+        remote_src: true
+        dest: /tmp/self-vm2-initial-dhclient4-pid
+        mode: "0600"
+
+- name: Reapply the DHCP endpoint configuration
+  ansible.builtin.import_playbook: ../../../playbooks/ovn-endpoints.yml
+  vars:
+    ovn_endpoint_central_hosts: all
+    ovn_endpoint_compute_hosts: all
+    ovn_endpoint_dhcp_timeout: 10
+    ovn_endpoints:
+      - name: self-vm2
+        host: default-0
+        switch: self-sw
+        iface_id: self-port2
+        mac: "02:00:00:00:02:01"
+        address_mode: dynamic
+        dhcpv4_options: self-dhcp
+        dhcp4: true
+        addresses: []

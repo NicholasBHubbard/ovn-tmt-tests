@@ -1,0 +1,43 @@
+- name: Find managed DHCP state for {{ ovn_endpoint.name }}
+  ansible.builtin.stat:
+    path: >-
+      {{ ovn_endpoint_runtime_dir }}/{{ ovn_endpoint.name }}-dhclient4.managed
+  register: ovn_endpoint_dhcp_state
+
+- name: Stop managed DHCPv4 client for {{ ovn_endpoint.name }}
+  ansible.builtin.command:
+    argv:
+      - ip
+      - netns
+      - exec
+      - "{{ ovn_endpoint.name }}"
+      - dhclient
+      - -4
+      - -x
+      - -pf
+      - >-
+        {{ ovn_endpoint_runtime_dir }}/{{ ovn_endpoint.name }}-dhclient4.pid
+      - -lf
+      - >-
+        {{ ovn_endpoint_runtime_dir }}/{{ ovn_endpoint.name }}-dhclient4.leases
+      - "{{ ovn_endpoint.name }}"
+    removes: >-
+      {{ ovn_endpoint_runtime_dir }}/{{ ovn_endpoint.name }}-dhclient4.pid
+
+- name: Remove managed DHCP state for {{ ovn_endpoint.name }}
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ ovn_endpoint_runtime_dir }}/{{ ovn_endpoint.name }}-dhclient4.pid"
+    - "{{ ovn_endpoint_runtime_dir }}/{{ ovn_endpoint.name }}-dhclient4.leases"
+    - "{{ ovn_endpoint_runtime_dir }}/{{ ovn_endpoint.name }}-dhclient4.managed"
+
+- name: Remove managed namespace configuration for {{ ovn_endpoint.name }}
+  when:
+    - >-
+      ovn_endpoint_dhcp_state.stat.exists
+      or ovn_endpoint.dhcp4 | default(false)
+  ansible.builtin.file:
+    path: "/etc/netns/{{ ovn_endpoint.name }}"
+    state: absent

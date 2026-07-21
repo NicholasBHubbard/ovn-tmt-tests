@@ -3,6 +3,9 @@
     cmd: "ip netns add {{ ovn_endpoint.name }}"
     creates: "/var/run/netns/{{ ovn_endpoint.name }}"
 
+- name: Reset managed DHCP state for {{ ovn_endpoint.name }}
+  ansible.builtin.include_tasks: dhcp_cleanup.yml
+
 - name: Create veth pair for {{ ovn_endpoint.name }}
   ansible.builtin.command:
     cmd: >-
@@ -65,6 +68,64 @@
       ip netns exec {{ ovn_endpoint.name }} ip address replace
       {{ item }} dev {{ ovn_endpoint.name }}
   loop: "{{ ovn_endpoint.addresses | default([]) }}"
+  changed_when: true
+
+- name: Create DHCP runtime directory for {{ ovn_endpoint.name }}
+  when: ovn_endpoint.dhcp4 | default(false)
+  ansible.builtin.file:
+    path: "{{ ovn_endpoint_runtime_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Create network namespace configuration for {{ ovn_endpoint.name }}
+  when: ovn_endpoint.dhcp4 | default(false)
+  ansible.builtin.file:
+    path: "/etc/netns/{{ ovn_endpoint.name }}"
+    state: directory
+    mode: "0755"
+
+- name: Isolate resolver configuration for {{ ovn_endpoint.name }}
+  when: ovn_endpoint.dhcp4 | default(false)
+  ansible.builtin.copy:
+    src: /etc/resolv.conf
+    remote_src: true
+    dest: "/etc/netns/{{ ovn_endpoint.name }}/resolv.conf"
+    mode: "0644"
+    setype: >-
+      {{ 'net_conf_t'
+         if ansible_selinux.status | default('disabled') == 'enabled'
+         else omit }}
+
+- name: Record managed DHCP state for {{ ovn_endpoint.name }}
+  when: ovn_endpoint.dhcp4 | default(false)
+  ansible.builtin.file:
+    path: >-
+      {{ ovn_endpoint_runtime_dir }}/{{ ovn_endpoint.name }}-dhclient4.managed
+    state: touch
+    mode: "0600"
+
+- name: Obtain DHCPv4 lease for {{ ovn_endpoint.name }}
+  when: ovn_endpoint.dhcp4 | default(false)
+  ansible.builtin.command:
+    argv:
+      - ip
+      - netns
+      - exec
+      - "{{ ovn_endpoint.name }}"
+      - dhclient
+      - -4
+      - -1
+      - --timeout
+      - >-
+        {{ ovn_endpoint.dhcp_timeout
+           | default(ovn_endpoint_dhcp_timeout) | string }}
+      - -pf
+      - >-
+        {{ ovn_endpoint_runtime_dir }}/{{ ovn_endpoint.name }}-dhclient4.pid
+      - -lf
+      - >-
+        {{ ovn_endpoint_runtime_dir }}/{{ ovn_endpoint.name }}-dhclient4.leases
+      - "{{ ovn_endpoint.name }}"
   changed_when: true
 
 - name: Configure routes for {{ ovn_endpoint.name }}
