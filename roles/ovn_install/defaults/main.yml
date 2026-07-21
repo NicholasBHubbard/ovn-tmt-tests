@@ -8,6 +8,17 @@ ovn_make_flags: ""
 ovn_werror: false
 ovn_dpdk: false
 ovn_dpdk_dir: /usr/local/dpdk
+ovn_dpdk_version: ""
+ovn_dpdk_checksum: ""
+ovn_dpdk_drivers: ""
+ovn_dpdk_runtime_package_names:
+  dnf:
+    - libpcap
+    - numactl-libs
+  apt:
+    - libpcap0.8
+    - libnuma1
+ovn_install_destdir: ""
 ovn_build_dependency_package_names:
   dnf:
     - autoconf
@@ -62,3 +73,17 @@ ovn_distro_repository_package_names:
 # package: install from specific package files or a directory of packages
 ovn_package_files: []
 ovn_package_dir: ""
+
+# artifact: install a source build fetched to the Ansible controller
+ovn_artifact_name: ovn
+ovn_artifact_build: true
+# Reuse requires the exact resolved OVN revision and a matching manifest.
+ovn_artifact_expected_revision: ""
+ovn_artifact_cache_dir: ""
+ovn_artifact_staging_dir: "/var/tmp/{{ ovn_artifact_name }}-root"
+ovn_artifact_remote_path: "/var/tmp/{{ ovn_artifact_name }}.tar.gz"
+ovn_artifact_manifest_remote_path: "/var/tmp/{{ ovn_artifact_name }}.json"
+ovn_artifact_local_path: >-
+  {{ ovn_artifact_cache_dir | default(inventory_dir, true) }}/{{ ovn_artifact_name }}.tar.gz
+ovn_artifact_manifest_local_path: >-
+  {{ ovn_artifact_cache_dir | default(inventory_dir, true) }}/{{ ovn_artifact_name }}.json

@@ -1,8 +1,10 @@
 - name: Verify install method is valid
   ansible.builtin.assert:
     that:
-      - ovn_install_method in ["source", "git", "distro", "package"]
-    fail_msg: "Unknown ovn_install_method '{{ ovn_install_method }}'. Valid: source, git, distro, package."
+      - ovn_install_method in ["source", "git", "distro", "package", "artifact"]
+    fail_msg: >-
+      Unknown ovn_install_method '{{ ovn_install_method }}'.
+      Valid: source, git, distro, package, artifact.
 
 - name: Install OVN from source
   when:
@@ -27,6 +29,12 @@
     - ovn_install_method == "package"
     - not (ovn_installed | default(false))
   ansible.builtin.include_tasks: package.yml
+
+- name: Install OVN from source artifact
+  when:
+    - ovn_install_method == "artifact"
+    - not (ovn_installed | default(false))
+  ansible.builtin.include_tasks: artifact.yml
 
 - name: Mark OVN as installed
   when: not (ovn_installed | default(false))

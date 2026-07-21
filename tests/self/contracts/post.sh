@@ -92,6 +92,121 @@ for plan in plans/ovn-ci/*.fmf; do
     fi
 done
 
+multihost_parent=plans/ovn-multihost/main.fmf
+assert_contains "$multihost_parent" 'playbook: playbooks/ovn-build-artifact.yml'
+assert_contains "$multihost_parent" '-e ovn_install_method=artifact'
+assert_contains "$multihost_parent" '-e ovn_artifact_build=$OVN_ARTIFACT_BUILD'
+assert_contains "$multihost_parent" '-e ovn_artifact_expected_revision=$OVN_ARTIFACT_EXPECTED_REVISION'
+assert_contains "$multihost_parent" "-e ovn_git_repo=\$OVN_GIT_REPO"
+assert_contains "$multihost_parent" "-e ovn_git_version=\$OVN_GIT_VERSION"
+
+for plan in plans/ovn-multihost/*.fmf; do
+    [ "$plan" = "$multihost_parent" ] && continue
+    assert_contains "$plan" 'prepare+:'
+    assert_not_contains "$plan" 'playbook: playbooks/multihost.yml'
+done
+
+artifact_tasks=roles/ovn_install/tasks/artifact.yml
+checksum_line=$(grep -n -m1 '^- name: Verify local OVN artifact checksum' "$artifact_tasks" | cut -d: -f1)
+runtime_line=$(grep -n -m1 '^- name: Install DPDK runtime dependencies' "$artifact_tasks" | cut -d: -f1)
+if [ "$checksum_line" -ge "$runtime_line" ]; then
+    record_failure "OVN artifacts must pass checksum validation before installing runtime dependencies."
+fi
+
+artifact_manifest=$(mktemp)
+artifact_file=$(mktemp)
+artifact_output=$(mktemp)
+trap 'rm -f "$artifact_manifest" "$artifact_file" "$artifact_output"' EXIT
+
+run_artifact_install() {
+    ansible-playbook -i localhost, -c local playbooks/ovn-install.yml \
+        -e ansible_become=false \
+        -e ansible_distribution=test \
+        -e ansible_distribution_version=2 \
+        -e ansible_architecture=test \
+        -e ovn_install_method=artifact \
+        -e ovn_artifact_manifest_local_path="$artifact_manifest" \
+        -e ovn_artifact_local_path="$artifact_file" \
+        "$@" \
+        > "$artifact_output" 2>&1
+}
+
+for incompatible_host in 'wrong 2 test' 'test 1 test' 'test 2 wrong'; do
+    read -r distribution distribution_version architecture <<< "$incompatible_host"
+    printf '%s\n' \
+        "{\"distribution\":\"$distribution\",\"distribution_version\":\"$distribution_version\",\"architecture\":\"$architecture\"}" \
+        > "$artifact_manifest"
+
+    if run_artifact_install; then
+        record_failure "OVN artifact installation accepted an incompatible host."
+    elif ! grep -F -q 'OVN artifact is incompatible with this host.' "$artifact_output"; then
+        record_failure "OVN artifact installation did not report a compatibility failure."
+    fi
+done
+
+printf '%s\n' \
+    '{"distribution":"test","distribution_version":"2","architecture":"test","ovn_git_repo":"wrong","ovn_git_version":"main","ovn_revision":"revision","ovn_cc":"","ovn_configure_flags":"","ovn_make_flags":"","ovn_werror":false,"ovn_dpdk":false,"ovn_dpdk_dir":"/usr/local/dpdk","ovn_dpdk_version":"","ovn_dpdk_checksum":"","ovn_dpdk_drivers":""}' \
+    > "$artifact_manifest"
+
+if run_artifact_install; then
+    record_failure "OVN artifact installation accepted incompatible build configuration."
+elif ! grep -F -q 'OVN artifact build configuration does not match the request.' "$artifact_output"; then
+    record_failure "OVN artifact installation did not report a build configuration failure."
+fi
+
+printf '%s\n' \
+    '{"distribution":"test","distribution_version":"2","architecture":"test","ovn_git_repo":"https://github.com/ovn-org/ovn.git","ovn_git_version":"main","ovn_revision":"old","ovn_cc":"","ovn_configure_flags":"","ovn_make_flags":"","ovn_werror":false,"ovn_dpdk":false,"ovn_dpdk_dir":"/usr/local/dpdk","ovn_dpdk_version":"","ovn_dpdk_checksum":"","ovn_dpdk_drivers":"","sha256":"wrong"}' \
+    > "$artifact_manifest"
+
+if run_artifact_install -e ovn_artifact_build=false; then
+    record_failure "OVN artifact reuse accepted an unspecified source revision."
+elif ! grep -F -q 'Set ovn_artifact_expected_revision when reusing an OVN artifact.' "$artifact_output"; then
+    record_failure "OVN artifact reuse did not require an exact source revision."
+fi
+
+if run_artifact_install -e ovn_artifact_expected_revision=new; then
+    record_failure "OVN artifact installation accepted the wrong source revision."
+elif ! grep -F -q 'OVN artifact source revision does not match the request.' "$artifact_output"; then
+    record_failure "OVN artifact installation did not report a source revision failure."
+fi
+
+printf '%s\n' \
+    '{"distribution":"test","distribution_version":"2","architecture":"test","ovn_git_repo":"https://github.com/ovn-org/ovn.git","ovn_git_version":"main","ovn_revision":"revision","ovn_cc":"","ovn_configure_flags":"","ovn_make_flags":"","ovn_werror":false,"ovn_dpdk":true,"ovn_dpdk_dir":"/usr/local/dpdk","ovn_dpdk_version":"wrong","ovn_dpdk_checksum":"wrong","ovn_dpdk_drivers":"wrong","sha256":"wrong"}' \
+    > "$artifact_manifest"
+
+if run_artifact_install \
+    -e ovn_dpdk=true \
+    -e ovn_dpdk_version=24.11.1 \
+    -e ovn_dpdk_checksum=checksum \
+    -e ovn_dpdk_drivers=drivers; then
+    record_failure "OVN artifact installation accepted the wrong DPDK identity."
+elif ! grep -F -q 'OVN artifact build configuration does not match the request.' "$artifact_output"; then
+    record_failure "OVN artifact installation did not report a DPDK identity failure."
+fi
+
+printf '%s\n' \
+    '{"distribution":"test","distribution_version":"2","architecture":"test","ovn_git_repo":"https://github.com/ovn-org/ovn.git","ovn_git_version":"main","ovn_revision":"revision","ovn_cc":"","ovn_configure_flags":"","ovn_make_flags":"","ovn_werror":false,"ovn_dpdk":false,"ovn_dpdk_dir":"/usr/local/dpdk","ovn_dpdk_version":"","ovn_dpdk_checksum":"","ovn_dpdk_drivers":"","sha256":"wrong"}' \
+    > "$artifact_manifest"
+
+if run_artifact_install; then
+    record_failure "OVN artifact installation accepted a bad checksum."
+elif ! grep -F -q 'OVN artifact is missing or its checksum does not match.' "$artifact_output"; then
+    record_failure "OVN artifact installation did not report a checksum failure."
+fi
+
+if ansible-playbook -i localhost, -c local playbooks/ovn-build-artifact.yml \
+    -e ansible_become=false \
+    -e ovn_artifact_builder_hosts=all \
+    -e ovn_artifact_build=false \
+    -e ovn_artifact_expected_revision=revision \
+    -e ovn_artifact_local_path="$artifact_file.missing" \
+    -e ovn_artifact_manifest_local_path="$artifact_manifest.missing" \
+    > "$artifact_output" 2>&1; then
+    record_failure "OVN artifact reuse rebuilt or accepted a missing artifact."
+elif ! grep -F -q 'The requested reusable OVN artifact is missing.' "$artifact_output"; then
+    record_failure "OVN artifact reuse did not report a missing artifact."
+fi
+
 if (
     ASSERT_FAILURES=0
     ss() {

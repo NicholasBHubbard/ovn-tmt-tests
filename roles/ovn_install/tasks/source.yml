@@ -81,7 +81,9 @@
 
 - name: Install OVS submodule
   ansible.builtin.command:
-    cmd: make install
+    cmd: >-
+      make install
+      {{ ('DESTDIR=' ~ ovn_install_destdir) if ovn_install_destdir else '' }}
     chdir: "{{ ovn_source_dir }}/ovs"
   changed_when: true
 
@@ -97,7 +99,10 @@
   when: ovn_dpdk | bool
   ansible.builtin.copy:
     src: "{{ ovn_source_dir }}/ovs/vswitchd/ovs-vswitchd_with_dpdk"
-    dest: /usr/local/sbin/ovs-vswitchd
+    dest: >-
+      {{ (ovn_install_destdir ~ '/usr/local/sbin/ovs-vswitchd')
+         if ovn_install_destdir
+         else '/usr/local/sbin/ovs-vswitchd' }}
     remote_src: true
     mode: "0755"
 
@@ -123,7 +128,9 @@
 
 - name: Install OVN
   ansible.builtin.command:
-    cmd: make install
+    cmd: >-
+      make install
+      {{ ('DESTDIR=' ~ ovn_install_destdir) if ovn_install_destdir else '' }}
     chdir: "{{ ovn_source_dir }}"
   changed_when: true
 

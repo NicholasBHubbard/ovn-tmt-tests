@@ -1,0 +1,68 @@
+summary: Test separate OVN artifacts on Fedora and Debian
+
+provision:
+  - name: fedora-builder
+    role: fedora-builder
+    how: virtual
+    image: fedora
+  - name: fedora-consumer
+    role: fedora-consumer
+    how: virtual
+    image: fedora
+  - name: debian-builder
+    role: debian-builder
+    how: virtual
+    image: debian
+  - name: debian-consumer
+    role: debian-consumer
+    how: virtual
+    image: debian
+
+prepare:
+  - name: Check clean guests
+    how: shell
+    script: ./tests/self/ovn-install/pre.sh
+
+  - name: Build Fedora artifact
+    how: ansible
+    where: [fedora-builder]
+    playbook: playbooks/ovn-build-artifact.yml
+    extra-args: >-
+      -e ovn_artifact_builder_hosts=all
+      -e ovn_artifact_name=ovn-fedora
+      -e ovn_artifact_build=$OVN_ARTIFACT_BUILD
+      -e 'ovn_artifact_cache_dir=$OVN_ARTIFACT_CACHE_DIR'
+      -e ovn_artifact_expected_revision=$OVN_ARTIFACT_EXPECTED_REVISION
+
+  - name: Install Fedora artifact
+    how: ansible
+    where: [fedora-builder, fedora-consumer]
+    playbook: playbooks/ovn-install.yml
+    extra-args: >-
+      -e ovn_install_method=artifact
+      -e ovn_artifact_name=ovn-fedora
+      -e ovn_artifact_build=$OVN_ARTIFACT_BUILD
+      -e 'ovn_artifact_cache_dir=$OVN_ARTIFACT_CACHE_DIR'
+      -e ovn_artifact_expected_revision=$OVN_ARTIFACT_EXPECTED_REVISION
+
+  - name: Build Debian artifact
+    how: ansible
+    where: [debian-builder]
+    playbook: playbooks/ovn-build-artifact.yml
+    extra-args: >-
+      -e ovn_artifact_builder_hosts=all
+      -e ovn_artifact_name=ovn-debian
+      -e ovn_artifact_build=$OVN_ARTIFACT_BUILD
+      -e 'ovn_artifact_cache_dir=$OVN_ARTIFACT_CACHE_DIR'
+      -e ovn_artifact_expected_revision=$OVN_ARTIFACT_EXPECTED_REVISION
+
+  - name: Install Debian artifact
+    how: ansible
+    where: [debian-builder, debian-consumer]
+    playbook: playbooks/ovn-install.yml
+    extra-args: >-
+      -e ovn_install_method=artifact
+      -e ovn_artifact_name=ovn-debian
+      -e ovn_artifact_build=$OVN_ARTIFACT_BUILD
+      -e 'ovn_artifact_cache_dir=$OVN_ARTIFACT_CACHE_DIR'
+      -e ovn_artifact_expected_revision=$OVN_ARTIFACT_EXPECTED_REVISION

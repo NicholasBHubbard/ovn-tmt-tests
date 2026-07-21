@@ -1,5 +1,10 @@
 summary: Base configuration for ovn-install self-tests
 
+environment:
+  OVN_ARTIFACT_BUILD: "true"
+  OVN_ARTIFACT_CACHE_DIR: ""
+  OVN_ARTIFACT_EXPECTED_REVISION: ""
+
 discover:
   how: fmf
   test:

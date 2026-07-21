@@ -17,11 +17,7 @@ provision:
     image: fedora
     connection: system
 
-prepare:
-  - name: Set up OVN topology
-    how: ansible
-    playbook: playbooks/multihost.yml
-
+prepare+:
   - name: Set up gateway NAT test scenario
     how: ansible
     order: 80
