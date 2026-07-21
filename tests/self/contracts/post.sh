@@ -55,9 +55,11 @@ inherited_plan_dirs=(
     ovn-central
     ovn-central-ssl
     ovn-clustered
+    ovn-endpoints
     ovn-host
     ovn-install
     ovn-system-test-deps
+    ovn-topology
     ovn-unit-test-deps
     ovs-setup
 )

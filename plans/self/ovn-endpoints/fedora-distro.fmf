@@ -1,0 +1,43 @@
+summary: Test OVN endpoint role on Fedora
+
+provision:
+  - how: virtual
+    image: fedora
+
+prepare:
+  - name: Set up OVN central
+    how: ansible
+    playbook: playbooks/ovn-central.yml
+    extra-args: '-e install_method=distro'
+  - name: Set up OVN host
+    how: ansible
+    playbook: playbooks/ovn-host.yml
+    extra-args: '-e install_method=distro'
+  - name: Check endpoint preconditions
+    how: shell
+    order: 78
+    script: ./tests/self/ovn-endpoints/pre.sh
+  - name: Record host state
+    how: shell
+    order: 79
+    script: ./tests/self/ovn-endpoints/record-host.sh
+  - name: Apply initial OVN endpoints
+    how: ansible
+    order: 80
+    playbook: tests/self/ovn-endpoints/initial.yml
+  - name: Verify initial OVN endpoints
+    how: shell
+    order: 81
+    script: ./tests/self/ovn-endpoints/verify-initial.sh
+  - name: Reconfigure OVN endpoints
+    how: ansible
+    order: 82
+    playbook: tests/self/ovn-endpoints/reconfigure.yml
+  - name: Record reconfigured OVN endpoints
+    how: shell
+    order: 83
+    script: ./tests/self/ovn-endpoints/record-reconfigured.sh
+  - name: Reapply OVN endpoints
+    how: ansible
+    order: 84
+    playbook: tests/self/ovn-endpoints/reconfigure.yml

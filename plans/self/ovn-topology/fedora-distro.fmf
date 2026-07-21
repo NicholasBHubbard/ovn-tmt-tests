@@ -1,0 +1,29 @@
+summary: Test OVN topology roles on Fedora
+
+provision:
+  - how: virtual
+    image: fedora
+
+prepare:
+  - name: Set up OVN central
+    how: ansible
+    playbook: playbooks/ovn-central.yml
+    extra-args: '-e install_method=distro'
+  - name: Check OVN topology preconditions
+    how: shell
+    script: ./tests/self/ovn-topology/pre.sh
+  - name: Apply initial OVN topology
+    how: ansible
+    playbook: tests/self/ovn-topology/initial.yml
+  - name: Verify initial OVN topology
+    how: shell
+    script: ./tests/self/ovn-topology/verify-initial.sh
+  - name: Reconfigure OVN topology
+    how: ansible
+    playbook: tests/self/ovn-topology/reconfigure.yml
+  - name: Record reconfigured OVN topology
+    how: shell
+    script: ./tests/self/ovn-topology/record-reconfigured.sh
+  - name: Reapply OVN topology
+    how: ansible
+    playbook: tests/self/ovn-topology/reconfigure.yml

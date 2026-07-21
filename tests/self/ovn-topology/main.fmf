@@ -1,0 +1,4 @@
+summary: Verify declarative OVN topology lifecycle
+test: ./post.sh
+framework: shell
+duration: 5m

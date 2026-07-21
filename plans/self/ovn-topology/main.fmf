@@ -1,0 +1,9 @@
+summary: Base configuration for OVN topology self-tests
+
+discover:
+  how: fmf
+  test:
+    - /tests/self/ovn-topology
+
+execute:
+  how: tmt
