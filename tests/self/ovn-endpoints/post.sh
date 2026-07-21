@@ -5,6 +5,10 @@ source "$TMT_TREE/tests/lib/assert.sh"
 source "$TMT_TREE/tests/lib/ovn.sh"
 
 echo "Checking OVN endpoints..."
+endpoint_mtu() {
+    ip -n "$1" -o link show dev "$1" | sed -n 's/.* mtu \([0-9]*\).*/\1/p'
+}
+
 check_ovn_row() {
     local table=$1
     local name=$2
@@ -84,6 +88,14 @@ check_endpoint self-vm1 self-port1 self-moved self-br 02:00:00:00:01:02 \
     192.0.2.10/24 2001:db8:2::1/64
 check_logical_port self-port2 self-moved 02:00:00:00:02:01 192.0.2.2/24
 check_endpoint self-remote self-port3 self-moved self-br 02:00:00:00:03:02
+if [ "$(</sys/class/net/self-vm1-p/mtu)" != 1500 ] || \
+    [ "$(endpoint_mtu self-vm1)" != 1500 ]; then
+    record_failure "Expected self-vm1 MTU to return to the default 1500"
+fi
+if [ "$(</sys/class/net/self-remote-p/mtu)" != 1300 ] || \
+    [ "$(endpoint_mtu self-remote)" != 1300 ]; then
+    record_failure "Expected self-remote MTU override 1300"
+fi
 check_ovn_row Logical_Switch_Port self-port4 ""
 for column in dhcpv4_options dhcpv6_options; do
     if [ -n "$(ovn-nbctl get Logical_Switch_Port self-port3 "$column" \
@@ -96,11 +108,15 @@ if [ "$(</tmp/self-port3-id)" != "$(ovn-nbctl --bare --columns=_uuid find \
     record_failure "Expected logical switch port identity to survive reconfiguration and reapply"
 fi
 
-if [ "$(stat -Lc '%i' /var/run/netns/self-vm1)" != "$(</tmp/self-vm1-ns-id)" ]; then
-    record_failure "Expected reapply to preserve the self-vm1 namespace"
+ns_id=$(stat -Lc '%i' /var/run/netns/self-vm1)
+if [ "$ns_id" != "$(</tmp/self-vm1-initial-ns-id)" ] || \
+    [ "$ns_id" != "$(</tmp/self-vm1-ns-id)" ]; then
+    record_failure "Expected MTU change and reapply to preserve the self-vm1 namespace"
 fi
-if [ "$(</sys/class/net/self-vm1-p/ifindex)" != "$(</tmp/self-vm1-ifindex)" ]; then
-    record_failure "Expected reapply to preserve the self-vm1 veth"
+ifindex=$(</sys/class/net/self-vm1-p/ifindex)
+if [ "$ifindex" != "$(</tmp/self-vm1-initial-ifindex)" ] || \
+    [ "$ifindex" != "$(</tmp/self-vm1-ifindex)" ]; then
+    record_failure "Expected MTU change and reapply to preserve the self-vm1 veth"
 fi
 
 check_route() {

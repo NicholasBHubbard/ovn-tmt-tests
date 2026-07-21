@@ -29,6 +29,7 @@
     ovn_endpoint_central_hosts: all
     ovn_endpoint_compute_hosts: all
     ovn_endpoint_dhcp_timeout: 10
+    ovn_endpoint_mtu: 1400
     ovn_endpoints:
       - name: self-vm1
         host: default-0
@@ -57,6 +58,7 @@
         switch: self-sw
         iface_id: self-port2
         mac: "02:00:00:00:02:01"
+        mtu: 1450
         address_mode: dynamic
         dhcpv4_options: self-dhcp
         dhcp4: true
@@ -95,12 +97,14 @@
     ovn_endpoint_central_hosts: all
     ovn_endpoint_compute_hosts: all
     ovn_endpoint_dhcp_timeout: 10
+    ovn_endpoint_mtu: 1400
     ovn_endpoints:
       - name: self-vm2
         host: default-0
         switch: self-sw
         iface_id: self-port2
         mac: "02:00:00:00:02:01"
+        mtu: 1450
         address_mode: dynamic
         dhcpv4_options: self-dhcp
         dhcp4: true

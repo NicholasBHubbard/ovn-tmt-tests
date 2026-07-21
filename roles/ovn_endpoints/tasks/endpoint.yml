@@ -45,9 +45,13 @@
       external_ids:iface-id={{ ovn_endpoint.iface_id }}
   changed_when: true
 
-- name: Bring up host interface for {{ ovn_endpoint.name }}
+- name: Configure host interface for {{ ovn_endpoint.name }}
   ansible.builtin.command:
-    cmd: "ip link set {{ ovn_endpoint.name }}-p up"
+    cmd: "ip link set {{ ovn_endpoint.name }}-p {{ item }}"
+  loop:
+    - >-
+      mtu {{ ovn_endpoint.mtu | default(ovn_endpoint_mtu) }}
+    - up
   changed_when: true
 
 - name: Configure interface for {{ ovn_endpoint.name }}
@@ -56,6 +60,9 @@
   loop:
     - ip link set lo up
     - "ip link set {{ ovn_endpoint.name }} address {{ ovn_endpoint.mac }}"
+    - >-
+      ip link set {{ ovn_endpoint.name }}
+      mtu {{ ovn_endpoint.mtu | default(ovn_endpoint_mtu) }}
     - "ip link set {{ ovn_endpoint.name }} up"
     - "ip -4 route flush table all dev {{ ovn_endpoint.name }} proto boot"
     - "ip -6 route flush table all dev {{ ovn_endpoint.name }} proto boot"

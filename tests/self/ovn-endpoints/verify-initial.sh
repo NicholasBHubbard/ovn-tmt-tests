@@ -1,6 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
+endpoint_mtu() {
+    ip -n "$1" -o link show dev "$1" | sed -n 's/.* mtu \([0-9]*\).*/\1/p'
+}
+
 ovn-nbctl --bare --columns=_uuid find Logical_Switch_Port name=self-port3 \
     > /tmp/self-port3-id
 ovn-nbctl get Logical_Switch_Port self-port2 dynamic_addresses \
@@ -8,6 +12,14 @@ ovn-nbctl get Logical_Switch_Port self-port2 dynamic_addresses \
 
 test -s /tmp/self-port3-id
 test -s /tmp/self-port2-dynamic-address
+test "$(</sys/class/net/self-vm1-p/mtu)" = 1400
+test "$(endpoint_mtu self-vm1)" = 1400
+test "$(</sys/class/net/self-vm2-p/mtu)" = 1450
+test "$(endpoint_mtu self-vm2)" = 1450
+stat -Lc '%i' /var/run/netns/self-vm1 > /tmp/self-vm1-initial-ns-id
+cat /sys/class/net/self-vm1-p/ifindex > /tmp/self-vm1-initial-ifindex
+test -s /tmp/self-vm1-initial-ns-id
+test -s /tmp/self-vm1-initial-ifindex
 test "$(ovn-nbctl lsp-get-addresses self-port3 \
     | tr -d '\"')" = '02:00:00:00:03:01 dynamic'
 test "$(ovn-nbctl get Logical_Switch_Port self-port3 dhcpv4_options \

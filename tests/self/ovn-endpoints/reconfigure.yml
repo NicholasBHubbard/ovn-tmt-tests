@@ -40,6 +40,7 @@
         switch: self-moved
         iface_id: self-port3
         mac: "02:00:00:00:03:02"
+        mtu: 1300
         addresses: []
       - name: self-delete
         iface_id: self-port4
