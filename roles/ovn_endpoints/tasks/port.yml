@@ -1,39 +1,136 @@
-- name: Find current logical switch for {{ ovn_endpoint.iface_id }}
-  when: ovn_endpoint.state | default('present') == 'present'
-  ansible.builtin.command:
-    cmd: "ovn-nbctl lsp-get-ls {{ ovn_endpoint.iface_id | quote }}"
-  register: ovn_endpoint_current_switch
-  failed_when: false
-  changed_when: false
-
-- name: Find desired logical switch for {{ ovn_endpoint.iface_id }}
-  when: ovn_endpoint.state | default('present') == 'present'
-  ansible.builtin.command:
-    cmd: "ovn-nbctl get Logical_Switch {{ ovn_endpoint.switch | quote }} _uuid"
-  register: ovn_endpoint_desired_switch
-  changed_when: false
-
-- name: Detach logical switch port from its old switch {{ ovn_endpoint.iface_id }}
-  when:
-    - ovn_endpoint.state | default('present') == 'present'
-    - ovn_endpoint_current_switch.stdout | length > 0
-    - ovn_endpoint_current_switch.stdout.split(' ') | first != ovn_endpoint_desired_switch.stdout
-  ansible.builtin.command:
-    cmd: "ovn-nbctl --if-exists lsp-del {{ ovn_endpoint.iface_id | quote }}"
-  changed_when: true
-
-- name: Create logical switch port for {{ ovn_endpoint.iface_id }}
+- name: Find logical switch port {{ ovn_endpoint.iface_id }}
   when: ovn_endpoint.state | default('present') == 'present'
   ansible.builtin.command:
     cmd: >-
-      ovn-nbctl --may-exist lsp-add
-      {{ ovn_endpoint.switch | quote }} {{ ovn_endpoint.iface_id | quote }}
-      -- lsp-set-addresses {{ ovn_endpoint.iface_id | quote }}
-      "{{ ([ovn_endpoint.mac]
-            + (ovn_endpoint.addresses
-               | map('regex_replace', '/.*$', '')
-               | list))
-           | join(' ') }}"
+      ovn-nbctl --bare --columns=_uuid find Logical_Switch_Port
+      name={{ ovn_endpoint.iface_id | quote }}
+  register: ovn_endpoint_port_row
+  changed_when: false
+
+- name: Find current logical switch for {{ ovn_endpoint.iface_id }}
+  when:
+    - ovn_endpoint.state | default('present') == 'present'
+    - ovn_endpoint_port_row.stdout | length > 0
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - --bare
+      - --columns=name
+      - find
+      - Logical_Switch
+      - "ports{>=}{{ ovn_endpoint_port_row.stdout }}"
+  register: ovn_endpoint_current_switch
+  changed_when: false
+
+- name: Move logical switch port {{ ovn_endpoint.iface_id }}
+  when:
+    - ovn_endpoint.state | default('present') == 'present'
+    - ovn_endpoint_port_row.stdout | length > 0
+    - ovn_endpoint_current_switch.stdout != ovn_endpoint.switch
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - remove
+      - Logical_Switch
+      - "{{ ovn_endpoint_current_switch.stdout }}"
+      - ports
+      - "{{ ovn_endpoint_port_row.stdout }}"
+      - --
+      - add
+      - Logical_Switch
+      - "{{ ovn_endpoint.switch }}"
+      - ports
+      - "{{ ovn_endpoint_port_row.stdout }}"
+  changed_when: true
+
+- name: Create logical switch port {{ ovn_endpoint.iface_id }}
+  when:
+    - ovn_endpoint.state | default('present') == 'present'
+    - ovn_endpoint_port_row.stdout | length == 0
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - lsp-add
+      - "{{ ovn_endpoint.switch }}"
+      - "{{ ovn_endpoint.iface_id }}"
+  changed_when: true
+
+- name: Find DHCP options for {{ ovn_endpoint.iface_id }}
+  when:
+    - ovn_endpoint.state | default('present') == 'present'
+    - ovn_endpoint_dhcp_reference.id | length > 0
+  ansible.builtin.command:
+    cmd: >-
+      ovn-nbctl --bare --columns=_uuid find DHCP_Options
+      external_ids:ovn-tmt-tests-id={{ ovn_endpoint_dhcp_reference.id | quote }}
+  loop:
+    - version: 4
+      id: "{{ ovn_endpoint.dhcpv4_options | default('') }}"
+    - version: 6
+      id: "{{ ovn_endpoint.dhcpv6_options | default('') }}"
+  loop_control:
+    loop_var: ovn_endpoint_dhcp_reference
+    label: "IPv{{ ovn_endpoint_dhcp_reference.version }}"
+  register: ovn_endpoint_dhcp_rows
+  changed_when: false
+
+- name: Verify DHCP options for {{ ovn_endpoint.iface_id }}
+  when:
+    - ovn_endpoint.state | default('present') == 'present'
+    - not ovn_endpoint_dhcp_row.skipped | default(false)
+  ansible.builtin.assert:
+    that:
+      - ovn_endpoint_dhcp_row.stdout_lines | length == 1
+    fail_msg: >-
+      DHCP options {{ ovn_endpoint_dhcp_row.ovn_endpoint_dhcp_reference.id }}
+      were not found unambiguously.
+  loop: "{{ ovn_endpoint_dhcp_rows.results }}"
+  loop_control:
+    loop_var: ovn_endpoint_dhcp_row
+    label: >-
+      IPv{{ ovn_endpoint_dhcp_row.ovn_endpoint_dhcp_reference.version }}
+
+- name: Configure logical switch port {{ ovn_endpoint.iface_id }}
+  when: ovn_endpoint.state | default('present') == 'present'
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - lsp-set-addresses
+      - "{{ ovn_endpoint.iface_id }}"
+      - "{{ ovn_endpoint_nb_addresses }}"
+      - --
+      - clear
+      - Logical_Switch_Port
+      - "{{ ovn_endpoint.iface_id }}"
+      - dhcpv4_options
+      - dhcpv6_options
+  vars:
+    ovn_endpoint_nb_addresses: >-
+      {{ ([ovn_endpoint.mac, 'dynamic']
+           if ovn_endpoint.address_mode | default('static') == 'dynamic'
+           else [ovn_endpoint.mac]
+                + (ovn_endpoint.addresses | default([])
+                   | map('regex_replace', '/.*$', '') | list))
+         | join(' ') }}
+  changed_when: true
+
+- name: Configure DHCP options for {{ ovn_endpoint.iface_id }}
+  when:
+    - ovn_endpoint.state | default('present') == 'present'
+    - not ovn_endpoint_dhcp_row.skipped | default(false)
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - >-
+        lsp-set-dhcpv{{ ovn_endpoint_dhcp_row.ovn_endpoint_dhcp_reference.version
+        }}-options
+      - "{{ ovn_endpoint.iface_id }}"
+      - "{{ ovn_endpoint_dhcp_row.stdout }}"
+  loop: "{{ ovn_endpoint_dhcp_rows.results }}"
+  loop_control:
+    loop_var: ovn_endpoint_dhcp_row
+    label: >-
+      IPv{{ ovn_endpoint_dhcp_row.ovn_endpoint_dhcp_reference.version }}
   changed_when: true
 
 - name: Delete logical switch port {{ ovn_endpoint.iface_id }}

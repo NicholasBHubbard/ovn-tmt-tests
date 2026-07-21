@@ -195,8 +195,10 @@
         switch: self-sw
         iface_id: self-port3
         mac: "02:00:00:00:03:01"
-        addresses:
-          - 192.0.2.3/24
+        address_mode: dynamic
+        dhcpv4_options: self-dhcp
+        dhcpv6_options: self-dhcp-v6
+        addresses: []
       - name: self-delete
         host: default-0
         switch: self-sw

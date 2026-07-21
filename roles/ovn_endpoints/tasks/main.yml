@@ -8,6 +8,16 @@
         | length == 0
     fail_msg: "Endpoint states must be present or absent."
 
+- name: Verify endpoint address modes
+  ansible.builtin.assert:
+    that:
+      - >-
+        ovn_endpoints
+        | map(attribute='address_mode', default='static')
+        | difference(['static', 'dynamic'])
+        | length == 0
+    fail_msg: "Endpoint address modes must be static or dynamic."
+
 - name: Configure OVN logical switch ports
   when: ovn_endpoint_mode == "ports"
   ansible.builtin.include_tasks: port.yml

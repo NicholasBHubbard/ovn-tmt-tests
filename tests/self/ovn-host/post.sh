@@ -498,6 +498,16 @@ check_endpoint self-vm1 self-port1 self-moved self-br 02:00:00:00:01:02 \
 check_logical_port self-port2 self-moved 02:00:00:00:02:01 192.0.2.2/24
 check_endpoint self-remote self-port3 self-moved self-br 02:00:00:00:03:02
 check_ovn_row Logical_Switch_Port self-port4 ""
+for column in dhcpv4_options dhcpv6_options; do
+    if [ -n "$(ovn-nbctl get Logical_Switch_Port self-port3 "$column" \
+        | tr -d '[]')" ]; then
+        record_failure "Expected self-port3 $column to be cleared"
+    fi
+done
+if [ "$(</tmp/self-port3-id)" != "$(ovn-nbctl --bare --columns=_uuid find \
+    Logical_Switch_Port name=self-port3)" ]; then
+    record_failure "Expected logical switch port identity to survive reconfiguration and reapply"
+fi
 
 if [ "$(stat -Lc '%i' /var/run/netns/self-vm1)" != "$(</tmp/self-vm1-ns-id)" ]; then
     record_failure "Expected reapply to preserve the self-vm1 namespace"

@@ -30,6 +30,8 @@ prepare:
       > /tmp/self-moved-id
       && ovn-nbctl --bare --columns=_uuid find Logical_Switch_Port name=self-rp-sw
       > /tmp/self-rp-sw-id
+      && ovn-nbctl --bare --columns=_uuid find Logical_Switch_Port name=self-port3
+      > /tmp/self-port3-id
       && ovn-nbctl --bare --columns=_uuid find Logical_Router_Port name=self-rp-delete
       > /tmp/self-rp-delete-id
       && ovn-nbctl --bare --columns=_uuid find Logical_Switch_Port name=self-rp-delete-sw
@@ -63,6 +65,7 @@ prepare:
       && test -s /tmp/self-rp-id
       && test -s /tmp/self-moved-id
       && test -s /tmp/self-rp-sw-id
+      && test -s /tmp/self-port3-id
       && test -s /tmp/self-rp-delete-id
       && test -s /tmp/self-rp-delete-sw-id
       && test -s /tmp/self-localnet-id
@@ -84,6 +87,12 @@ prepare:
       | tr -d '\"')" = 203.0.113.1..203.0.113.2
       && test "$(ovn-nbctl get Logical_Switch self-moved other_config:mcast_snoop
       | tr -d '\"')" = true
+      && test "$(ovn-nbctl lsp-get-addresses self-port3
+      | tr -d '\"')" = '02:00:00:00:03:01 dynamic'
+      && test "$(ovn-nbctl get Logical_Switch_Port self-port3 dhcpv4_options
+      | tr -d '[]')" = "$(cat /tmp/self-dhcp-id)"
+      && test "$(ovn-nbctl get Logical_Switch_Port self-port3 dhcpv6_options
+      | tr -d '[]')" = "$(cat /tmp/self-dhcp-v6-id)"
       && test "$(ovn-nbctl get Logical_Router_Static_Route
       "$(cat /tmp/self-route-id)" ip_prefix | tr -d '\"')" = 198.51.100.0/24
       && test "$(ovn-nbctl get Logical_Router_Static_Route
