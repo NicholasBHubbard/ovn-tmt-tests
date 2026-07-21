@@ -9,15 +9,8 @@
     fail_msg: "Logical switch states must be present or absent."
 
 - name: Configure OVN logical switches
-  ansible.builtin.command:
-    cmd: >-
-      ovn-nbctl
-      {{ '--if-exists ls-del'
-         if ovn_switch.state | default('present') == 'absent'
-         else '--may-exist ls-add' }}
-      {{ ovn_switch.name | quote }}
+  ansible.builtin.include_tasks: switch.yml
   loop: "{{ ovn_switches }}"
   loop_control:
     loop_var: ovn_switch
     label: "{{ ovn_switch.name }}"
-  changed_when: true

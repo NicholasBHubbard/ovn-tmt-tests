@@ -1,2 +1,3 @@
 # Listed switches default to present; absent removes them. Unlisted switches are untouched.
+# Omitted other_config values are cleared.
 ovn_switches: []

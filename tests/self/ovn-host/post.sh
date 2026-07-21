@@ -35,6 +35,30 @@ check_ovn_row() {
 check_ovn_row Logical_Switch self-sw self-sw
 check_ovn_row Logical_Switch self-moved self-moved
 check_ovn_row Logical_Switch self-unused ""
+if [ "$(ovn-nbctl get Logical_Switch self-moved other_config:subnet | tr -d '\"')" != \
+    198.51.100.0/24 ]; then
+    record_failure "Expected self-moved other_config subnet to be replaced"
+fi
+if [ "$(ovn-nbctl get Logical_Switch self-moved other_config:mcast_snoop | tr -d '\"')" != \
+    false ]; then
+    record_failure "Expected self-moved other_config mcast_snoop to be replaced"
+fi
+if [ -n "$(ovn-nbctl --if-exists get Logical_Switch self-moved \
+    other_config:exclude_ips 2>/dev/null)" ]; then
+    record_failure "Expected omitted self-moved other_config exclude_ips to be absent"
+fi
+if [ "$(ovn-nbctl get Logical_Switch self-sw other_config:subnet | tr -d '\"')" != \
+    192.0.2.0/24 ]; then
+    record_failure "Expected unlisted self-sw other_config subnet to remain"
+fi
+if [ "$(ovn-nbctl get Logical_Switch self-sw other_config:exclude_ips | tr -d '\"')" != \
+    192.0.2.1..192.0.2.2 ]; then
+    record_failure "Expected unlisted self-sw other_config exclude_ips to remain"
+fi
+if [ "$(</tmp/self-moved-id)" != "$(ovn-nbctl --bare --columns=_uuid find \
+    Logical_Switch name=self-moved)" ]; then
+    record_failure "Expected logical switch identity to survive reconfiguration and reapply"
+fi
 
 check_router_option() {
     local router=$1

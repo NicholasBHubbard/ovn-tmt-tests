@@ -26,6 +26,8 @@ prepare:
     script: >-
       ovn-nbctl --bare --columns=_uuid find Logical_Router_Port name=self-rp
       > /tmp/self-rp-id
+      && ovn-nbctl --bare --columns=_uuid find Logical_Switch name=self-moved
+      > /tmp/self-moved-id
       && ovn-nbctl --bare --columns=_uuid find Logical_Switch_Port name=self-rp-sw
       > /tmp/self-rp-sw-id
       && ovn-nbctl --bare --columns=_uuid find Logical_Router_Port name=self-rp-delete
@@ -59,6 +61,7 @@ prepare:
       && ovn-nbctl --bare --columns=_uuid find Logical_Router_Static_Route
       external_ids:ovn-tmt-tests-id=self-route-delete > /tmp/self-route-delete-id
       && test -s /tmp/self-rp-id
+      && test -s /tmp/self-moved-id
       && test -s /tmp/self-rp-sw-id
       && test -s /tmp/self-rp-delete-id
       && test -s /tmp/self-rp-delete-sw-id
@@ -75,6 +78,12 @@ prepare:
       && test -s /tmp/self-nat-delete-id
       && test -s /tmp/self-route-id
       && test -s /tmp/self-route-delete-id
+      && test "$(ovn-nbctl get Logical_Switch self-moved other_config:subnet
+      | tr -d '\"')" = 203.0.113.0/24
+      && test "$(ovn-nbctl get Logical_Switch self-moved other_config:exclude_ips
+      | tr -d '\"')" = 203.0.113.1..203.0.113.2
+      && test "$(ovn-nbctl get Logical_Switch self-moved other_config:mcast_snoop
+      | tr -d '\"')" = true
       && test "$(ovn-nbctl get Logical_Router_Static_Route
       "$(cat /tmp/self-route-id)" ip_prefix | tr -d '\"')" = 198.51.100.0/24
       && test "$(ovn-nbctl get Logical_Router_Static_Route

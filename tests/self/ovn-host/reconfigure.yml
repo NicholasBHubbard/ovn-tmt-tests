@@ -13,6 +13,9 @@
     ovn_topology_central_hosts: all
     ovn_switches:
       - name: self-moved
+        other_config:
+          subnet: 198.51.100.0/24
+          mcast_snoop: false
       - name: self-unused
         state: absent
     ovn_dhcp_options:

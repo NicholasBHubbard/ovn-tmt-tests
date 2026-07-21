@@ -1,0 +1,44 @@
+- name: Create logical switch and reset other config {{ ovn_switch.name }}
+  when: ovn_switch.state | default('present') == 'present'
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - --may-exist
+      - ls-add
+      - "{{ ovn_switch.name }}"
+      - --
+      - clear
+      - Logical_Switch
+      - "{{ ovn_switch.name }}"
+      - other_config
+  changed_when: true
+
+- name: Configure other config for logical switch {{ ovn_switch.name }}
+  when: ovn_switch.state | default('present') == 'present'
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - set
+      - Logical_Switch
+      - "{{ ovn_switch.name }}"
+      - "other_config:{{ ovn_switch_config.key }}={{ ovn_switch_config_value }}"
+  loop: "{{ ovn_switch.other_config | default({}) | dict2items }}"
+  loop_control:
+    loop_var: ovn_switch_config
+    label: "{{ ovn_switch_config.key }}"
+  vars:
+    ovn_switch_config_value: >-
+      {{ (ovn_switch_config.value | string | lower)
+         if ovn_switch_config.value is boolean
+         else (ovn_switch_config.value | string) }}
+  changed_when: true
+
+- name: Delete logical switch {{ ovn_switch.name }}
+  when: ovn_switch.state | default('present') == 'absent'
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - --if-exists
+      - ls-del
+      - "{{ ovn_switch.name }}"
+  changed_when: true
