@@ -61,6 +61,7 @@ inherited_plan_dirs=(
     ovn-system-test-deps
     ovn-topology
     ovn-unit-test-deps
+    ovs-endpoints
     ovs-setup
 )
 

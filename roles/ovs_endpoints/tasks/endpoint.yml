@@ -1,0 +1,5 @@
+- name: Configure namespace for {{ ovs_endpoint.name }}
+  ansible.builtin.include_tasks: namespace.yml
+
+- name: Configure routes for {{ ovs_endpoint.name }}
+  ansible.builtin.include_tasks: routes.yml

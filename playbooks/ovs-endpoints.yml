@@ -1,0 +1,5 @@
+- name: Configure direct OVS endpoints
+  hosts: "{{ ovs_endpoint_hosts | default('all') }}"
+  become: true
+  roles:
+    - ovs_endpoints

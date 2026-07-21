@@ -1,17 +1,9 @@
 - name: Clean managed DHCP state for {{ ovn_endpoint.name }}
   ansible.builtin.include_tasks: dhcp_cleanup.yml
 
-- name: Detach host interface for {{ ovn_endpoint.name }}
-  ansible.builtin.command:
-    cmd: "ovs-vsctl --if-exists del-port {{ ovn_endpoint.name }}-p"
-    removes: "/sys/class/net/{{ ovn_endpoint.name }}-p"
-
-- name: Delete host interface for {{ ovn_endpoint.name }}
-  ansible.builtin.command:
-    cmd: "ip link delete {{ ovn_endpoint.name }}-p"
-    removes: "/sys/class/net/{{ ovn_endpoint.name }}-p"
-
-- name: Delete network namespace for {{ ovn_endpoint.name }}
-  ansible.builtin.command:
-    cmd: "ip netns delete {{ ovn_endpoint.name }}"
-    removes: "/var/run/netns/{{ ovn_endpoint.name }}"
+- name: Clean OVS namespace for {{ ovn_endpoint.name }}
+  ansible.builtin.include_role:
+    name: ovs_endpoints
+    tasks_from: cleanup.yml
+  vars:
+    ovs_endpoint: "{{ ovn_endpoint }}"

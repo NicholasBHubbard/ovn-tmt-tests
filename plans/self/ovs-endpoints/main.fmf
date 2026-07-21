@@ -1,0 +1,9 @@
+summary: Base configuration for direct OVS endpoint self-tests
+
+discover:
+  how: fmf
+  test:
+    - /tests/self/ovs-endpoints
+
+execute:
+  how: tmt

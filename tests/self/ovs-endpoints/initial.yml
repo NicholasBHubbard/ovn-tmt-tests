@@ -1,0 +1,65 @@
+- name: Create test OVS bridges
+  hosts: all
+  become: true
+  tasks:
+    - name: Create test OVS bridge
+      ansible.builtin.command:
+        cmd: "ovs-vsctl --may-exist add-br {{ item }}"
+      loop:
+        - self-br-a
+        - self-br-b
+      changed_when: true
+
+- name: Apply initial direct OVS endpoints
+  ansible.builtin.import_playbook: ../../../playbooks/ovs-endpoints.yml
+  vars:
+    ovs_endpoint_hosts: all
+    ovs_endpoint_mtu: 1400
+    ovs_endpoints:
+      - name: self-direct
+        host: default-0
+        bridge: self-br-a
+        mac: "02:00:00:00:20:01"
+        addresses:
+          - 192.0.2.10/24
+          - 2001:db8:1::10/64
+        routes:
+          - to: default
+            via: 192.0.2.1
+          - to: 198.51.100.0/24
+            via: 192.0.2.2
+            table: 100
+            metric: 10
+          - to: default
+            via: 2001:db8:1::1
+            family: 6
+            table: 200
+      - name: self-peer
+        host: default-0
+        bridge: self-br-a
+        mac: "02:00:00:00:20:02"
+        mtu: 1450
+        addresses:
+          - 192.0.2.20/24
+      - name: self-delete
+        host: default-0
+        bridge: self-br-a
+        mac: "02:00:00:00:20:03"
+        addresses: []
+      - name: self-away
+        host: default-0
+        bridge: self-br-a
+        mac: "02:00:00:00:20:04"
+        addresses: []
+      - name: self-stale
+        host: default-0
+        bridge: self-br-a
+        mac: "02:00:00:00:20:06"
+        addresses: []
+      - name: self-keep
+        host: default-0
+        bridge: self-br-a
+        mac: "02:00:00:00:20:05"
+        mtu: 1450
+        addresses:
+          - 198.18.0.10/24

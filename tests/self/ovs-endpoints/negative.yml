@@ -1,0 +1,48 @@
+- name: Verify invalid OVS endpoint configuration
+  hosts: all
+  become: true
+  tasks:
+    - name: Verify invalid OVS endpoint configuration is rejected
+      ansible.builtin.include_tasks: negative-case.yml
+      loop:
+        - name: invalid state
+          endpoints:
+            - name: self-invalid
+              state: invalid
+          message: "OVS endpoint states must be present or absent."
+        - name: zero endpoint MTU
+          endpoints:
+            - name: self-invalid
+              mtu: 0
+          message: "OVS endpoint MTUs must be positive integers."
+        - name: non-integer endpoint MTU
+          endpoints:
+            - name: self-invalid
+              mtu: invalid
+          message: "OVS endpoint MTUs must be positive integers."
+      loop_control:
+        loop_var: ovs_endpoint_negative_case
+        label: "{{ ovs_endpoint_negative_case.name }}"
+
+    - name: Require rejection of zero default MTU
+      block:
+        - name: Apply zero default MTU
+          ansible.builtin.include_role:
+            name: ovs_endpoints
+          vars:
+            ovs_endpoint_mtu: 0
+            ovs_endpoints: []
+
+        - name: Fail if zero default MTU was accepted
+          ansible.builtin.fail:
+            msg: "Invalid configuration was accepted: zero default MTU"
+      rescue:
+        - name: Verify expected default MTU validation failure
+          ansible.builtin.assert:
+            that:
+              - >-
+                ansible_failed_result.msg ==
+                'ovs_endpoint_mtu must be a positive integer.'
+            fail_msg: >-
+              zero default MTU failed for an unexpected reason:
+              {{ ansible_failed_result.msg }}

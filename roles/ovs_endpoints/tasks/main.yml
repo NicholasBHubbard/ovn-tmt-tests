@@ -1,0 +1,48 @@
+- name: Verify OVS endpoint states
+  ansible.builtin.assert:
+    that:
+      - >-
+        ovs_endpoints
+        | map(attribute='state', default='present')
+        | difference(['present', 'absent'])
+        | length == 0
+    fail_msg: "OVS endpoint states must be present or absent."
+
+- name: Verify default OVS endpoint MTU
+  ansible.builtin.assert:
+    that:
+      - ovs_endpoint_mtu is integer
+      - ovs_endpoint_mtu > 0
+    fail_msg: "ovs_endpoint_mtu must be a positive integer."
+
+- name: Verify OVS endpoint MTUs
+  ansible.builtin.assert:
+    that:
+      - (ovs_endpoint.mtu | default(ovs_endpoint_mtu)) is integer
+      - (ovs_endpoint.mtu | default(ovs_endpoint_mtu)) > 0
+    fail_msg: "OVS endpoint MTUs must be positive integers."
+  loop: "{{ ovs_endpoints }}"
+  loop_control:
+    loop_var: ovs_endpoint
+    label: "{{ ovs_endpoint.name }}"
+
+- name: Remove absent or moved OVS endpoints
+  when:
+    - >-
+      ovs_endpoint.state | default('present') == 'absent'
+      or ovs_endpoint.host | default('') != inventory_hostname
+  ansible.builtin.include_tasks: cleanup.yml
+  loop: "{{ ovs_endpoints }}"
+  loop_control:
+    loop_var: ovs_endpoint
+    label: "{{ ovs_endpoint.name }}"
+
+- name: Configure direct OVS endpoints
+  when:
+    - ovs_endpoint.state | default('present') == 'present'
+    - ovs_endpoint.host == inventory_hostname
+  ansible.builtin.include_tasks: endpoint.yml
+  loop: "{{ ovs_endpoints }}"
+  loop_control:
+    loop_var: ovs_endpoint
+    label: "{{ ovs_endpoint.name }}"

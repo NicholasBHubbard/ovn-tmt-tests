@@ -1,0 +1,43 @@
+- name: Simulate a missing managed veth
+  hosts: all
+  become: true
+  tasks:
+    - name: Delete managed veth without removing its OVS Port
+      ansible.builtin.command:
+        cmd: ip link delete self-stale-p
+        removes: /sys/class/net/self-stale-p
+
+- name: Reapply changed direct OVS endpoints
+  ansible.builtin.import_playbook: ../../../playbooks/ovs-endpoints.yml
+  vars:
+    ovs_endpoint_hosts: all
+    ovs_endpoints:
+      - name: self-direct
+        host: default-0
+        bridge: self-br-b
+        mac: "02:00:00:00:20:11"
+        addresses:
+          - 203.0.113.10/24
+        routes:
+          - to: default
+            via: 203.0.113.1
+          - to: 198.51.100.0/24
+            via: 203.0.113.2
+            table: 101
+            metric: 20
+      - name: self-peer
+        host: default-0
+        bridge: self-br-b
+        mac: "02:00:00:00:20:02"
+        mtu: 1300
+        addresses:
+          - 203.0.113.20/24
+      - name: self-delete
+        state: absent
+      - name: self-away
+        host: another-host
+        bridge: self-br-a
+        mac: "02:00:00:00:20:04"
+        addresses: []
+      - name: self-stale
+        state: absent

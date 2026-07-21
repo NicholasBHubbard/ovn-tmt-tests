@@ -1,0 +1,26 @@
+- name: Require rejection of {{ ovs_endpoint_negative_case.name }}
+  block:
+    - name: Apply invalid OVS endpoint configuration
+      ansible.builtin.include_role:
+        name: ovs_endpoints
+      vars:
+        ovs_endpoints: "{{ ovs_endpoint_negative_case.endpoints }}"
+
+    - name: Fail if invalid configuration was accepted
+      ansible.builtin.fail:
+        msg: >-
+          Invalid configuration was accepted:
+          {{ ovs_endpoint_negative_case.name }}
+  rescue:
+    - name: Verify expected validation failure
+      ansible.builtin.assert:
+        that:
+          - >-
+            ansible_failed_result.msg == ovs_endpoint_negative_case.message
+            or
+            ansible_failed_result.results | default([])
+            | selectattr('msg', 'equalto', ovs_endpoint_negative_case.message)
+            | list | length == 1
+        fail_msg: >-
+          {{ ovs_endpoint_negative_case.name }} failed for an unexpected reason:
+          {{ ansible_failed_result.msg }}

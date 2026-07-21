@@ -1,0 +1,7 @@
+summary: Verify direct OVS endpoint lifecycle
+test: ./post.sh
+framework: shell
+duration: 5m
+require:
+  - iproute
+  - iputils

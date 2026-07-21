@@ -1,0 +1,39 @@
+summary: Test direct OVS endpoints on Fedora
+
+provision:
+  - how: virtual
+    image: fedora
+
+prepare:
+  - name: Set up OVS
+    how: ansible
+    playbook: playbooks/ovs-setup.yml
+    extra-args: '-e ovs_install_method=package'
+  - name: Check endpoint preconditions
+    how: shell
+    order: 78
+    script: ./tests/self/ovs-endpoints/pre.sh
+  - name: Verify invalid OVS endpoint configuration
+    how: ansible
+    order: 79
+    playbook: tests/self/ovs-endpoints/negative.yml
+  - name: Apply initial OVS endpoints
+    how: ansible
+    order: 80
+    playbook: tests/self/ovs-endpoints/initial.yml
+  - name: Verify initial OVS endpoints
+    how: shell
+    order: 81
+    script: ./tests/self/ovs-endpoints/verify-initial.sh
+  - name: Reconfigure OVS endpoints
+    how: ansible
+    order: 82
+    playbook: tests/self/ovs-endpoints/reconfigure.yml
+  - name: Record reconfigured OVS endpoints
+    how: shell
+    order: 83
+    script: ./tests/self/ovs-endpoints/record-reconfigured.sh
+  - name: Reapply OVS endpoints
+    how: ansible
+    order: 84
+    playbook: tests/self/ovs-endpoints/reconfigure.yml
