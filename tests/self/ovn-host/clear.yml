@@ -1,0 +1,5 @@
+- name: Clear OVN gateway configuration
+  hosts: all
+  become: true
+  roles:
+    - ovn_host

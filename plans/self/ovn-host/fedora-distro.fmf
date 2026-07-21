@@ -14,5 +14,25 @@ prepare:
     script: ./tests/self/ovn-host/pre.sh
   - name: Set up OVN host
     how: ansible
-    playbook: playbooks/ovn-host.yml
-    extra-args: '-e install_method=distro'
+    order: 80
+    playbook: tests/self/ovn-host/initial.yml
+  - name: Verify initial gateway configuration
+    how: shell
+    order: 81
+    script: ./tests/self/ovn-host/verify-initial.sh
+  - name: Reconfigure OVN gateway
+    how: ansible
+    order: 82
+    playbook: tests/self/ovn-host/reconfigure.yml
+  - name: Verify reconfigured gateway
+    how: shell
+    order: 83
+    script: ./tests/self/ovn-host/verify-reconfigured.sh
+  - name: Clear OVN gateway configuration
+    how: ansible
+    order: 84
+    playbook: tests/self/ovn-host/clear.yml
+  - name: Reapply cleared OVN gateway configuration
+    how: ansible
+    order: 85
+    playbook: tests/self/ovn-host/clear.yml

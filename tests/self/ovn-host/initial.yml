@@ -1,0 +1,11 @@
+- name: Apply initial OVN gateway configuration
+  ansible.builtin.import_playbook: ../../../playbooks/ovn-host.yml
+  vars:
+    install_method: distro
+    ovn_bridges:
+      - br-int
+      - br-ex
+    ovn_bridge_mappings: public:br-ex
+    ovn_cms_options:
+      - enable-chassis-as-gw
+      - prefer-chassis-as-gw

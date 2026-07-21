@@ -40,6 +40,29 @@
     cmd: "ovs-vsctl set open . external-ids:system-id={{ ovn_chassis_name }}"
   changed_when: true
 
+- name: Configure OVN CMS options
+  when: ovn_cms_options | length > 0
+  ansible.builtin.command:
+    argv:
+      - ovs-vsctl
+      - set
+      - open
+      - .
+      - "external-ids:ovn-cms-options={{ ovn_cms_options | join(',') }}"
+  changed_when: true
+
+- name: Clear OVN CMS options
+  when: ovn_cms_options | length == 0
+  ansible.builtin.command:
+    argv:
+      - ovs-vsctl
+      - remove
+      - open
+      - .
+      - external_ids
+      - ovn-cms-options
+  changed_when: true
+
 # --- Create OVN bridges ---
 
 - name: Create OVN bridges
@@ -52,6 +75,18 @@
   when: ovn_bridge_mappings | length > 0
   ansible.builtin.command:
     cmd: "ovs-vsctl set open . external-ids:ovn-bridge-mappings={{ ovn_bridge_mappings }}"
+  changed_when: true
+
+- name: Clear bridge mappings
+  when: ovn_bridge_mappings | length == 0
+  ansible.builtin.command:
+    argv:
+      - ovs-vsctl
+      - remove
+      - open
+      - .
+      - external_ids
+      - ovn-bridge-mappings
   changed_when: true
 
 # --- Start ovn-controller ---

@@ -1,0 +1,12 @@
+- name: Reconfigure OVN gateway
+  hosts: all
+  become: true
+  roles:
+    - ovn_host
+  vars:
+    ovn_bridges:
+      - br-int
+      - br-ex
+    ovn_bridge_mappings: provider:br-ex
+    ovn_cms_options:
+      - enable-chassis-as-gw
