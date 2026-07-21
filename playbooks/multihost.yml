@@ -6,10 +6,10 @@
     - ovs_setup
     - ovn_central
 
-- name: Set up OVN host on compute nodes
-  hosts: compute
-  become: true
-  pre_tasks:
+- name: Resolve central for OVN hosts
+  hosts: compute:gateway
+  gather_facts: false
+  tasks:
     - name: Resolve central address
       ansible.builtin.set_fact:
         ovn_central_address: >-
@@ -20,11 +20,33 @@
     - name: Wait for SB database to be reachable on central
       ansible.builtin.wait_for:
         host: "{{ ovn_central_address }}"
-        port: "{{ ovn_sb_port }}"
+        port: "{{ ovn_sb_port | default(6642) }}"
         timeout: 2700
+
+- name: Set up OVN host on compute nodes
+  hosts: compute
+  become: true
   roles:
     - ovn_install
     - ovs_setup
     - ovn_host
   vars:
     ovn_remote: "tcp:{{ ovn_central_address }}:{{ ovn_sb_port }}"
+
+- name: Set up OVN host on gateway nodes
+  hosts: gateway
+  become: true
+  roles:
+    - ovn_install
+    - ovs_setup
+    - ovn_host
+  vars:
+    ovn_remote: "tcp:{{ ovn_central_address }}:{{ ovn_sb_port }}"
+    ovn_chassis_name: >-
+      {{ ovn_gateway_chassis_name | default(inventory_hostname) }}
+    ovn_bridges: >-
+      {{ ovn_gateway_bridges | default(['br-int', 'br-ex']) }}
+    ovn_bridge_mappings: >-
+      {{ ovn_gateway_bridge_mappings | default('public:br-ex') }}
+    ovn_cms_options: >-
+      {{ ovn_gateway_cms_options | default(['enable-chassis-as-gw']) }}

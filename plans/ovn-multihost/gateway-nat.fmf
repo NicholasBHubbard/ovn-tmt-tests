@@ -1,0 +1,40 @@
+summary: Verify packet-level gateway and NAT connectivity
+
+provision:
+  - name: central
+    role: central
+    how: virtual
+    image: fedora
+    connection: system
+  - name: compute-1
+    role: compute
+    how: virtual
+    image: fedora
+    connection: system
+  - name: gateway-1
+    role: gateway
+    how: virtual
+    image: fedora
+    connection: system
+
+prepare:
+  - name: Set up OVN topology
+    how: ansible
+    playbook: playbooks/multihost.yml
+
+  - name: Set up gateway NAT test scenario
+    how: ansible
+    order: 80
+    playbook: tests/ovn-gateway-nat/setup.yml
+
+discover:
+  - name: compute
+    how: fmf
+    where: compute
+    test:
+      - /tests/ovn-gateway-nat
+  - name: gateway
+    how: fmf
+    where: gateway
+    test:
+      - /tests/ovn-gateway-nat

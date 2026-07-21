@@ -1,0 +1,65 @@
+- name: Apply gateway NAT topology
+  ansible.builtin.import_playbook: ../../playbooks/ovn-topology.yml
+  vars:
+    ovn_switches:
+      - name: nat-private
+      - name: nat-public
+    ovn_localnet_ports:
+      - name: nat-localnet
+        switch: nat-public
+        network: public
+    ovn_routers:
+      - name: nat-router
+    ovn_router_ports:
+      - name: nat-private-router
+        router: nat-router
+        switch: nat-private
+        switch_port: nat-private-router-port
+        mac: "02:00:00:00:30:01"
+        networks:
+          - 10.0.0.1/24
+      - name: nat-public-router
+        router: nat-router
+        switch: nat-public
+        switch_port: nat-public-router-port
+        mac: "02:00:00:00:30:02"
+        networks:
+          - 192.0.2.1/24
+    ovn_gateway_chassis:
+      - id: nat-gateway
+        router_port: nat-public-router
+        chassis: gateway-1
+        priority: 50
+    ovn_nat_rules:
+      - id: nat-floating-ip
+        router: nat-router
+        type: dnat_and_snat
+        external_ip: 192.0.2.100
+        logical_ip: 10.0.0.10
+
+- name: Apply internal endpoint
+  ansible.builtin.import_playbook: ../../playbooks/ovn-endpoints.yml
+  vars:
+    ovn_endpoints:
+      - name: nat-internal
+        host: compute-1
+        switch: nat-private
+        iface_id: nat-internal-port
+        mac: "02:00:00:00:10:10"
+        addresses:
+          - 10.0.0.10/24
+        routes:
+          - to: default
+            via: 10.0.0.1
+
+- name: Apply external endpoint
+  ansible.builtin.import_playbook: ../../playbooks/ovs-endpoints.yml
+  vars:
+    ovs_endpoint_hosts: gateway
+    ovs_endpoints:
+      - name: nat-external
+        host: gateway-1
+        bridge: br-ex
+        mac: "02:00:00:00:20:50"
+        addresses:
+          - 192.0.2.50/24
