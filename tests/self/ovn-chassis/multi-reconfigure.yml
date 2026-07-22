@@ -10,6 +10,7 @@
     ovn_chassis_container_network: ovn-chassis-selftest
     ovn_chassis_instances:
       - name: scale-b
+        image: localhost/ovn-chassis-selftest-alternate
         container_ip: 10.89.0.11
         bridges:
           - br-int

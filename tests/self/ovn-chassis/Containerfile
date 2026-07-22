@@ -3,4 +3,7 @@ FROM registry.fedoraproject.org/fedora:latest
 RUN dnf -y install iproute iputils openvswitch ovn ovn-host procps-ng && \
     dnf clean all
 
+ARG OVN_CHASSIS_IMAGE_MARKER=
+RUN test -z "$OVN_CHASSIS_IMAGE_MARKER" || touch "$OVN_CHASSIS_IMAGE_MARKER"
+
 CMD ["sleep", "infinity"]

@@ -14,6 +14,33 @@ for chassis in scale-a scale-b; do
     fi
 done
 
+default_image=$(podman image inspect --format '{{.Id}}' \
+    localhost/ovn-chassis-selftest)
+alternate_image=
+if ! alternate_image=$(podman image inspect --format '{{.Id}}' \
+    localhost/ovn-chassis-selftest-alternate); then
+    record_failure "Expected alternate chassis image"
+fi
+
+scale_a_image=$(podman inspect --format '{{.Image}}' ovn-chassis-scale-a)
+scale_b_image=$(podman inspect --format '{{.Image}}' ovn-chassis-scale-b)
+if [ "$scale_a_image" != "$default_image" ]; then
+    record_failure "scale-a did not use the default chassis image"
+fi
+if [ "$scale_b_image" != "$alternate_image" ]; then
+    record_failure "scale-b did not use its per-instance chassis image"
+fi
+if [ "$scale_a_image" = "$scale_b_image" ]; then
+    record_failure "Both chassis used the same image"
+fi
+if podman exec ovn-chassis-scale-a test -f /ovn-chassis-image-alternate; then
+    record_failure "Default scale-a chassis used the alternate image"
+fi
+if ! podman exec ovn-chassis-scale-b test -f \
+    /ovn-chassis-image-alternate; then
+    record_failure "scale-b chassis did not use the alternate image"
+fi
+
 ovn-nbctl --if-exists ls-del scale-test
 ovn-nbctl ls-add scale-test \
     -- lsp-add scale-test scale-a-port \

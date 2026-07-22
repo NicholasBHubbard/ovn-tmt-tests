@@ -12,4 +12,5 @@
       - name: scale-a
         container_ip: 10.89.0.10
       - name: scale-b
+        image: localhost/ovn-chassis-selftest-alternate
         container_ip: 10.89.0.11
