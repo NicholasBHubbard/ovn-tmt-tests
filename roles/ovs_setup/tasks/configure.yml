@@ -57,6 +57,12 @@
     cmd: "ovs-vsctl set-ssl {{ ovs_ssl_private_key }} {{ ovs_ssl_certificate }} {{ ovs_ssl_ca_cert }}"
   changed_when: true
 
+- name: Clear SSL configuration
+  when: not (ovs_ssl_enabled | bool)
+  ansible.builtin.command:
+    cmd: ovs-vsctl del-ssl
+  changed_when: true
+
 - name: Mark OVS as configured
   ansible.builtin.set_fact:
     ovs_configured: true

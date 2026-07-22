@@ -1,0 +1,6 @@
+- name: Create OVN test PKI
+  hosts: central
+  become: true
+  roles:
+    - role: ovn_test_pki
+      ovn_test_pki_action: create

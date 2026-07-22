@@ -4,7 +4,16 @@
   roles:
     - ovn_install
     - ovs_setup
-    - ovn_central
+    - role: ovn_central
+      ovn_ssl_private_key: >-
+        {{ ovn_multihost_ssl_private_key
+           | default('/run/ovn-test-pki/private-key.pem') }}
+      ovn_ssl_certificate: >-
+        {{ ovn_multihost_ssl_certificate
+           | default('/run/ovn-test-pki/certificate.pem') }}
+      ovn_ssl_ca_cert: >-
+        {{ ovn_multihost_ssl_ca_cert
+           | default('/run/ovn-test-pki/ca-cert.pem') }}
 
 - name: Resolve central for OVN hosts
   hosts: compute:gateway
@@ -28,20 +37,42 @@
   become: true
   roles:
     - ovn_install
-    - ovs_setup
+    - role: ovs_setup
+      ovs_ssl_enabled: "{{ ovn_ssl_enabled | default(false) | bool }}"
+      ovs_ssl_private_key: >-
+        {{ ovn_multihost_ssl_private_key
+           | default('/run/ovn-test-pki/private-key.pem') }}
+      ovs_ssl_certificate: >-
+        {{ ovn_multihost_ssl_certificate
+           | default('/run/ovn-test-pki/certificate.pem') }}
+      ovs_ssl_ca_cert: >-
+        {{ ovn_multihost_ssl_ca_cert
+           | default('/run/ovn-test-pki/ca-cert.pem') }}
     - ovn_host
   vars:
-    ovn_remote: "tcp:{{ ovn_central_address }}:{{ ovn_sb_port }}"
+    ovn_remote: >-
+      {{ 'ssl' if ovn_ssl_enabled | default(false) | bool else 'tcp' }}:{{ ovn_central_address }}:{{ ovn_sb_port }}
 
 - name: Set up OVN host on gateway nodes
   hosts: gateway
   become: true
   roles:
     - ovn_install
-    - ovs_setup
+    - role: ovs_setup
+      ovs_ssl_enabled: "{{ ovn_ssl_enabled | default(false) | bool }}"
+      ovs_ssl_private_key: >-
+        {{ ovn_multihost_ssl_private_key
+           | default('/run/ovn-test-pki/private-key.pem') }}
+      ovs_ssl_certificate: >-
+        {{ ovn_multihost_ssl_certificate
+           | default('/run/ovn-test-pki/certificate.pem') }}
+      ovs_ssl_ca_cert: >-
+        {{ ovn_multihost_ssl_ca_cert
+           | default('/run/ovn-test-pki/ca-cert.pem') }}
     - ovn_host
   vars:
-    ovn_remote: "tcp:{{ ovn_central_address }}:{{ ovn_sb_port }}"
+    ovn_remote: >-
+      {{ 'ssl' if ovn_ssl_enabled | default(false) | bool else 'tcp' }}:{{ ovn_central_address }}:{{ ovn_sb_port }}
     ovn_chassis_name: >-
       {{ ovn_gateway_chassis_name | default(inventory_hostname) }}
     ovn_bridges: >-

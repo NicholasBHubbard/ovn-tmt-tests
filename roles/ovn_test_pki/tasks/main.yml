@@ -1,0 +1,8 @@
+- name: Verify OVN test PKI action
+  ansible.builtin.assert:
+    that:
+      - ovn_test_pki_action in ['create', 'install']
+    fail_msg: "OVN test PKI action must be create or install."
+
+- name: Run OVN test PKI action
+  ansible.builtin.include_tasks: "{{ ovn_test_pki_action }}.yml"

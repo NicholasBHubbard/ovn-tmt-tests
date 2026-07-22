@@ -79,6 +79,82 @@ assert_ovn_sb_available
 echo "Checking for registered chassis..."
 assert_ovn_chassis_present
 
+if [ "${OVN_SSL_ENABLED:-false}" = true ]; then
+    echo "Checking end-to-end OVN TLS..."
+    central_address=$(multihost_guest_hostname central)
+    if [[ $(ovn-nbctl get-connection) != *pssl:* ]]; then
+        record_failure "OVN NB database is not listening with TLS"
+    fi
+    if [[ $(ovn-sbctl get-connection) != *pssl:* ]]; then
+        record_failure "OVN SB database is not listening with TLS"
+    fi
+    for guest in ${TMT_ROLES[compute]}; do
+        ovn_remote=$(multihost_exec "$guest" ovs-vsctl get Open_vSwitch . \
+            external_ids:ovn-remote | tr -d '"')
+        if [[ "$ovn_remote" != ssl:* ]]; then
+            record_failure "$guest OVN remote is not using TLS: $ovn_remote"
+        fi
+        if ! multihost_exec "$guest" test -s \
+            /run/ovn-test-pki/certificate.pem; then
+            record_failure "$guest is missing its managed OVN certificate"
+        fi
+    done
+    if ! multihost_exec compute-1 ovn-nbctl \
+        --db="ssl:$central_address:6641" \
+        --private-key=/run/ovn-test-pki/private-key.pem \
+        --certificate=/run/ovn-test-pki/certificate.pem \
+        --ca-cert=/run/ovn-test-pki/ca-cert.pem show; then
+        record_failure "Remote OVN NB TLS connection failed"
+    fi
+    if ! multihost_exec compute-1 ovn-sbctl \
+        --db="ssl:$central_address:6642" \
+        --private-key=/run/ovn-test-pki/private-key.pem \
+        --certificate=/run/ovn-test-pki/certificate.pem \
+        --ca-cert=/run/ovn-test-pki/ca-cert.pem show; then
+        record_failure "Remote OVN SB TLS connection failed"
+    fi
+    if ! multihost_wait_for_ping compute-1 self-tls-a 192.0.2.22; then
+        record_failure "OVN packet traffic failed while controllers used TLS"
+    fi
+
+    echo "Checking TLS to TCP reconfiguration..."
+    multihost_run_playbook "$TMT_TREE/playbooks/multihost.yml" \
+        -e ovn_ssl_enabled=false
+    multihost_run_playbook "$TMT_TREE/playbooks/ovn-test-pki-install.yml" \
+        -e ovn_test_pki_enabled=false
+    if [[ $(ovn-nbctl get-connection) != *ptcp:* ]]; then
+        record_failure "OVN NB database did not return to TCP"
+    fi
+    if [[ $(ovn-sbctl get-connection) != *ptcp:* ]]; then
+        record_failure "OVN SB database did not return to TCP"
+    fi
+    if [ -n "$(ovn-nbctl get-ssl)" ]; then
+        record_failure "OVN NB database retained stale SSL configuration"
+    fi
+    if [ -n "$(ovn-sbctl get-ssl)" ]; then
+        record_failure "OVN SB database retained stale SSL configuration"
+    fi
+    for guest in ${TMT_ROLES[compute]}; do
+        ovn_remote=$(multihost_exec "$guest" ovs-vsctl get Open_vSwitch . \
+            external_ids:ovn-remote | tr -d '"')
+        if [[ "$ovn_remote" != tcp:* ]]; then
+            record_failure "$guest OVN remote did not return to TCP: $ovn_remote"
+        fi
+    done
+    for guest in $TMT_GUEST_NAMES; do
+        if [ -n "$(multihost_exec "$guest" ovs-vsctl get-ssl)" ]; then
+            record_failure "$guest retained stale OVS SSL configuration"
+        fi
+        if multihost_exec "$guest" test -e \
+            /run/ovn-test-pki; then
+            record_failure "$guest retained managed OVN certificates"
+        fi
+    done
+    if ! multihost_wait_for_ping compute-1 self-tls-a 192.0.2.22; then
+        record_failure "OVN packet traffic failed after returning to TCP"
+    fi
+fi
+
 echo "Checking cross-guest command execution..."
 if [ -n "${MULTIHOST_TEST_GUEST:-}" ]; then
     remote_name=$(multihost_exec "$MULTIHOST_TEST_GUEST" hostname)

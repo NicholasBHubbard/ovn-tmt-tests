@@ -1,0 +1,24 @@
+- name: Create logical switch for the TLS packet check
+  ansible.builtin.import_playbook: ../../../playbooks/ovn-topology.yml
+  vars:
+    ovn_switches:
+      - name: self-tls
+
+- name: Create endpoints for the TLS packet check
+  ansible.builtin.import_playbook: ../../../playbooks/ovn-endpoints.yml
+  vars:
+    ovn_endpoints:
+      - name: self-tls-a
+        host: compute-1
+        switch: self-tls
+        iface_id: self-tls-a
+        mac: "02:00:00:00:20:21"
+        addresses:
+          - 192.0.2.21/24
+      - name: self-tls-b
+        host: compute-1
+        switch: self-tls
+        iface_id: self-tls-b
+        mac: "02:00:00:00:20:22"
+        addresses:
+          - 192.0.2.22/24

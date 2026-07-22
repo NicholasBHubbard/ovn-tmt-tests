@@ -16,6 +16,7 @@ environment:
   OVN_GIT_VERSION: main
   OVN_MAKE_FLAGS: ""
   OVN_SOURCE_DIR: /usr/src/ovn
+  OVN_SSL_ENABLED: "false"
   OVN_TEST_DEBUG: "false"
   OVN_WERROR: "true"
 
@@ -30,6 +31,19 @@ prepare:
     how: ansible
     order: 31
     playbook: playbooks/multihost-driver-authorize.yml
+
+  - name: Create OVN test PKI
+    how: ansible
+    order: 32
+    where: [central]
+    playbook: playbooks/ovn-test-pki-create.yml
+    extra-args: '-e ovn_test_pki_enabled=$OVN_SSL_ENABLED'
+
+  - name: Install OVN test PKI
+    how: ansible
+    order: 33
+    playbook: playbooks/ovn-test-pki-install.yml
+    extra-args: '-e ovn_test_pki_enabled=$OVN_SSL_ENABLED'
 
   - name: Build OVN artifact
     how: ansible
@@ -65,6 +79,7 @@ prepare:
       -e ovn_dpdk_version=$OVN_DPDK_VERSION
       -e ovn_dpdk_checksum=$OVN_DPDK_CHECKSUM
       -e ovn_dpdk_drivers=$OVN_DPDK_DRIVERS
+      -e ovn_ssl_enabled=$OVN_SSL_ENABLED
 
 discover:
   how: fmf

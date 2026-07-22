@@ -1,0 +1,6 @@
+- name: Install OVN test PKI
+  hosts: all
+  become: true
+  roles:
+    - role: ovn_test_pki
+      ovn_test_pki_action: install

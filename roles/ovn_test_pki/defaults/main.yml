@@ -1,0 +1,13 @@
+ovn_test_pki_enabled: false
+ovn_test_pki_action: create
+ovn_test_pki_controller_dir: "{{ inventory_dir }}/ovn-test-pki"
+ovn_test_pki_remote_dir: /run/ovn-test-pki
+ovn_test_pki_service_group: openvswitch
+ovn_test_pki_private_key: "{{ ovn_test_pki_remote_dir }}/private-key.pem"
+ovn_test_pki_certificate: "{{ ovn_test_pki_remote_dir }}/certificate.pem"
+ovn_test_pki_ca_cert: "{{ ovn_test_pki_remote_dir }}/ca-cert.pem"
+ovn_test_pki_package_names:
+  dnf:
+    - openssl
+  apt:
+    - openssl

@@ -102,7 +102,28 @@ assert_contains "$multihost_parent" '-e ovn_artifact_build=$OVN_ARTIFACT_BUILD'
 assert_contains "$multihost_parent" '-e ovn_artifact_expected_revision=$OVN_ARTIFACT_EXPECTED_REVISION'
 assert_contains "$multihost_parent" "-e ovn_git_repo=\$OVN_GIT_REPO"
 assert_contains "$multihost_parent" "-e ovn_git_version=\$OVN_GIT_VERSION"
+assert_contains "$multihost_parent" 'OVN_SSL_ENABLED: "false"'
 assert_contains "$multihost_parent" 'OVN_TEST_DEBUG: "false"'
+assert_contains "$multihost_parent" 'playbook: playbooks/ovn-test-pki-create.yml'
+assert_contains "$multihost_parent" 'playbook: playbooks/ovn-test-pki-install.yml'
+assert_contains "$multihost_parent" '-e ovn_test_pki_enabled=$OVN_SSL_ENABLED'
+
+multihost_topology_prepare=$(sed -n \
+    '/  - name: Set up OVN topology/,/^$/p' "$multihost_parent")
+if [[ "$multihost_topology_prepare" != *'-e ovn_ssl_enabled=$OVN_SSL_ENABLED'* ]]; then
+    record_failure "OVN TLS setting is not passed to multihost topology setup"
+fi
+
+assert_file playbooks/ovn-test-pki-create.yml
+assert_file playbooks/ovn-test-pki-install.yml
+assert_file roles/ovn_test_pki/defaults/main.yml
+assert_file roles/ovn_test_pki/tasks/create.yml
+assert_file roles/ovn_test_pki/tasks/install.yml
+assert_contains playbooks/multihost.yml \
+    "'ssl' if ovn_ssl_enabled | default(false) | bool else 'tcp'"
+assert_contains roles/ovn_central/tasks/main.yml 'del-ssl'
+assert_contains roles/ovs_setup/tasks/configure.yml 'del-ssl'
+assert_contains plans/self/multihost/minimal.fmf 'OVN_SSL_ENABLED: "true"'
 
 for plan in plans/ovn-multihost/*.fmf; do
     [ "$plan" = "$multihost_parent" ] && continue

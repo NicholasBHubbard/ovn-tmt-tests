@@ -3,6 +3,7 @@ summary: Minimal OVN topology (1 central + 1 compute) on Fedora
 environment:
   EXPECTED_CHASSIS: "1"
   MULTIHOST_TEST_GUEST: compute-1
+  OVN_SSL_ENABLED: "true"
 
 provision:
   - name: central
@@ -26,6 +27,17 @@ prepare:
     how: ansible
     playbook: playbooks/multihost-driver-authorize.yml
 
+  - name: Create OVN test PKI
+    how: ansible
+    where: [central]
+    playbook: playbooks/ovn-test-pki-create.yml
+    extra-args: '-e ovn_test_pki_enabled=$OVN_SSL_ENABLED'
+
+  - name: Install OVN test PKI
+    how: ansible
+    playbook: playbooks/ovn-test-pki-install.yml
+    extra-args: '-e ovn_test_pki_enabled=$OVN_SSL_ENABLED'
+
   - name: Check central preconditions
     how: shell
     where: [central]
@@ -39,6 +51,12 @@ prepare:
   - name: Set up OVN topology
     how: ansible
     playbook: playbooks/multihost.yml
+    extra-args: '-e ovn_ssl_enabled=$OVN_SSL_ENABLED'
+
+  - name: Create TLS packet endpoints
+    how: ansible
+    order: 80
+    playbook: tests/self/multihost/tls.yml
 
 discover:
   - how: fmf
