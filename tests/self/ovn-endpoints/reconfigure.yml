@@ -22,6 +22,8 @@
         addresses:
           - 192.0.2.10/24
           - 2001:db8:2::1/64
+        options:
+          requested-chassis: another-host
         routes:
           - to: default
             via: 192.0.2.1

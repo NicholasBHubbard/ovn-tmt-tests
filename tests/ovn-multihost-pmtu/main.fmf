@@ -1,0 +1,8 @@
+summary: Verify logical-switch PMTU across OVN encapsulations
+test: ./test.sh
+framework: shell
+duration: 10m
+environment:
+  OVN_TEST_ENCAP: geneve
+require:
+  - iputils

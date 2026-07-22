@@ -2,6 +2,7 @@ summary: Minimal OVN topology (1 central + 1 compute) on Fedora
 
 environment:
   EXPECTED_CHASSIS: "1"
+  MULTIHOST_TEST_GUEST: compute-1
 
 provision:
   - name: central
@@ -16,6 +17,15 @@ provision:
     connection: system
 
 prepare:
+  - name: Set up cross-guest test driver
+    how: ansible
+    where: [central]
+    playbook: playbooks/multihost-driver.yml
+
+  - name: Authorize cross-guest test driver
+    how: ansible
+    playbook: playbooks/multihost-driver-authorize.yml
+
   - name: Check central preconditions
     how: shell
     where: [central]

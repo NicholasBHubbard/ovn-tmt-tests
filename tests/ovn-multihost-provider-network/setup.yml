@@ -1,0 +1,27 @@
+- name: Create shared provider mesh
+  ansible.builtin.import_playbook: ../../playbooks/ovs-tunnel-mesh.yml
+  vars:
+    ovs_tunnel_mesh_hosts: compute-1:compute-2:gateway-1
+    ovs_tunnel_meshes:
+      - name: upstream-provider
+        hosts:
+          - compute-1
+          - compute-2
+          - gateway-1
+        hub: gateway-1
+        bridge: br-ex
+        key: 100
+
+- name: Configure shared provider bridge mappings
+  hosts: compute-1:compute-2:gateway-1
+  become: true
+  tasks:
+    - name: Configure public bridge mapping
+      ansible.builtin.command:
+        argv:
+          - ovs-vsctl
+          - set
+          - open
+          - .
+          - external-ids:ovn-bridge-mappings=public:br-ex
+      changed_when: true

@@ -5,6 +5,7 @@ source "$TMT_TREE/tests/lib/assert.sh"
 cd_repo_root
 
 assert_file tests/lib/assert.sh
+assert_file tests/lib/multihost.sh
 assert_file tests/lib/ovn.sh
 
 for test_dir in tests/self/*; do
@@ -94,6 +95,8 @@ done
 
 multihost_parent=plans/ovn-multihost/main.fmf
 assert_contains "$multihost_parent" 'playbook: playbooks/ovn-build-artifact.yml'
+assert_contains "$multihost_parent" 'playbook: playbooks/multihost-driver.yml'
+assert_contains "$multihost_parent" 'playbook: playbooks/multihost-driver-authorize.yml'
 assert_contains "$multihost_parent" '-e ovn_install_method=artifact'
 assert_contains "$multihost_parent" '-e ovn_artifact_build=$OVN_ARTIFACT_BUILD'
 assert_contains "$multihost_parent" '-e ovn_artifact_expected_revision=$OVN_ARTIFACT_EXPECTED_REVISION'

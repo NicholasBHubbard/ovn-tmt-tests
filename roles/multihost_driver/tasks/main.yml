@@ -1,0 +1,32 @@
+- name: Install SSH client
+  ansible.builtin.include_role:
+    name: distro_packages
+  vars:
+    distro_package_names: "{{ multihost_driver_package_names }}"
+
+- name: Create multihost driver directory
+  ansible.builtin.file:
+    path: "{{ multihost_driver_runtime_dir }}"
+    state: directory
+    owner: "{{ multihost_driver_user }}"
+    group: "{{ multihost_driver_user }}"
+    mode: "0700"
+
+- name: Create multihost driver key
+  ansible.builtin.command:
+    argv:
+      - ssh-keygen
+      - -q
+      - -t
+      - ed25519
+      - -N
+      - ""
+      - -f
+      - "{{ multihost_driver_key_path }}"
+    creates: "{{ multihost_driver_key_path }}"
+
+- name: Fetch multihost driver public key
+  ansible.builtin.fetch:
+    src: "{{ multihost_driver_key_path }}.pub"
+    dest: "{{ multihost_driver_controller_public_key_path }}"
+    flat: true

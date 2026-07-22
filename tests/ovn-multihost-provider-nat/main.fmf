@@ -1,0 +1,6 @@
+summary: Verify NAT when a provider switch loses its localnet port
+test: ./test.sh
+framework: shell
+duration: 10m
+require:
+  - iputils

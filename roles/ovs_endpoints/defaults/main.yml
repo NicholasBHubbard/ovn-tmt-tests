@@ -1,5 +1,7 @@
 # Present endpoints need name, host, bridge and mac; addresses and routes default to empty.
 # host is the Ansible inventory hostname where the namespace should exist.
+# interface optionally names the interface inside the namespace. It defaults to the
+# endpoint name when that fits Linux's limit, and to eth0 otherwise.
 # Routes need to; via, family, metric and table are optional.
 # Listed endpoints default to present; absent removes them. Unlisted endpoints are untouched.
 # ovs_endpoint_mtu defaults to 1500; mtu overrides it for one endpoint.

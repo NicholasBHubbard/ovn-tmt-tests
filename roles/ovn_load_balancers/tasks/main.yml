@@ -1,0 +1,24 @@
+- name: Verify load balancer states
+  ansible.builtin.assert:
+    that:
+      - >-
+        ovn_load_balancers
+        | map(attribute='state', default='present')
+        | difference(['present', 'absent'])
+        | length == 0
+    fail_msg: "Load balancer states must be present or absent."
+
+- name: Verify load balancer IDs are unique
+  ansible.builtin.assert:
+    that:
+      - >-
+        ovn_load_balancers | map(attribute='id') | unique | length
+        == ovn_load_balancers | length
+    fail_msg: "Load balancer IDs must be unique."
+
+- name: Configure load balancers
+  ansible.builtin.include_tasks: load_balancer.yml
+  loop: "{{ ovn_load_balancers }}"
+  loop_control:
+    loop_var: ovn_load_balancer
+    label: "{{ ovn_load_balancer.id }}"

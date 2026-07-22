@@ -1,0 +1,122 @@
+- name: Apply IPv6 NA topology
+  ansible.builtin.import_playbook: ../../playbooks/ovn-topology.yml
+  vars:
+    ovn_switches:
+      - name: na-internal-a
+      - name: na-internal-b
+      - name: na-public
+    ovn_localnet_ports:
+      - name: na-public-localnet
+        switch: na-public
+        network: public
+    ovn_routers:
+      - name: na-router
+    ovn_router_ports:
+      - name: na-internal-a-router
+        router: na-router
+        switch: na-internal-a
+        switch_port: na-internal-a-router-port
+        mac: "02:00:00:91:00:01"
+        networks:
+          - 192.168.91.254/24
+          - 2001:91::a/64
+      - name: na-internal-b-router
+        router: na-router
+        switch: na-internal-b
+        switch_port: na-internal-b-router-port
+        mac: "02:00:00:92:00:01"
+        networks:
+          - 192.168.92.254/24
+          - 2001:92::a/64
+      - name: na-public-router
+        router: na-router
+        switch: na-public
+        switch_port: na-public-router-port
+        mac: "0a:0a:56:96:02:ff"
+        networks:
+          - 172.18.96.254/24
+          - 6812:96::254/64
+    ovn_gateway_chassis:
+      - id: na-gateway
+        router_port: na-public-router
+        chassis: compute-2
+        priority: 50
+    ovn_nat_rules:
+      - id: na-ipv4
+        router: na-router
+        type: dnat_and_snat
+        external_ip: 172.18.96.11
+        logical_ip: 192.168.91.1
+        logical_port: na-internal1-port
+        external_mac: "0a:0a:56:96:02:11"
+      - id: na-ipv6
+        router: na-router
+        type: dnat_and_snat
+        external_ip: 6812:96::11
+        logical_ip: 2001:91::1
+        logical_port: na-internal1-port
+        external_mac: "0a:0a:56:96:02:11"
+
+- name: Apply IPv6 NA internal endpoints
+  ansible.builtin.import_playbook: ../../playbooks/ovn-endpoints.yml
+  vars:
+    ovn_endpoints:
+      - name: na-internal1
+        host: compute-1
+        switch: na-internal-a
+        iface_id: na-internal1-port
+        mac: "02:00:00:91:00:11"
+        addresses:
+          - 192.168.91.1/24
+          - 2001:91::1/64
+        routes:
+          - to: default
+            via: 192.168.91.254
+          - to: default
+            via: 2001:91::a
+      - name: na-internal2
+        host: compute-1
+        switch: na-internal-a
+        iface_id: na-internal2-port
+        mac: "02:00:00:91:00:12"
+        addresses:
+          - 192.168.91.2/24
+          - 2001:91::2/64
+        routes:
+          - to: default
+            via: 192.168.91.254
+          - to: default
+            via: 2001:91::a
+      - name: na-internal3
+        host: compute-1
+        switch: na-internal-b
+        iface_id: na-internal3-port
+        mac: "02:00:00:92:00:11"
+        addresses:
+          - 192.168.92.1/24
+          - 2001:92::1/64
+        routes:
+          - to: default
+            via: 192.168.92.254
+          - to: default
+            via: 2001:92::a
+
+- name: Apply IPv6 NA external endpoints
+  ansible.builtin.import_playbook: ../../playbooks/ovs-endpoints.yml
+  vars:
+    ovs_endpoint_hosts: compute
+    ovs_endpoints:
+      - name: na-external1
+        host: compute-1
+        bridge: br-ex
+        mac: "02:00:00:96:00:01"
+        addresses:
+          - 172.18.96.101/24
+          - 6812:96::101/64
+      - name: na-external2
+        host: compute-2
+        bridge: br-ex
+        mac: "02:00:00:96:00:02"
+        addresses:
+          - 172.18.96.102/24
+          - 6812:96::102/64

@@ -1,0 +1,5 @@
+# Each mesh needs a name, hosts, bridge and unique tunnel key. Type defaults to geneve.
+# hub optionally makes the mesh hub-and-spoke; otherwise every host connects directly.
+# addresses can override the inventory address for individual hosts.
+# Listed meshes are authoritative for their own managed tunnel ports.
+ovs_tunnel_meshes: []

@@ -1,0 +1,6 @@
+summary: Verify live migration between OVN chassis
+test: ./test.sh
+framework: shell
+duration: 5m
+require:
+  - iputils

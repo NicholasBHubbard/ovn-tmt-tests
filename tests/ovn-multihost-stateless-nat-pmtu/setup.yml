@@ -1,0 +1,145 @@
+- name: Apply stateless NAT PMTU topology
+  ansible.builtin.import_playbook: ../../playbooks/ovn-topology.yml
+  vars:
+    ovn_switches:
+      - name: snat-private
+      - name: snat-public
+    ovn_localnet_ports:
+      - name: snat-public-localnet
+        switch: snat-public
+        network: public
+    ovn_routers:
+      - name: snat-router
+        options:
+          chassis: gateway-1
+    ovn_router_ports:
+      - name: snat-private-router
+        router: snat-router
+        switch: snat-private
+        switch_port: snat-private-router-port
+        mac: "02:00:00:93:00:01"
+        networks:
+          - 10.93.0.1/24
+      - name: snat-public-router
+        router: snat-router
+        switch: snat-public
+        switch_port: snat-public-router-port
+        mac: "02:00:00:93:00:02"
+        networks:
+          - 172.19.0.100/24
+    ovn_nat_rules:
+      - id: stateless-pmtu
+        router: snat-router
+        type: dnat_and_snat
+        external_ip: 172.19.0.110
+        logical_ip: 10.93.0.3
+        options:
+          stateless: true
+    ovn_static_routes:
+      - id: stateless-pmtu-default
+        router: snat-router
+        prefix: 0.0.0.0/0
+        nexthop: 172.19.0.1
+
+- name: Apply stateless NAT PMTU endpoint
+  ansible.builtin.import_playbook: ../../playbooks/ovn-endpoints.yml
+  vars:
+    ovn_endpoints:
+      - name: snat-internal
+        host: compute-1
+        switch: snat-private
+        iface_id: snat-internal-port
+        mac: "02:00:00:93:10:03"
+        mtu: 1500
+        addresses:
+          - 10.93.0.3/24
+        routes:
+          - to: default
+            via: 10.93.0.1
+
+- name: Create stateless NAT PMTU external router
+  hosts: gateway-1
+  become: true
+  tasks:
+    - name: Create external namespaces
+      ansible.builtin.command:
+        argv:
+          - ip
+          - netns
+          - add
+          - "{{ item }}"
+        creates: "/run/netns/{{ item }}"
+      loop:
+        - snat-router
+        - snat-far
+
+    - name: Create provider uplink
+      ansible.builtin.command:
+        argv:
+          - ovs-vsctl
+          - --may-exist
+          - add-port
+          - br-ex
+          - snat-uplink
+          - --
+          - set
+          - Interface
+          - snat-uplink
+          - type=internal
+      changed_when: true
+
+    - name: Find provider uplink in the root namespace
+      ansible.builtin.command:
+        argv:
+          - ip
+          - link
+          - show
+          - snat-uplink
+      register: snat_uplink_root
+      failed_when: false
+      changed_when: false
+
+    - name: Move provider uplink into the router namespace
+      when: snat_uplink_root.rc == 0
+      ansible.builtin.command:
+        argv:
+          - ip
+          - link
+          - set
+          - snat-uplink
+          - netns
+          - snat-router
+      changed_when: true
+
+    - name: Create downstream link
+      ansible.builtin.shell:
+        cmd: |
+          if ! ip -n snat-router link show snat-down >/dev/null 2>&1; then
+              ip link add snat-down type veth peer name snat-far
+              ip link set snat-down netns snat-router
+              ip link set snat-far netns snat-far
+          fi
+      changed_when: true
+
+    - name: Configure external router interfaces
+      ansible.builtin.command:
+        argv: "{{ item }}"
+      loop:
+        - [ip, -n, snat-router, link, set, lo, up]
+        - [ip, -n, snat-router, link, set, snat-uplink, up]
+        - [ip, -n, snat-router, address, replace, 172.19.0.1/24, dev, snat-uplink]
+        - [ip, -n, snat-router, link, set, snat-down, up]
+        - [ip, -n, snat-router, link, set, snat-down, mtu, "1500"]
+        - [ip, -n, snat-router, address, replace, 172.19.1.1/24, dev, snat-down]
+        - [ip, netns, exec, snat-router, sysctl, -w, net.ipv4.ip_forward=1]
+      changed_when: true
+
+    - name: Configure far endpoint
+      ansible.builtin.command:
+        argv: "{{ item }}"
+      loop:
+        - [ip, -n, snat-far, link, set, lo, up]
+        - [ip, -n, snat-far, link, set, snat-far, up]
+        - [ip, -n, snat-far, address, replace, 172.19.1.2/24, dev, snat-far]
+        - [ip, -n, snat-far, route, replace, default, via, 172.19.1.1]
+      changed_when: true

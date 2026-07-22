@@ -1,0 +1,5 @@
+- name: Configure OVS tunnel mesh
+  hosts: "{{ ovs_tunnel_mesh_hosts | default('compute:gateway') }}"
+  become: true
+  roles:
+    - ovs_tunnel_mesh

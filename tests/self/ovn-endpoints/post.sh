@@ -86,6 +86,14 @@ check_endpoint() {
 
 check_endpoint self-vm1 self-port1 self-moved self-br 02:00:00:00:01:02 \
     192.0.2.10/24 2001:db8:2::1/64
+if [ "$(ovn-nbctl get Logical_Switch_Port self-port1 \
+    options:requested-chassis 2>/dev/null | tr -d '\"' || true)" != another-host ]; then
+    record_failure "Expected self-port1 requested-chassis=another-host"
+fi
+if [ -n "$(ovn-nbctl --if-exists get Logical_Switch_Port self-port1 \
+    options:mcast_flood 2>/dev/null)" ]; then
+    record_failure "Expected omitted self-port1 option mcast_flood to be absent"
+fi
 check_logical_port self-port2 self-moved 02:00:00:00:02:01 192.0.2.2/24
 check_endpoint self-remote self-port3 self-moved self-br 02:00:00:00:03:02
 if [ "$(</sys/class/net/self-vm1-p/mtu)" != 1500 ] || \

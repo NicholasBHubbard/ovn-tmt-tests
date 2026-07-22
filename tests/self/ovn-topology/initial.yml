@@ -57,6 +57,9 @@
         networks:
           - 192.0.2.254/24
           - 2001:db8:1::ff/64
+        options:
+          redirect-type: bridged
+          gateway_mtu: 1400
       - name: self-rp-delete
         router: self-r3
         switch: self-sw
@@ -106,6 +109,30 @@
         type: dnat
         external_ip: 203.0.113.10
         logical_ip: 192.0.2.10
+    ovn_load_balancers:
+      - id: self-lb
+        name: self-lb
+        protocol: udp
+        vips:
+          192.0.2.100:80:
+            - 192.0.2.1:8080
+            - 192.0.2.2:8080
+          192.0.2.101:80: 192.0.2.3:8080
+        switches:
+          - self-sw
+          - self-moved
+        routers:
+          - self-r1
+        options:
+          reject: true
+        selection_fields:
+          - ip_src
+      - id: self-lb-delete
+        name: self-lb-delete
+        vips:
+          203.0.113.100:80: 203.0.113.10:8080
+        switches:
+          - self-sw
     ovn_static_routes:
       - id: self-route
         router: self-r1

@@ -1,0 +1,79 @@
+- name: Apply redirect-bridged topology
+  ansible.builtin.import_playbook: ../../playbooks/ovn-topology.yml
+  vars:
+    ovn_switches:
+      - name: rr-local
+      - name: rr-provider
+    ovn_localnet_ports:
+      - name: rr-localnet
+        switch: rr-provider
+        network: public
+    ovn_routers:
+      - name: rr-router
+    ovn_router_ports:
+      - name: rr-local
+        router: rr-router
+        switch: rr-local
+        switch_port: rr-local-router
+        mac: "02:00:00:10:00:01"
+        networks:
+          - 10.10.0.1/24
+      - name: rr-public
+        router: rr-router
+        switch: rr-provider
+        switch_port: rr-public-router
+        mac: "02:00:00:20:00:01"
+        networks:
+          - 20.10.0.1/24
+        options:
+          redirect-type: bridged
+    ovn_gateway_chassis:
+      - id: rr-gateway
+        router_port: rr-public
+        chassis: gateway-1
+        priority: 50
+
+- name: Apply redirect-bridged endpoints
+  ansible.builtin.import_playbook: ../../playbooks/ovn-endpoints.yml
+  vars:
+    ovn_endpoints:
+      - name: rr-vm1
+        host: compute-1
+        switch: rr-local
+        iface_id: rr-vm1-port
+        mac: "02:00:00:10:00:02"
+        addresses:
+          - 10.10.0.2/24
+        routes:
+          - to: default
+            via: 10.10.0.1
+      - name: rr-vm2
+        host: compute-1
+        switch: rr-provider
+        iface_id: rr-vm2-port
+        mac: "02:00:00:20:00:02"
+        addresses:
+          - 20.10.0.2/24
+        routes:
+          - to: default
+            via: 20.10.0.1
+
+- name: Configure provider-network chassis MACs
+  hosts: compute-1:gateway-1
+  become: true
+  vars:
+    rr_chassis_macs:
+      compute-1: "aa:bb:cc:dd:01:01"
+      gateway-1: "aa:bb:cc:dd:02:01"
+  tasks:
+    - name: Configure provider-network chassis MAC
+      ansible.builtin.command:
+        argv:
+          - ovs-vsctl
+          - set
+          - open
+          - .
+          - >-
+            external-ids:ovn-chassis-mac-mappings=public:{{
+            rr_chassis_macs[inventory_hostname] }}
+      changed_when: true

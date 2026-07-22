@@ -40,6 +40,9 @@
           - 192.0.2.1/24
           - 192.0.2.11/24
           - 2001:db8:1::1/64
+        options:
+          requested-chassis: default-0
+          mcast_flood: false
         routes:
           - to: default
             via: 192.0.2.254

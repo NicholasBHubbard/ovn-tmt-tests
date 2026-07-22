@@ -7,6 +7,10 @@ endpoint_mtu() {
 
 test "$(ovs-vsctl port-to-br self-direct-p)" = self-br-a
 test "$(ovs-vsctl port-to-br self-peer-p)" = self-br-a
+long_host_interface="ovse-$(printf %s self-long-endpoint-name | sha1sum | cut -c1-10)"
+test "$(ovs-vsctl port-to-br "$long_host_interface")" = self-br-a
+ip -n self-long-endpoint-name -o link show dev inside0 \
+    | grep -F -q 'link/ether 02:00:00:00:20:07'
 test "$(</sys/class/net/self-direct-p/mtu)" = 1400
 test "$(endpoint_mtu self-direct)" = 1400
 test "$(</sys/class/net/self-peer-p/mtu)" = 1450
@@ -16,6 +20,7 @@ ip -n self-direct -o link show dev self-direct \
 test "$(ip -n self-direct -o address show dev self-direct scope global \
     | awk '{print $4}' | sort)" = $'192.0.2.10/24\n2001:db8:1::10/64'
 ip netns exec self-direct ping -c 1 -W 2 192.0.2.20
+ip netns exec self-long-endpoint-name ping -c 1 -W 2 192.0.2.20
 ip -n self-direct -4 route show default | grep -F -q \
     'default via 192.0.2.1 dev self-direct'
 ip -n self-direct -4 route show table 100 198.51.100.0/24 | grep -F -q \

@@ -1,0 +1,16 @@
+- name: Verify OVS tunnel mesh states
+  ansible.builtin.assert:
+    that:
+      - >-
+        ovs_tunnel_meshes
+        | map(attribute='state', default='present')
+        | difference(['present', 'absent'])
+        | length == 0
+    fail_msg: "OVS tunnel mesh states must be present or absent."
+
+- name: Configure OVS tunnel meshes
+  ansible.builtin.include_tasks: mesh.yml
+  loop: "{{ ovs_tunnel_meshes }}"
+  loop_control:
+    loop_var: ovs_tunnel_mesh
+    label: "{{ ovs_tunnel_mesh.name }}"

@@ -1,0 +1,89 @@
+- name: Apply multi-chassis load-balancer topology
+  ansible.builtin.import_playbook: ../../playbooks/ovn-topology.yml
+  vars:
+    ovn_switches:
+      - name: lb-backend-switch
+      - name: lb-public
+    ovn_localnet_ports:
+      - name: lb-public-localnet
+        switch: lb-public
+        network: public
+    ovn_routers:
+      - name: lb-router
+    ovn_router_ports:
+      - name: lb-backend-router
+        router: lb-router
+        switch: lb-backend-switch
+        switch_port: lb-backend-router-port
+        mac: "02:00:00:80:00:01"
+        networks:
+          - 10.80.0.1/24
+      - name: lb-public-router
+        router: lb-router
+        switch: lb-public
+        switch_port: lb-public-router-port
+        mac: "02:00:00:80:00:02"
+        networks:
+          - 172.31.0.1/24
+    ovn_gateway_chassis:
+      - id: lb-gateway
+        router_port: lb-public-router
+        chassis: gateway-1
+        priority: 50
+    ovn_load_balancers:
+      - id: multichassis-lb
+        name: multichassis-lb
+        protocol: tcp
+        vips:
+          172.31.1.100:8080:
+            - 10.80.0.10:8080
+            - 10.80.0.11:8080
+        selection_fields:
+          - ip_src
+          - tp_src
+          - ip_dst
+          - tp_dst
+        switches:
+          - lb-backend-switch
+        routers:
+          - lb-router
+
+- name: Apply multi-chassis load-balancer endpoints
+  ansible.builtin.import_playbook: ../../playbooks/ovn-endpoints.yml
+  vars:
+    ovn_endpoints:
+      - name: lb-backend-a
+        host: compute-1
+        switch: lb-backend-switch
+        iface_id: lb-backend-a-port
+        mac: "02:00:00:80:00:10"
+        addresses:
+          - 10.80.0.10/24
+        routes:
+          - to: default
+            via: 10.80.0.1
+      - name: lb-backend-b
+        host: compute-2
+        switch: lb-backend-switch
+        iface_id: lb-backend-b-port
+        mac: "02:00:00:80:00:11"
+        addresses:
+          - 10.80.0.11/24
+        routes:
+          - to: default
+            via: 10.80.0.1
+
+- name: Apply load-balancer external client
+  ansible.builtin.import_playbook: ../../playbooks/ovs-endpoints.yml
+  vars:
+    ovs_endpoint_hosts: compute
+    ovs_endpoints:
+      - name: lb-external
+        host: compute-1
+        bridge: br-ex
+        mac: "02:00:00:80:31:10"
+        addresses:
+          - 172.31.0.10/24
+        routes:
+          - to: default
+            via: 172.31.0.1

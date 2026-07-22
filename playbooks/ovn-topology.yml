@@ -10,3 +10,4 @@
     - ovn_gateway_chassis
     - ovn_nat
     - ovn_static_routes
+    - ovn_load_balancers

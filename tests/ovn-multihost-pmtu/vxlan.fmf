@@ -1,0 +1,3 @@
+summary: Verify logical-switch PMTU over VXLAN
+environment:
+  OVN_TEST_ENCAP: vxlan

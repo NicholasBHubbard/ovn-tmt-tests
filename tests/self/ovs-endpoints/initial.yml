@@ -63,3 +63,10 @@
         mtu: 1450
         addresses:
           - 198.18.0.10/24
+      - name: self-long-endpoint-name
+        interface: inside0
+        host: default-0
+        bridge: self-br-a
+        mac: "02:00:00:00:20:07"
+        addresses:
+          - 192.0.2.30/24

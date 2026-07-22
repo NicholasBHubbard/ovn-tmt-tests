@@ -2,23 +2,71 @@
   ansible.builtin.import_playbook: ../../playbooks/ovn-topology.yml
   vars:
     ovn_switches:
-      - name: tmt-sw0
+      - name: sw0
+      - name: sw1
+    ovn_routers:
+      - name: lr0
+    ovn_router_ports:
+      - name: lr0-sw0
+        router: lr0
+        switch: sw0
+        switch_port: sw0-lr0
+        mac: "00:00:00:00:ff:01"
+        networks:
+          - 10.0.0.1/24
+          - 1000::a/64
+      - name: lr0-sw1
+        router: lr0
+        switch: sw1
+        switch_port: sw1-lr0
+        mac: "00:00:00:00:ff:02"
+        networks:
+          - 20.0.0.1/24
+          - 2000::a/64
 
 - name: Apply the top-down endpoint configuration
   ansible.builtin.import_playbook: ../../playbooks/ovn-endpoints.yml
   vars:
     ovn_endpoints:
-      - name: tmt-vm1
+      - name: sw0p1
         host: compute-1
-        switch: tmt-sw0
-        iface_id: tmt-vm1
-        mac: "02:00:00:00:00:01"
+        switch: sw0
+        iface_id: sw0-port1
+        mac: "50:54:00:00:00:03"
+        mtu: 1342
         addresses:
-          - 10.0.0.1/24
-      - name: tmt-vm2
+          - 10.0.0.3/24
+          - 1000::3/64
+        routes:
+          - to: default
+            via: 10.0.0.1
+          - to: default
+            via: 1000::a
+      - name: sw0p2
         host: compute-2
-        switch: tmt-sw0
-        iface_id: tmt-vm2
-        mac: "02:00:00:00:00:02"
+        switch: sw0
+        iface_id: sw0-port2
+        mac: "50:54:00:00:00:04"
+        mtu: 1342
         addresses:
-          - 10.0.0.2/24
+          - 10.0.0.4/24
+          - 1000::4/64
+        routes:
+          - to: default
+            via: 10.0.0.1
+          - to: default
+            via: 1000::a
+      - name: sw1p1
+        host: compute-2
+        switch: sw1
+        iface_id: sw1-port1
+        mac: "40:54:00:00:00:03"
+        mtu: 1342
+        addresses:
+          - 20.0.0.3/24
+          - 2000::3/64
+        routes:
+          - to: default
+            via: 20.0.0.1
+          - to: default
+            via: 2000::a

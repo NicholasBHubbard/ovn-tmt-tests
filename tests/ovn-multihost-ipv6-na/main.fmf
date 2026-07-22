@@ -1,0 +1,6 @@
+summary: Verify IPv6 neighbor advertisements on a non-resident chassis
+test: ./test.sh
+framework: shell
+duration: 10m
+require:
+  - iputils

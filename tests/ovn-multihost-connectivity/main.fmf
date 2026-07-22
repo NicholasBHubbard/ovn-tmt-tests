@@ -1,4 +1,4 @@
-summary: Verify logical-switch connectivity across hosts
+summary: Verify basic OVN switching, ACL and routing across hosts
 test: ./test.sh
 framework: shell
 duration: 5m

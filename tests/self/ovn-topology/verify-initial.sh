@@ -33,6 +33,10 @@ ovn-nbctl --bare --columns=_uuid find NAT \
     external_ids:ovn-tmt-tests-id=self-nat-snat > /tmp/self-nat-snat-id
 ovn-nbctl --bare --columns=_uuid find NAT \
     external_ids:ovn-tmt-tests-id=self-nat-delete > /tmp/self-nat-delete-id
+ovn-nbctl --bare --columns=_uuid find Load_Balancer \
+    external_ids:ovn-tmt-tests-id=self-lb > /tmp/self-lb-id
+ovn-nbctl --bare --columns=_uuid find Load_Balancer \
+    external_ids:ovn-tmt-tests-id=self-lb-delete > /tmp/self-lb-delete-id
 ovn-nbctl --bare --columns=_uuid find Logical_Router_Static_Route \
     external_ids:ovn-tmt-tests-id=self-route > /tmp/self-route-id
 ovn-nbctl --bare --columns=_uuid find Logical_Router_Static_Route \
@@ -55,6 +59,8 @@ for path in \
     /tmp/self-nat-id \
     /tmp/self-nat-snat-id \
     /tmp/self-nat-delete-id \
+    /tmp/self-lb-id \
+    /tmp/self-lb-delete-id \
     /tmp/self-route-id \
     /tmp/self-route-delete-id; do
     test -s "$path"
@@ -87,6 +93,10 @@ test "$(ovn-nbctl --bare --columns=name find Logical_Router \
     "ports{>=}$(</tmp/self-rp-id)")" = self-r1
 test "$(ovn-nbctl --bare --columns=name find Logical_Switch \
     "ports{>=}$(</tmp/self-rp-sw-id)")" = self-sw
+test "$(ovn-nbctl get Logical_Router_Port self-rp options:redirect-type \
+    | tr -d '\"')" = bridged
+test "$(ovn-nbctl get Logical_Router_Port self-rp options:gateway_mtu \
+    | tr -d '\"')" = 1400
 
 test "$(ovn-nbctl --bare --columns=name find Logical_Switch \
     "ports{>=}$(</tmp/self-localnet-id)")" = self-sw
@@ -144,7 +154,16 @@ test "$(ovn-nbctl get NAT "$(</tmp/self-nat-snat-id)" external_ip \
 test "$(ovn-nbctl get NAT "$(</tmp/self-nat-snat-id)" logical_ip \
     | tr -d '\"')" = 192.0.2.0/24
 test "$(ovn-nbctl get NAT "$(</tmp/self-nat-snat-id)" priority)" = 0
+test "$(ovn-nbctl get Load_Balancer "$(</tmp/self-lb-id)" protocol \
+    | tr -d '\"')" = udp
+test "$(ovn-nbctl get Load_Balancer "$(</tmp/self-lb-id)" \
+    'vips:"192.0.2.100:80"' | tr -d '\"')" = \
+    '192.0.2.1:8080,192.0.2.2:8080'
+test "$(ovn-nbctl get Load_Balancer "$(</tmp/self-lb-id)" \
+    options:reject | tr -d '\"')" = true
 test "$(ovn-nbctl --bare --columns=name find Logical_Router \
     "static_routes{>=}$(</tmp/self-route-id)")" = self-r1
 test "$(ovn-nbctl --bare --columns=name find Logical_Router \
     "nat{>=}$(</tmp/self-nat-id)")" = self-r1
+test "$(ovn-nbctl --bare --columns=name find Logical_Router \
+    "load_balancer{>=}$(</tmp/self-lb-id)")" = self-r1

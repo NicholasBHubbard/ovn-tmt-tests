@@ -22,3 +22,9 @@ prepare+:
     how: ansible
     order: 80
     playbook: tests/ovn-multihost-connectivity/setup.yml
+
+discover:
+  how: fmf
+  where: [central]
+  test:
+    - /tests/ovn-multihost-connectivity

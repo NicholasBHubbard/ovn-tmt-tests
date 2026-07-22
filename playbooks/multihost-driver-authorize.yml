@@ -1,0 +1,12 @@
+- name: Authorize multihost test driver
+  hosts: all
+  become: true
+  tasks:
+    - name: Authorize multihost driver key
+      ansible.posix.authorized_key:
+        user: "{{ multihost_driver_user | default('root') }}"
+        key: >-
+          {{ lookup('ansible.builtin.file',
+                    multihost_driver_controller_public_key_path
+                    | default(inventory_dir ~ '/multihost-driver.pub')) }}
+        state: present

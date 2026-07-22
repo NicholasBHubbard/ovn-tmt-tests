@@ -78,6 +78,31 @@
       - "{{ ovn_router_port.name }}"
       - "mac={{ ovn_router_port.mac | to_json }}"
       - "networks={{ ovn_router_port.networks | default([]) | to_json }}"
+      - --
+      - clear
+      - Logical_Router_Port
+      - "{{ ovn_router_port.name }}"
+      - options
+  changed_when: true
+
+- name: Configure options for logical router port {{ ovn_router_port.name }}
+  when: ovn_router_port.state | default('present') == 'present'
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - set
+      - Logical_Router_Port
+      - "{{ ovn_router_port.name }}"
+      - "options:{{ ovn_router_port_option.key }}={{ ovn_router_port_option_value }}"
+  loop: "{{ ovn_router_port.options | default({}) | dict2items }}"
+  loop_control:
+    loop_var: ovn_router_port_option
+    label: "{{ ovn_router_port_option.key }}"
+  vars:
+    ovn_router_port_option_value: >-
+      {{ (ovn_router_port_option.value | string | lower)
+         if ovn_router_port_option.value is boolean
+         else (ovn_router_port_option.value | string) }}
   changed_when: true
 
 - name: Find logical switch port {{ ovn_router_port.switch_port }}

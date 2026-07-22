@@ -131,6 +131,14 @@ check_router_attachment() {
 
 check_router_attachment self-rp self-rp-sw self-r3 self-moved \
     02:00:00:00:10:03 203.0.113.1/24 2001:db8:2::ff/64
+if [ "$(ovn-nbctl get Logical_Router_Port self-rp options:gateway_mtu \
+    2>/dev/null | tr -d '\"' || true)" != 1300 ]; then
+    record_failure "Expected self-rp option gateway_mtu=1300"
+fi
+if [ -n "$(ovn-nbctl --if-exists get Logical_Router_Port self-rp \
+    options:redirect-type 2>/dev/null)" ]; then
+    record_failure "Expected omitted self-rp option redirect-type to be absent"
+fi
 check_ovn_row Logical_Router_Port self-rp-delete ""
 check_ovn_row Logical_Switch_Port self-rp-delete-sw ""
 
@@ -352,6 +360,49 @@ else
 fi
 if ! ovn-nbctl lr-nat-list self-r3 | grep -F -q '203.0.113.20'; then
     record_failure "Expected unmanaged NAT rule to remain"
+fi
+
+load_balancer_uuid=$(ovn-nbctl --bare --columns=_uuid find Load_Balancer \
+    external_ids:ovn-tmt-tests-id=self-lb)
+if [ -z "$load_balancer_uuid" ]; then
+    record_failure "Expected managed load balancer self-lb"
+else
+    if [ "$load_balancer_uuid" != "$(</tmp/self-lb-id)" ]; then
+        record_failure "Expected load balancer identity to survive reconfiguration"
+    fi
+    if [ "$(ovn-nbctl get Load_Balancer "$load_balancer_uuid" protocol \
+        | tr -d '\"')" != tcp ]; then
+        record_failure "Expected self-lb protocol tcp"
+    fi
+    if [ "$(ovn-nbctl get Load_Balancer "$load_balancer_uuid" \
+        'vips:"198.51.100.100:443"' | tr -d '\"')" != \
+        198.51.100.10:8443 ]; then
+        record_failure "Expected self-lb replacement VIP"
+    fi
+    if [ "$(ovn-nbctl get Load_Balancer "$load_balancer_uuid" vips \
+        | grep -o ':443' | wc -l)" -ne 1 ]; then
+        record_failure "Expected omitted self-lb VIPs to be absent"
+    fi
+    if [ "$(ovn-nbctl get Load_Balancer "$load_balancer_uuid" options:reject \
+        | tr -d '\"')" != false ]; then
+        record_failure "Expected self-lb option reject=false"
+    fi
+    if [ "$(ovn-nbctl get Load_Balancer "$load_balancer_uuid" selection_fields \
+        | tr -d '[],\" ')" != ip_dst ]; then
+        record_failure "Expected self-lb selection field ip_dst"
+    fi
+    if [ "$(ovn-nbctl --bare --columns=name find Logical_Switch \
+        "load_balancer{>=}$load_balancer_uuid")" != self-moved ]; then
+        record_failure "Expected self-lb only on self-moved"
+    fi
+    if [ "$(ovn-nbctl --bare --columns=name find Logical_Router \
+        "load_balancer{>=}$load_balancer_uuid")" != self-r3 ]; then
+        record_failure "Expected self-lb only on self-r3"
+    fi
+fi
+if ovn-nbctl --bare --columns=_uuid find Load_Balancer \
+    external_ids:ovn-tmt-tests-id=self-lb-delete | grep -q .; then
+    record_failure "Expected deleted managed load balancer to be absent"
 fi
 
 check_static_route() {

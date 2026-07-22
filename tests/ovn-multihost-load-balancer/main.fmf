@@ -1,0 +1,6 @@
+summary: Verify load balancing across compute chassis
+test: ./test.sh
+framework: shell
+duration: 5m
+require:
+  - python3

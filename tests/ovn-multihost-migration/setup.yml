@@ -1,0 +1,49 @@
+- name: Apply migration switch
+  ansible.builtin.import_playbook: ../../playbooks/ovn-topology.yml
+  vars:
+    ovn_switches:
+      - name: mig-switch
+
+- name: Apply migration endpoints
+  ansible.builtin.import_playbook: ../../playbooks/ovn-endpoints.yml
+  vars:
+    ovn_endpoints:
+      - name: mig-vm1
+        host: compute-1
+        switch: mig-switch
+        iface_id: mig-vm1-port
+        mac: "02:00:00:30:00:01"
+        addresses:
+          - 10.30.0.1/24
+      - name: mig-vm2
+        host: compute-2
+        switch: mig-switch
+        iface_id: mig-vm2-port
+        mac: "02:00:00:30:00:02"
+        addresses:
+          - 10.30.0.2/24
+      - name: mig-vm3
+        host: compute-3
+        switch: mig-switch
+        iface_id: mig-vm3-port
+        mac: "02:00:00:30:00:03"
+        addresses:
+          - 10.30.0.3/24
+      - name: mig-src
+        host: compute-1
+        switch: mig-switch
+        iface_id: mig-port
+        mac: "02:00:00:30:00:09"
+        addresses:
+          - 10.30.0.9/24
+        options:
+          requested-chassis: compute-1
+      - name: mig-dst
+        host: compute-3
+        switch: mig-switch
+        iface_id: mig-port
+        mac: "02:00:00:30:00:09"
+        addresses:
+          - 10.30.0.9/24
+        options:
+          requested-chassis: compute-1

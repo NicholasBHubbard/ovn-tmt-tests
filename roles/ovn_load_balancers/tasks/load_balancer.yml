@@ -1,0 +1,218 @@
+- name: Find load balancer {{ ovn_load_balancer.id }}
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - --bare
+      - --columns=_uuid
+      - find
+      - Load_Balancer
+      - "external_ids:ovn-tmt-tests-id={{ ovn_load_balancer.id }}"
+  register: ovn_load_balancer_rows
+  changed_when: false
+
+- name: Verify load balancer {{ ovn_load_balancer.id }} is unambiguous
+  ansible.builtin.assert:
+    that:
+      - ovn_load_balancer_rows.stdout_lines | length <= 1
+    fail_msg: "Load balancer ID {{ ovn_load_balancer.id }} is not unique."
+
+- name: Create load balancer {{ ovn_load_balancer.id }}
+  when:
+    - ovn_load_balancer.state | default('present') == 'present'
+    - ovn_load_balancer_rows.stdout_lines | length == 0
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - create
+      - Load_Balancer
+      - "name={{ ovn_load_balancer.name | default(ovn_load_balancer.id) }}"
+      - "external_ids:ovn-tmt-tests-id={{ ovn_load_balancer.id }}"
+  register: ovn_load_balancer_created
+  changed_when: true
+
+- name: Select load balancer {{ ovn_load_balancer.id }}
+  when: ovn_load_balancer.state | default('present') == 'present'
+  ansible.builtin.set_fact:
+    ovn_load_balancer_uuid: >-
+      {{ ovn_load_balancer_rows.stdout
+         if ovn_load_balancer_rows.stdout_lines | length == 1
+         else ovn_load_balancer_created.stdout }}
+
+- name: Reset load balancer {{ ovn_load_balancer.id }}
+  when: ovn_load_balancer.state | default('present') == 'present'
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - set
+      - Load_Balancer
+      - "{{ ovn_load_balancer_uuid }}"
+      - "name={{ ovn_load_balancer.name | default(ovn_load_balancer.id) }}"
+      - "protocol={{ ovn_load_balancer.protocol | default('tcp') }}"
+      - --
+      - clear
+      - Load_Balancer
+      - "{{ ovn_load_balancer_uuid }}"
+      - vips
+      - options
+      - selection_fields
+  changed_when: true
+
+- name: Configure VIPs for load balancer {{ ovn_load_balancer.id }}
+  when: ovn_load_balancer.state | default('present') == 'present'
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - set
+      - Load_Balancer
+      - "{{ ovn_load_balancer_uuid }}"
+      - >-
+        vips:{{ ovn_load_balancer_vip.key | to_json
+        }}={{ ovn_load_balancer_backends | to_json }}
+  loop: "{{ ovn_load_balancer.vips | default({}) | dict2items }}"
+  loop_control:
+    loop_var: ovn_load_balancer_vip
+    label: "{{ ovn_load_balancer_vip.key }}"
+  vars:
+    ovn_load_balancer_backends: >-
+      {{ ovn_load_balancer_vip.value | join(',')
+         if ovn_load_balancer_vip.value is not string
+         else ovn_load_balancer_vip.value }}
+  changed_when: true
+
+- name: Configure options for load balancer {{ ovn_load_balancer.id }}
+  when: ovn_load_balancer.state | default('present') == 'present'
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - set
+      - Load_Balancer
+      - "{{ ovn_load_balancer_uuid }}"
+      - >-
+        options:{{ ovn_load_balancer_option.key
+        }}={{ ovn_load_balancer_option_value }}
+  loop: "{{ ovn_load_balancer.options | default({}) | dict2items }}"
+  loop_control:
+    loop_var: ovn_load_balancer_option
+    label: "{{ ovn_load_balancer_option.key }}"
+  vars:
+    ovn_load_balancer_option_value: >-
+      {{ (ovn_load_balancer_option.value | string | lower)
+         if ovn_load_balancer_option.value is boolean
+         else (ovn_load_balancer_option.value | string) }}
+  changed_when: true
+
+- name: Configure selection fields for load balancer {{ ovn_load_balancer.id }}
+  when:
+    - ovn_load_balancer.state | default('present') == 'present'
+    - ovn_load_balancer.selection_fields | default([]) | length > 0
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - set
+      - Load_Balancer
+      - "{{ ovn_load_balancer_uuid }}"
+      - >-
+        selection_fields={{ ovn_load_balancer.selection_fields | to_json }}
+  changed_when: true
+
+- name: Find current switch attachments for load balancer {{ ovn_load_balancer.id }}
+  when: ovn_load_balancer.state | default('present') == 'present'
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - --bare
+      - --columns=name
+      - find
+      - Logical_Switch
+      - "load_balancer{>=}{{ ovn_load_balancer_uuid }}"
+  register: ovn_load_balancer_current_switches
+  changed_when: false
+
+- name: Remove old switch attachments for load balancer {{ ovn_load_balancer.id }}
+  when: ovn_load_balancer.state | default('present') == 'present'
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - remove
+      - Logical_Switch
+      - "{{ item }}"
+      - load_balancer
+      - "{{ ovn_load_balancer_uuid }}"
+  loop: >-
+    {{ ovn_load_balancer_current_switches.stdout_lines
+       | reject('equalto', '') | list
+       | difference(ovn_load_balancer.switches | default([])) }}
+  changed_when: true
+
+- name: Attach load balancer {{ ovn_load_balancer.id }} to switches
+  when: ovn_load_balancer.state | default('present') == 'present'
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - add
+      - Logical_Switch
+      - "{{ item }}"
+      - load_balancer
+      - "{{ ovn_load_balancer_uuid }}"
+  loop: >-
+    {{ ovn_load_balancer.switches | default([])
+       | difference(ovn_load_balancer_current_switches.stdout_lines
+                    | reject('equalto', '') | list) }}
+  changed_when: true
+
+- name: Find current router attachments for load balancer {{ ovn_load_balancer.id }}
+  when: ovn_load_balancer.state | default('present') == 'present'
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - --bare
+      - --columns=name
+      - find
+      - Logical_Router
+      - "load_balancer{>=}{{ ovn_load_balancer_uuid }}"
+  register: ovn_load_balancer_current_routers
+  changed_when: false
+
+- name: Remove old router attachments for load balancer {{ ovn_load_balancer.id }}
+  when: ovn_load_balancer.state | default('present') == 'present'
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - remove
+      - Logical_Router
+      - "{{ item }}"
+      - load_balancer
+      - "{{ ovn_load_balancer_uuid }}"
+  loop: >-
+    {{ ovn_load_balancer_current_routers.stdout_lines
+       | reject('equalto', '') | list
+       | difference(ovn_load_balancer.routers | default([])) }}
+  changed_when: true
+
+- name: Attach load balancer {{ ovn_load_balancer.id }} to routers
+  when: ovn_load_balancer.state | default('present') == 'present'
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - add
+      - Logical_Router
+      - "{{ item }}"
+      - load_balancer
+      - "{{ ovn_load_balancer_uuid }}"
+  loop: >-
+    {{ ovn_load_balancer.routers | default([])
+       | difference(ovn_load_balancer_current_routers.stdout_lines
+                    | reject('equalto', '') | list) }}
+  changed_when: true
+
+- name: Delete load balancer {{ ovn_load_balancer.id }}
+  when:
+    - ovn_load_balancer.state | default('present') == 'absent'
+    - ovn_load_balancer_rows.stdout_lines | length == 1
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - destroy
+      - Load_Balancer
+      - "{{ ovn_load_balancer_rows.stdout }}"
+  changed_when: true

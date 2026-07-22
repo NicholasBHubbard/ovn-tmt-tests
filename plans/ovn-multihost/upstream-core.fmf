@@ -1,0 +1,79 @@
+summary: Run native ports of the core OVN fake-multinode scenarios
+
+provision:
+  - name: central
+    role: central
+    how: virtual
+    image: fedora
+    connection: system
+  - name: compute-1
+    role: compute
+    how: virtual
+    image: fedora
+    connection: system
+  - name: compute-2
+    role: compute
+    how: virtual
+    image: fedora
+    connection: system
+  - name: compute-3
+    role: compute
+    how: virtual
+    image: fedora
+    connection: system
+  - name: gateway-1
+    role: gateway
+    how: virtual
+    image: fedora
+    connection: system
+
+prepare+:
+  - name: Set up shared provider network
+    how: ansible
+    order: 70
+    playbook: tests/ovn-multihost-provider-network/setup.yml
+  - name: Set up redirect-bridged scenario
+    how: ansible
+    order: 80
+    playbook: tests/ovn-multihost-redirect-bridged/setup.yml
+  - name: Set up migration scenario
+    how: ansible
+    order: 81
+    playbook: tests/ovn-multihost-migration/setup.yml
+  - name: Set up provider NAT scenario
+    how: ansible
+    order: 82
+    playbook: tests/ovn-multihost-provider-nat/setup.yml
+  - name: Set up always-tunnel scenario
+    how: ansible
+    order: 83
+    playbook: tests/ovn-multihost-always-tunnel/setup.yml
+  - name: Set up PMTU scenarios
+    how: ansible
+    order: 84
+    playbook: tests/ovn-multihost-pmtu/setup.yml
+  - name: Set up multi-chassis load-balancer scenario
+    how: ansible
+    order: 85
+    playbook: tests/ovn-multihost-load-balancer/setup.yml
+  - name: Set up IPv6 neighbor-advertisement scenario
+    how: ansible
+    order: 86
+    playbook: tests/ovn-multihost-ipv6-na/setup.yml
+  - name: Set up stateless NAT PMTU scenario
+    how: ansible
+    order: 87
+    playbook: tests/ovn-multihost-stateless-nat-pmtu/setup.yml
+
+discover:
+  how: fmf
+  where: [central]
+  test:
+    - /tests/ovn-multihost-redirect-bridged
+    - /tests/ovn-multihost-migration
+    - /tests/ovn-multihost-provider-nat
+    - /tests/ovn-multihost-always-tunnel
+    - /tests/ovn-multihost-pmtu
+    - /tests/ovn-multihost-load-balancer
+    - /tests/ovn-multihost-ipv6-na
+    - /tests/ovn-multihost-stateless-nat-pmtu

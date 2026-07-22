@@ -6,19 +6,51 @@
 - name: Create veth pair for {{ ovs_endpoint.name }}
   ansible.builtin.command:
     cmd: >-
-      ip link add {{ ovs_endpoint.name }}-p type veth
-      peer name {{ ovs_endpoint.name }}
-    creates: "/sys/class/net/{{ ovs_endpoint.name }}-p"
+      ip link add {{ ovs_endpoint_host_interface }} type veth
+      peer name {{ ovs_endpoint_temporary_interface }}
+    creates: "/sys/class/net/{{ ovs_endpoint_host_interface }}"
 
 - name: Move interface into namespace for {{ ovs_endpoint.name }}
   ansible.builtin.command:
     cmd: >-
-      ip link set {{ ovs_endpoint.name }} netns {{ ovs_endpoint.name }}
-    removes: "/sys/class/net/{{ ovs_endpoint.name }}"
+      ip link set {{ ovs_endpoint_temporary_interface }}
+      netns {{ ovs_endpoint.name }}
+    removes: "/sys/class/net/{{ ovs_endpoint_temporary_interface }}"
+
+- name: Find namespace interface for {{ ovs_endpoint.name }}
+  ansible.builtin.command:
+    cmd: "ip -n {{ ovs_endpoint.name }} -o link show type veth"
+  register: ovs_endpoint_current_interface
+  changed_when: false
+
+- name: Verify namespace interface for {{ ovs_endpoint.name }}
+  ansible.builtin.assert:
+    that:
+      - ovs_endpoint_current_interface.stdout_lines | length == 1
+    fail_msg: >-
+      Expected exactly one managed interface in namespace {{ ovs_endpoint.name }}.
+
+- name: Rename namespace interface for {{ ovs_endpoint.name }}
+  when: >-
+    ovs_endpoint_current_interface.stdout.split(': ', 1)[1].split('@', 1)[0]
+    != ovs_endpoint_interface
+  ansible.builtin.command:
+    argv:
+      - ip
+      - -n
+      - "{{ ovs_endpoint.name }}"
+      - link
+      - set
+      - >-
+        {{ ovs_endpoint_current_interface.stdout
+           .split(': ', 1)[1].split('@', 1)[0] }}
+      - name
+      - "{{ ovs_endpoint_interface }}"
+  changed_when: true
 
 - name: Find current OVS bridge for {{ ovs_endpoint.name }}
   ansible.builtin.command:
-    cmd: "ovs-vsctl port-to-br {{ ovs_endpoint.name }}-p"
+    cmd: "ovs-vsctl port-to-br {{ ovs_endpoint_host_interface }}"
   register: ovs_endpoint_current_bridge
   failed_when: false
   changed_when: false
@@ -30,23 +62,23 @@
   ansible.builtin.command:
     cmd: >-
       ovs-vsctl del-port {{ ovs_endpoint_current_bridge.stdout }}
-      {{ ovs_endpoint.name }}-p
+      {{ ovs_endpoint_host_interface }}
   changed_when: true
 
 - name: Attach endpoint to {{ ovs_endpoint.bridge }}
   ansible.builtin.command:
     cmd: >-
       ovs-vsctl --may-exist add-port {{ ovs_endpoint.bridge }}
-      {{ ovs_endpoint.name }}-p
+      {{ ovs_endpoint_host_interface }}
       {% if ovs_endpoint.iface_id is defined %}
-      -- set Interface {{ ovs_endpoint.name }}-p
+      -- set Interface {{ ovs_endpoint_host_interface }}
       external_ids:iface-id={{ ovs_endpoint.iface_id }}
       {% endif %}
   changed_when: true
 
 - name: Configure host interface for {{ ovs_endpoint.name }}
   ansible.builtin.command:
-    cmd: "ip link set {{ ovs_endpoint.name }}-p {{ item }}"
+    cmd: "ip link set {{ ovs_endpoint_host_interface }} {{ item }}"
   loop:
     - >-
       mtu {{ ovs_endpoint.mtu | default(ovs_endpoint_mtu) }}
@@ -58,20 +90,20 @@
     cmd: "ip netns exec {{ ovs_endpoint.name }} {{ item }}"
   loop:
     - ip link set lo up
-    - "ip link set {{ ovs_endpoint.name }} address {{ ovs_endpoint.mac }}"
+    - "ip link set {{ ovs_endpoint_interface }} address {{ ovs_endpoint.mac }}"
     - >-
-      ip link set {{ ovs_endpoint.name }}
+      ip link set {{ ovs_endpoint_interface }}
       mtu {{ ovs_endpoint.mtu | default(ovs_endpoint_mtu) }}
-    - "ip link set {{ ovs_endpoint.name }} up"
-    - "ip -4 route flush table all dev {{ ovs_endpoint.name }} proto boot"
-    - "ip -6 route flush table all dev {{ ovs_endpoint.name }} proto boot"
-    - "ip address flush dev {{ ovs_endpoint.name }} scope global"
+    - "ip link set {{ ovs_endpoint_interface }} up"
+    - "ip -4 route flush table all dev {{ ovs_endpoint_interface }} proto boot"
+    - "ip -6 route flush table all dev {{ ovs_endpoint_interface }} proto boot"
+    - "ip address flush dev {{ ovs_endpoint_interface }} scope global"
   changed_when: true
 
 - name: Configure addresses for {{ ovs_endpoint.name }}
   ansible.builtin.command:
     cmd: >-
       ip netns exec {{ ovs_endpoint.name }} ip address replace
-      {{ item }} dev {{ ovs_endpoint.name }}
+      {{ item }} dev {{ ovs_endpoint_interface }}
   loop: "{{ ovs_endpoint.addresses | default([]) }}"
   changed_when: true

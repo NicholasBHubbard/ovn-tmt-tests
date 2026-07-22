@@ -1,0 +1,108 @@
+- name: Apply provider NAT topology
+  ansible.builtin.import_playbook: ../../playbooks/ovn-topology.yml
+  vars:
+    ovn_switches:
+      - name: npl-private-a
+      - name: npl-private-b
+      - name: npl-public
+    ovn_localnet_ports:
+      - name: npl-localnet
+        switch: npl-public
+        network: public
+    ovn_routers:
+      - name: npl-router
+    ovn_router_ports:
+      - name: npl-private-a-router
+        router: npl-router
+        switch: npl-private-a
+        switch_port: npl-private-a-router-port
+        mac: "02:00:00:40:00:01"
+        networks:
+          - 10.40.0.1/24
+      - name: npl-private-b-router
+        router: npl-router
+        switch: npl-private-b
+        switch_port: npl-private-b-router-port
+        mac: "02:00:00:40:00:02"
+        networks:
+          - 20.40.0.1/24
+      - name: npl-public-router
+        router: npl-router
+        switch: npl-public
+        switch_port: npl-public-router-port
+        mac: "02:00:00:40:00:03"
+        networks:
+          - 172.30.0.100/24
+    ovn_gateway_chassis:
+      - id: npl-gateway
+        router_port: npl-public-router
+        chassis: gateway-1
+        priority: 50
+    ovn_nat_rules:
+      - id: npl-floating-a
+        router: npl-router
+        type: dnat_and_snat
+        external_ip: 172.30.0.110
+        logical_ip: 10.40.0.3
+        logical_port: npl-private-a1-port
+        external_mac: "02:00:00:40:10:03"
+      - id: npl-floating-b
+        router: npl-router
+        type: dnat_and_snat
+        external_ip: 172.30.0.120
+        logical_ip: 20.40.0.3
+      - id: npl-snat-a
+        router: npl-router
+        type: snat
+        external_ip: 172.30.0.100
+        logical_ip: 10.40.0.0/24
+      - id: npl-snat-b
+        router: npl-router
+        type: snat
+        external_ip: 172.30.0.100
+        logical_ip: 20.40.0.0/24
+
+- name: Apply provider NAT endpoints
+  ansible.builtin.import_playbook: ../../playbooks/ovn-endpoints.yml
+  vars:
+    ovn_endpoints:
+      - name: npl-private-a1
+        host: compute-1
+        switch: npl-private-a
+        iface_id: npl-private-a1-port
+        mac: "02:00:00:40:10:03"
+        addresses:
+          - 10.40.0.3/24
+        routes:
+          - to: default
+            via: 10.40.0.1
+      - name: npl-private-a2
+        host: compute-2
+        switch: npl-private-a
+        iface_id: npl-private-a2-port
+        mac: "02:00:00:40:10:04"
+        addresses:
+          - 10.40.0.4/24
+        routes:
+          - to: default
+            via: 10.40.0.1
+      - name: npl-private-b1
+        host: compute-2
+        switch: npl-private-b
+        iface_id: npl-private-b1-port
+        mac: "02:00:00:40:20:03"
+        addresses:
+          - 20.40.0.3/24
+        routes:
+          - to: default
+            via: 20.40.0.1
+      - name: npl-public1
+        host: compute-1
+        switch: npl-public
+        iface_id: npl-public1-port
+        mac: "02:00:00:40:30:50"
+        addresses:
+          - 172.30.0.50/24
+        routes:
+          - to: default
+            via: 172.30.0.100

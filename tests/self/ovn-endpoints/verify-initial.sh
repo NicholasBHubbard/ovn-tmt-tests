@@ -22,6 +22,10 @@ test -s /tmp/self-vm1-initial-ns-id
 test -s /tmp/self-vm1-initial-ifindex
 test "$(ovn-nbctl lsp-get-addresses self-port3 \
     | tr -d '\"')" = '02:00:00:00:03:01 dynamic'
+test "$(ovn-nbctl get Logical_Switch_Port self-port1 \
+    options:requested-chassis | tr -d '\"')" = default-0
+test "$(ovn-nbctl get Logical_Switch_Port self-port1 \
+    options:mcast_flood | tr -d '\"')" = false
 test "$(ovn-nbctl get Logical_Switch_Port self-port3 dhcpv4_options \
     | tr -d '[]')" = "$(ovn-nbctl --bare --columns=_uuid find DHCP_Options \
     external_ids:ovn-tmt-tests-id=self-dhcp)"

@@ -4,6 +4,7 @@
 # dhcp4 defaults to false and manages an IPv4 DHCP client in a local endpoint namespace.
 # dhcp_timeout overrides ovn_endpoint_dhcp_timeout for one endpoint.
 # ovn_endpoint_mtu defaults to 1500; mtu overrides it for one endpoint.
+# Omitted options are cleared from listed logical switch ports.
 ovn_endpoints: []
 ovn_endpoint_bridge: br-int
 ovn_endpoint_dhcp_timeout: 30

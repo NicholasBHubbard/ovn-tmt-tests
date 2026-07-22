@@ -1,0 +1,10 @@
+multihost_driver_user: root
+multihost_driver_runtime_dir: /run/ovn-tmt-tests/multihost-driver
+multihost_driver_key_path: "{{ multihost_driver_runtime_dir }}/id_ed25519"
+multihost_driver_controller_public_key_path: >-
+  {{ inventory_dir }}/multihost-driver.pub
+multihost_driver_package_names:
+  dnf:
+    - openssh-clients
+  apt:
+    - openssh-client

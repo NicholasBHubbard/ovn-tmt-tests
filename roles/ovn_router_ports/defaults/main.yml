@@ -1,2 +1,3 @@
 # Listed attachments default to present; absent removes them. Unlisted attachments are untouched.
+# Omitted options are cleared from listed router ports.
 ovn_router_ports: []

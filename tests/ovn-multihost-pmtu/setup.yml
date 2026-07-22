@@ -1,0 +1,98 @@
+- name: Apply PMTU topology
+  ansible.builtin.import_playbook: ../../playbooks/ovn-topology.yml
+  vars:
+    ovn_switches:
+      - name: pmtu-sw0
+      - name: pmtu-sw1
+    ovn_routers:
+      - name: pmtu-router
+    ovn_router_ports:
+      - name: pmtu-sw0-router
+        router: pmtu-router
+        switch: pmtu-sw0
+        switch_port: pmtu-sw0-router-port
+        mac: "02:00:00:70:00:01"
+        networks:
+          - 10.70.0.1/24
+      - name: pmtu-sw1-router
+        router: pmtu-router
+        switch: pmtu-sw1
+        switch_port: pmtu-sw1-router-port
+        mac: "02:00:00:70:00:02"
+        networks:
+          - 20.70.0.1/24
+    ovn_gateway_chassis:
+      - id: pmtu-sw0-gateway
+        router_port: pmtu-sw0-router
+        chassis: compute-1
+        priority: 10
+      - id: pmtu-sw1-gateway
+        router_port: pmtu-sw1-router
+        chassis: compute-2
+        priority: 10
+    ovn_load_balancers:
+      - id: pmtu-lb
+        name: pmtu-lb
+        protocol: udp
+        vips:
+          10.70.0.1:8080: 10.70.0.4:8080
+        switches:
+          - pmtu-sw0
+
+- name: Apply PMTU endpoints
+  ansible.builtin.import_playbook: ../../playbooks/ovn-endpoints.yml
+  vars:
+    ovn_endpoints:
+      - name: pmtu-vm1
+        host: compute-1
+        switch: pmtu-sw0
+        iface_id: pmtu-vm1-port
+        mac: "02:00:00:70:10:03"
+        mtu: 1342
+        addresses:
+          - 10.70.0.3/24
+        routes:
+          - to: default
+            via: 10.70.0.1
+      - name: pmtu-vm2
+        host: compute-2
+        switch: pmtu-sw0
+        iface_id: pmtu-vm2-port
+        mac: "02:00:00:70:10:04"
+        mtu: 1342
+        addresses:
+          - 10.70.0.4/24
+        routes:
+          - to: default
+            via: 10.70.0.1
+      - name: pmtu-vm3
+        host: compute-2
+        switch: pmtu-sw1
+        iface_id: pmtu-vm3-port
+        mac: "02:00:00:70:20:03"
+        mtu: 1342
+        addresses:
+          - 20.70.0.3/24
+        routes:
+          - to: default
+            via: 20.70.0.1
+
+- name: Configure PMTU stateful ACLs
+  hosts: central
+  become: true
+  tasks:
+    - name: Add allow-related ACLs
+      ansible.builtin.command:
+        argv:
+          - ovn-nbctl
+          - --may-exist
+          - acl-add
+          - "{{ item }}"
+          - from-lport
+          - "1002"
+          - ip4 || ip6
+          - allow-related
+      loop:
+        - pmtu-sw0
+        - pmtu-sw1
+      changed_when: true

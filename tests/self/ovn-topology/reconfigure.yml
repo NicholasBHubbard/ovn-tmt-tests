@@ -43,6 +43,8 @@
         networks:
           - 203.0.113.1/24
           - 2001:db8:2::ff/64
+        options:
+          gateway_mtu: 1300
       - name: self-rp-delete
         switch_port: self-rp-delete-sw
         state: absent
@@ -64,6 +66,22 @@
         external_ip: 2001:db8:ffff::10
         logical_ip: 2001:db8:2::1
       - id: self-nat-delete
+        state: absent
+    ovn_load_balancers:
+      - id: self-lb
+        name: self-lb
+        protocol: tcp
+        vips:
+          198.51.100.100:443: 198.51.100.10:8443
+        switches:
+          - self-moved
+        routers:
+          - self-r3
+        options:
+          reject: false
+        selection_fields:
+          - ip_dst
+      - id: self-lb-delete
         state: absent
     ovn_static_routes:
       - id: self-route

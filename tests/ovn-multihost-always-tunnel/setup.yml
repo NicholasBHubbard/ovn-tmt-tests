@@ -1,0 +1,67 @@
+- name: Apply always-tunnel topology
+  ansible.builtin.import_playbook: ../../playbooks/ovn-topology.yml
+  vars:
+    ovn_switches:
+      - name: at-sw0
+      - name: at-sw1
+    ovn_localnet_ports:
+      - name: at-sw0-localnet
+        switch: at-sw0
+        network: public
+        tag: 100
+      - name: at-sw1-localnet
+        switch: at-sw1
+        network: public
+        tag: 101
+    ovn_routers:
+      - name: at-router
+    ovn_router_ports:
+      - name: at-sw0-router
+        router: at-router
+        switch: at-sw0
+        switch_port: at-sw0-router-port
+        mac: "02:00:00:60:00:01"
+        networks:
+          - 10.60.0.1/24
+      - name: at-sw1-router
+        router: at-router
+        switch: at-sw1
+        switch_port: at-sw1-router-port
+        mac: "02:00:00:60:00:02"
+        networks:
+          - 20.60.0.1/24
+
+- name: Apply always-tunnel endpoints
+  ansible.builtin.import_playbook: ../../playbooks/ovn-endpoints.yml
+  vars:
+    ovn_endpoints:
+      - name: at-vm1
+        host: compute-1
+        switch: at-sw0
+        iface_id: at-vm1-port
+        mac: "02:00:00:60:10:03"
+        addresses:
+          - 10.60.0.3/24
+        routes:
+          - to: default
+            via: 10.60.0.1
+      - name: at-vm2
+        host: compute-2
+        switch: at-sw0
+        iface_id: at-vm2-port
+        mac: "02:00:00:60:10:04"
+        addresses:
+          - 10.60.0.4/24
+        routes:
+          - to: default
+            via: 10.60.0.1
+      - name: at-vm3
+        host: compute-2
+        switch: at-sw1
+        iface_id: at-vm3-port
+        mac: "02:00:00:60:20:03"
+        addresses:
+          - 20.60.0.3/24
+        routes:
+          - to: default
+            via: 20.60.0.1

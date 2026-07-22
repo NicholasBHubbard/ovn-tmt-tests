@@ -18,6 +18,17 @@ for endpoint in self-direct self-peer; do
     fi
 done
 
+long_host_interface="ovse-$(printf %s self-long-endpoint-name | sha1sum | cut -c1-10)"
+if [ "$(ovs-vsctl port-to-br "$long_host_interface" 2>/dev/null)" != self-br-b ]; then
+    record_failure "Expected long-name endpoint on self-br-b"
+fi
+if ! ip -n self-long-endpoint-name -o link show dev endpoint0 \
+    | grep -F -q 'link/ether 02:00:00:00:20:17'; then
+    record_failure "Expected reconfigured long-name endpoint interface"
+fi
+ip netns exec self-long-endpoint-name ping -c 1 -W 2 203.0.113.20 || \
+    record_failure "Expected long-name endpoint connectivity across self-br-b"
+
 if [ "$(</sys/class/net/self-direct-p/mtu)" != 1500 ] || \
     [ "$(endpoint_mtu self-direct)" != 1500 ]; then
     record_failure "Expected self-direct MTU to return to the default 1500"

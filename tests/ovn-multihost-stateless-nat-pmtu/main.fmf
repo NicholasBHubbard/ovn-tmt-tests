@@ -1,0 +1,6 @@
+summary: Verify stateless NAT rewrites inner ICMP PMTU addresses
+test: ./test.sh
+framework: shell
+duration: 10m
+require:
+  - iputils

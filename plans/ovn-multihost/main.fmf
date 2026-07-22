@@ -19,6 +19,17 @@ environment:
   OVN_WERROR: "true"
 
 prepare:
+  - name: Set up cross-guest test driver
+    how: ansible
+    order: 30
+    where: [central]
+    playbook: playbooks/multihost-driver.yml
+
+  - name: Authorize cross-guest test driver
+    how: ansible
+    order: 31
+    playbook: playbooks/multihost-driver-authorize.yml
+
   - name: Build OVN artifact
     how: ansible
     order: 40

@@ -1,0 +1,5 @@
+- name: Configure multihost test driver
+  hosts: "{{ multihost_driver_hosts | default('central') }}"
+  become: true
+  roles:
+    - multihost_driver

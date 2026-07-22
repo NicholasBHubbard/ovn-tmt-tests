@@ -1,0 +1,37 @@
+- name: Create self-test provider mesh
+  ansible.builtin.import_playbook: ../../../playbooks/ovs-tunnel-mesh.yml
+  vars:
+    ovs_tunnel_mesh_hosts: central:compute
+    ovs_tunnel_meshes:
+      - name: self-provider
+        hosts:
+          - central
+          - compute-1
+          - compute-2
+        hub: compute-1
+        bridge: self-provider
+        key: 101
+
+- name: Create self-test provider endpoints
+  ansible.builtin.import_playbook: ../../../playbooks/ovs-endpoints.yml
+  vars:
+    ovs_endpoint_hosts: central:compute
+    ovs_endpoints:
+      - name: self-provider-0
+        host: central
+        bridge: self-provider
+        mac: "02:00:00:00:40:00"
+        addresses:
+          - 192.0.2.0/24
+      - name: self-provider-1
+        host: compute-1
+        bridge: self-provider
+        mac: "02:00:00:00:40:01"
+        addresses:
+          - 192.0.2.1/24
+      - name: self-provider-2
+        host: compute-2
+        bridge: self-provider
+        mac: "02:00:00:00:40:02"
+        addresses:
+          - 192.0.2.2/24

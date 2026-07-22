@@ -1,0 +1,3 @@
+# Each load balancer needs a stable id. Name defaults to id and protocol to tcp.
+# VIPs, options, selection fields and switch/router attachments are authoritative.
+ovn_load_balancers: []

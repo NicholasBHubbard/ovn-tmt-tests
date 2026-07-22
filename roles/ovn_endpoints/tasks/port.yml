@@ -104,6 +104,7 @@
       - "{{ ovn_endpoint.iface_id }}"
       - dhcpv4_options
       - dhcpv6_options
+      - options
   vars:
     ovn_endpoint_nb_addresses: >-
       {{ ([ovn_endpoint.mac, 'dynamic']
@@ -112,6 +113,26 @@
                 + (ovn_endpoint.addresses | default([])
                    | map('regex_replace', '/.*$', '') | list))
          | join(' ') }}
+  changed_when: true
+
+- name: Configure options for {{ ovn_endpoint.iface_id }}
+  when: ovn_endpoint.state | default('present') == 'present'
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - set
+      - Logical_Switch_Port
+      - "{{ ovn_endpoint.iface_id }}"
+      - "options:{{ ovn_endpoint_option.key }}={{ ovn_endpoint_option_value }}"
+  loop: "{{ ovn_endpoint.options | default({}) | dict2items }}"
+  loop_control:
+    loop_var: ovn_endpoint_option
+    label: "{{ ovn_endpoint_option.key }}"
+  vars:
+    ovn_endpoint_option_value: >-
+      {{ (ovn_endpoint_option.value | string | lower)
+         if ovn_endpoint_option.value is boolean
+         else (ovn_endpoint_option.value | string) }}
   changed_when: true
 
 - name: Configure DHCP options for {{ ovn_endpoint.iface_id }}

@@ -1,33 +1,27 @@
 #!/bin/bash
 set -euo pipefail
 
-# tmt creates this file at runtime.
-# shellcheck disable=SC1090
-source "$TMT_TOPOLOGY_BASH"
+source "$TMT_TREE/tests/lib/multihost.sh"
 
-case "${TMT_GUEST[name]}" in
-    compute-1)
-        namespace=tmt-vm1
-        peer=10.0.0.2
-        ;;
-    compute-2)
-        namespace=tmt-vm2
-        peer=10.0.0.1
-        ;;
-    *)
-        echo "Unexpected test guest: ${TMT_GUEST[name]}" >&2
-        exit 1
-        ;;
-esac
+multihost_exec compute-1 ip netns exec sw0p1 true
+multihost_exec compute-2 ip netns exec sw0p2 true
+multihost_exec compute-2 ip netns exec sw1p1 true
 
-ip netns list | grep -q "^${namespace}\b"
+multihost_wait_for_ping compute-1 sw0p1 10.0.0.4
 
-for _ in {1..30}; do
-    if ip netns exec "$namespace" ping -c 1 -W 1 "$peer"; then
-        exit 0
-    fi
-    sleep 1
-done
+ovn-nbctl pg-add pg0 sw0-port1 sw0-port2
+ovn-nbctl acl-add pg0 to-lport 1001 \
+    'outport == @pg0 && ip4' drop
+ovn-nbctl --wait=sb sync
+multihost_expect_no_ping compute-1 sw0p1 10.0.0.4
 
-echo "No connectivity from $namespace to $peer" >&2
-exit 1
+ovn-nbctl acl-add pg0 to-lport 1002 \
+    'outport == @pg0 && ip4 && icmp' allow-related
+ovn-nbctl --wait=sb sync
+multihost_wait_for_ping compute-1 sw0p1 10.0.0.4
+
+multihost_wait_for_ping compute-1 sw0p1 20.0.0.3
+
+ovn-nbctl lsp-set-addresses sw1-port1 unknown
+ovn-nbctl --wait=hv sync
+multihost_wait_for_ping compute-1 sw0p1 20.0.0.3

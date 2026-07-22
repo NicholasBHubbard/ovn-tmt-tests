@@ -20,6 +20,10 @@
     that:
       - (ovs_endpoint.mtu | default(ovs_endpoint_mtu)) is integer
       - (ovs_endpoint.mtu | default(ovs_endpoint_mtu)) > 0
+      - >-
+        ovs_endpoint.interface
+        | default(ovs_endpoint.name if ovs_endpoint.name | length <= 15 else 'eth0')
+        | length <= 15
     fail_msg: "OVS endpoint MTUs must be positive integers."
   loop: "{{ ovs_endpoints }}"
   loop_control:

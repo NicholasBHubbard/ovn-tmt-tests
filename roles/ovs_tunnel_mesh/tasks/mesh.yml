@@ -1,0 +1,101 @@
+- name: Verify OVS tunnel mesh {{ ovs_tunnel_mesh.name }}
+  ansible.builtin.assert:
+    that:
+      - ovs_tunnel_mesh.hosts | length > 1
+      - ovs_tunnel_mesh.bridge | length > 0
+      - ovs_tunnel_mesh.key is defined
+      - ovs_tunnel_mesh.type | default('geneve') in ['geneve', 'gre', 'vxlan']
+      - >-
+        ovs_tunnel_mesh.hub is not defined
+        or ovs_tunnel_mesh.hub in ovs_tunnel_mesh.hosts
+    fail_msg: >-
+      OVS tunnel meshes need at least two hosts, a bridge, a key and a supported type.
+
+- name: Build desired ports for OVS tunnel mesh {{ ovs_tunnel_mesh.name }}
+  ansible.builtin.set_fact:
+    ovs_tunnel_mesh_desired_ports: >-
+      {{ ovs_tunnel_mesh_desired_ports | default([])
+         + [{'name': 'tm' ~ ((ovs_tunnel_mesh.name ~ ':' ~ item)
+                             | hash('sha1'))[:10],
+             'peer': item}] }}
+  loop: >-
+    {{ ovs_tunnel_mesh.hosts
+       if ovs_tunnel_mesh.hub is not defined
+          or inventory_hostname == ovs_tunnel_mesh.hub
+       else [ovs_tunnel_mesh.hub] }}
+  when:
+    - ovs_tunnel_mesh.state | default('present') == 'present'
+    - inventory_hostname in ovs_tunnel_mesh.hosts
+    - item != inventory_hostname
+
+- name: Find managed ports for OVS tunnel mesh {{ ovs_tunnel_mesh.name }}
+  ansible.builtin.command:
+    argv:
+      - ovs-vsctl
+      - --data=bare
+      - --no-heading
+      - --columns=name
+      - find
+      - Interface
+      - >-
+        external_ids:ovn-tmt-tests-mesh={{ ovs_tunnel_mesh.name }}
+  register: ovs_tunnel_mesh_managed_ports
+  changed_when: false
+
+- name: Remove stale ports from OVS tunnel mesh {{ ovs_tunnel_mesh.name }}
+  ansible.builtin.command:
+    argv:
+      - ovs-vsctl
+      - --if-exists
+      - del-port
+      - "{{ item }}"
+  loop: >-
+    {{ ovs_tunnel_mesh_managed_ports.stdout_lines
+       | difference(ovs_tunnel_mesh_desired_ports | default([])
+                    | map(attribute='name') | list) }}
+  changed_when: true
+
+- name: Create bridge for OVS tunnel mesh {{ ovs_tunnel_mesh.name }}
+  when:
+    - ovs_tunnel_mesh.state | default('present') == 'present'
+    - inventory_hostname in ovs_tunnel_mesh.hosts
+  ansible.builtin.command:
+    argv:
+      - ovs-vsctl
+      - --may-exist
+      - add-br
+      - "{{ ovs_tunnel_mesh.bridge }}"
+  changed_when: true
+
+- name: Configure ports for OVS tunnel mesh {{ ovs_tunnel_mesh.name }}
+  ansible.builtin.command:
+    argv:
+      - ovs-vsctl
+      - --if-exists
+      - del-port
+      - "{{ item.name }}"
+      - --
+      - --may-exist
+      - add-port
+      - "{{ ovs_tunnel_mesh.bridge }}"
+      - "{{ item.name }}"
+      - --
+      - set
+      - Interface
+      - "{{ item.name }}"
+      - "type={{ ovs_tunnel_mesh.type | default('geneve') }}"
+      - "options:remote_ip={{ ovs_tunnel_mesh_remote_ip }}"
+      - "options:key={{ ovs_tunnel_mesh.key }}"
+      - "external_ids:ovn-tmt-tests-mesh={{ ovs_tunnel_mesh.name }}"
+      - "external_ids:ovn-tmt-tests-peer={{ item.peer }}"
+  loop: "{{ ovs_tunnel_mesh_desired_ports | default([]) }}"
+  vars:
+    ovs_tunnel_mesh_remote_ip: >-
+      {{ (ovs_tunnel_mesh.addresses | default({})).get(
+           item.peer,
+           hostvars[item.peer].ansible_host | default(item.peer)) }}
+  changed_when: true
+
+- name: Reset desired OVS tunnel mesh ports
+  ansible.builtin.set_fact:
+    ovs_tunnel_mesh_desired_ports: []
