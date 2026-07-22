@@ -10,7 +10,7 @@
   register: ovn_load_balancer_rows
   changed_when: false
 
-- name: Verify load balancer {{ ovn_load_balancer.id }} is unambiguous
+- name: Verify load balancer is unambiguous {{ ovn_load_balancer.id }}
   ansible.builtin.assert:
     that:
       - ovn_load_balancer_rows.stdout_lines | length <= 1
@@ -144,7 +144,7 @@
        | difference(ovn_load_balancer.switches | default([])) }}
   changed_when: true
 
-- name: Attach load balancer {{ ovn_load_balancer.id }} to switches
+- name: Attach load balancer to switches {{ ovn_load_balancer.id }}
   when: ovn_load_balancer.state | default('present') == 'present'
   ansible.builtin.command:
     argv:
@@ -189,7 +189,7 @@
        | difference(ovn_load_balancer.routers | default([])) }}
   changed_when: true
 
-- name: Attach load balancer {{ ovn_load_balancer.id }} to routers
+- name: Attach load balancer to routers {{ ovn_load_balancer.id }}
   when: ovn_load_balancer.state | default('present') == 'present'
   ansible.builtin.command:
     argv:
