@@ -2,7 +2,7 @@
   hosts: all
   become: true
   roles:
-    - ovn_host
+    - ovn_chassis
   vars:
     ovn_bridges:
       - br-int

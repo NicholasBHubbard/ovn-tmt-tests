@@ -1,0 +1,15 @@
+- name: Create two TLS-connected isolated OVN chassis
+  hosts: all
+  become: true
+  roles:
+    - ovn_chassis
+  vars:
+    ovn_remote: ssl:host.containers.internal:6642
+    ovn_chassis_runtime: podman
+    ovn_chassis_container_image: localhost/ovn-chassis-selftest
+    ovn_chassis_container_network: ovn-chassis-selftest
+    ovn_chassis_instances:
+      - name: scale-a
+        container_ip: 10.89.0.10
+      - name: scale-b
+        container_ip: 10.89.0.11

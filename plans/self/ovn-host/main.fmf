@@ -1,9 +1,0 @@
-summary: Base configuration for ovn-host self-tests
-
-discover:
-  how: fmf
-  test:
-    - /tests/self/ovn-host
-
-execute:
-  how: tmt

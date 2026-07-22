@@ -1,5 +1,5 @@
 - name: Apply initial OVN gateway configuration
-  ansible.builtin.import_playbook: ../../../playbooks/ovn-host.yml
+  ansible.builtin.import_playbook: ../../../playbooks/ovn-chassis.yml
   vars:
     install_method: distro
     ovn_bridges:

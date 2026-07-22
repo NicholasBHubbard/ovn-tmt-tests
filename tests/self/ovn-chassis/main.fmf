@@ -1,7 +1,8 @@
-summary: Verify OVN host services and central connection
+summary: Verify OVN chassis services and central connection
 test: ./post.sh
 framework: shell
 duration: 5m
 require:
+  - ansible-core
   - iproute
   - procps-ng

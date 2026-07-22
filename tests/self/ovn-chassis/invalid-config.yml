@@ -1,0 +1,32 @@
+- name: Reject invalid OVN chassis configuration
+  hosts: all
+  become: true
+  roles:
+    - ovn_chassis
+  vars:
+    ovn_chassis_instances: "{{ ovn_chassis_invalid_cases[ovn_chassis_invalid_case] }}"
+    ovn_chassis_invalid_cases:
+      duplicate_names:
+        - name: duplicate
+          runtime: podman
+          image: localhost/ovn-chassis-selftest
+        - name: duplicate
+          runtime: podman
+          image: localhost/ovn-chassis-selftest
+      duplicate_containers:
+        - name: duplicate-a
+          runtime: podman
+          container_name: ovn-chassis-duplicate
+          image: localhost/ovn-chassis-selftest
+        - name: duplicate-b
+          runtime: podman
+          container_name: ovn-chassis-duplicate
+          image: localhost/ovn-chassis-selftest
+      multiple_system:
+        - name: system-a
+          runtime: system
+        - name: system-b
+          runtime: system
+      invalid_runtime:
+        - name: invalid-runtime
+          runtime: invalid

@@ -1,0 +1,119 @@
+- name: Verify chassis instance configuration
+  ansible.builtin.assert:
+    that:
+      - ovn_chassis_instances is sequence
+      - ovn_chassis_instances is not string
+    fail_msg: "ovn_chassis_instances must be a list."
+
+- name: Verify individual chassis instances
+  ansible.builtin.assert:
+    that:
+      - item.name is defined
+      - item.name | length > 0
+      - item.name is match('^[A-Za-z0-9][A-Za-z0-9_.-]*$')
+      - (item.runtime | default(ovn_chassis_runtime)) in ['system', 'podman']
+      - (item.state | default('present')) in ['present', 'absent']
+      - >-
+        (item.state | default('present')) == 'present'
+        or (item.runtime | default(ovn_chassis_runtime)) == 'podman'
+    fail_msg: "Each chassis needs a valid unique name, runtime and state."
+  loop: "{{ ovn_chassis_instances }}"
+  loop_control:
+    label: "{{ item.name | default('unnamed') }}"
+
+- name: Verify chassis names are unique
+  ansible.builtin.assert:
+    that:
+      - >-
+        ovn_chassis_instances | map(attribute='name') | list | unique | length
+        == ovn_chassis_instances | length
+    fail_msg: "ovn_chassis_instances contains duplicate names."
+
+- name: Initialize chassis runtime facts
+  ansible.builtin.set_fact:
+    ovn_chassis_desired_containers: []
+    ovn_chassis_system_instances: 0
+    ovn_chassis_wants_podman: false
+  changed_when: false
+
+- name: Resolve desired chassis runtimes
+  ansible.builtin.set_fact:
+    ovn_chassis_desired_containers: >-
+      {{ ovn_chassis_desired_containers
+         + ([item.container_name
+             | default(ovn_chassis_container_prefix ~ '-' ~ item.name)]
+            if (item.runtime | default(ovn_chassis_runtime)) == 'podman'
+               and (item.state | default('present')) == 'present'
+            else []) }}
+    ovn_chassis_system_instances: >-
+      {{ ovn_chassis_system_instances | int
+         + (1
+            if (item.runtime | default(ovn_chassis_runtime)) == 'system'
+               and (item.state | default('present')) == 'present'
+            else 0) }}
+    ovn_chassis_wants_podman: >-
+      {{ ovn_chassis_wants_podman
+         or (item.runtime | default(ovn_chassis_runtime)) == 'podman' }}
+  loop: "{{ ovn_chassis_instances }}"
+  loop_control:
+    label: "{{ item.name }}"
+  changed_when: false
+
+- name: Verify only one system chassis is requested
+  ansible.builtin.assert:
+    that:
+      - ovn_chassis_system_instances | int <= 1
+    fail_msg: "Only one system chassis can use the host OVS database."
+
+- name: Verify Podman chassis container names are unique
+  ansible.builtin.assert:
+    that:
+      - >-
+        ovn_chassis_desired_containers | unique | length
+        == ovn_chassis_desired_containers | length
+    fail_msg: "Podman chassis container names must be unique."
+
+- name: Detect Podman
+  ansible.builtin.command:
+    cmd: which podman
+  register: ovn_chassis_podman
+  failed_when: false
+  changed_when: false
+
+- name: Verify Podman is available when requested
+  ansible.builtin.assert:
+    that:
+      - not (ovn_chassis_wants_podman | bool) or ovn_chassis_podman.rc == 0
+    fail_msg: "Podman is required for podman chassis instances."
+
+- name: List managed chassis containers
+  when: ovn_chassis_podman.rc == 0
+  ansible.builtin.command:
+    argv:
+      - podman
+      - ps
+      - --all
+      - --filter
+      - label=io.ovn-tmt-tests.role=ovn_chassis
+      - --format
+      - "{{ '{{.Names}}' }}"
+  register: ovn_chassis_managed_containers
+  changed_when: false
+
+- name: Remove stale chassis containers
+  when: ovn_chassis_podman.rc == 0
+  ansible.builtin.include_tasks: remove_podman.yml
+  loop: >-
+    {{ (ovn_chassis_managed_containers.stdout_lines | default([]))
+       | difference(ovn_chassis_desired_containers) }}
+  loop_control:
+    loop_var: ovn_chassis_stale_container
+    label: "{{ ovn_chassis_stale_container }}"
+
+- name: Configure requested chassis instances
+  when: (ovn_chassis_instance.state | default('present')) == 'present'
+  ansible.builtin.include_tasks: instance.yml
+  loop: "{{ ovn_chassis_instances }}"
+  loop_control:
+    loop_var: ovn_chassis_instance
+    label: "{{ ovn_chassis_instance.name }}"

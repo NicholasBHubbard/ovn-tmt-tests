@@ -18,13 +18,13 @@ assert_contains roles/ovs_setup/defaults/main.yml 'ovs_repository_package_names'
 
 assert_not_contains roles/ovn_central/tasks/main.yml 'distro_packages'
 assert_not_contains roles/ovn_central/defaults/main.yml 'ovn_central_package_names'
-assert_not_contains roles/ovn_host/tasks/main.yml 'distro_packages'
-assert_not_contains roles/ovn_host/defaults/main.yml 'ovn_host_package_names'
+assert_not_contains roles/ovn_chassis/tasks/main.yml 'distro_packages'
+assert_not_contains roles/ovn_chassis/defaults/main.yml 'ovn_chassis_package_names'
 
 assert_contains playbooks/ovn-central.yml 'ovn_install'
 assert_contains playbooks/ovn-central.yml 'ovs_setup'
-assert_contains playbooks/ovn-host.yml 'ovn_install'
-assert_contains playbooks/ovn-host.yml 'ovs_setup'
+assert_contains playbooks/ovn-chassis.yml 'ovn_install'
+assert_contains playbooks/ovn-chassis.yml 'ovs_setup'
 assert_contains playbooks/multihost.yml 'ovn_install'
 assert_contains playbooks/multihost.yml 'ovs_setup'
 

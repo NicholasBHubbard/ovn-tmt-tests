@@ -8,6 +8,15 @@ assert_file tests/lib/assert.sh
 assert_file tests/lib/multihost.sh
 assert_file tests/lib/ovn.sh
 
+assert_directory roles/ovn_chassis
+assert_file roles/ovn_chassis/defaults/main.yml
+assert_file roles/ovn_chassis/tasks/main.yml
+assert_file playbooks/ovn-chassis.yml
+assert_contains roles/ovn_chassis/defaults/main.yml 'ovn_chassis_instances:'
+if [ -e roles/ovn_host ] || [ -e playbooks/ovn-host.yml ]; then
+    record_failure "The renamed ovn_host role or playbook still exists."
+fi
+
 for test_dir in tests/self/*; do
     [ -d "$test_dir" ] || continue
 
@@ -57,7 +66,7 @@ inherited_plan_dirs=(
     ovn-central-ssl
     ovn-clustered
     ovn-endpoints
-    ovn-host
+    ovn-chassis
     ovn-install
     ovn-system-test-deps
     ovn-topology

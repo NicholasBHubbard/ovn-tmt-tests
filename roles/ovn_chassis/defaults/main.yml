@@ -1,0 +1,36 @@
+# Shared defaults are inherited by every chassis instance. An instance may
+# override remote, encap_type, encap_ip, bridges, bridge_mappings or cms_options.
+ovn_sb_port: 6642
+ovn_remote: "tcp:127.0.0.1:{{ ovn_sb_port }}"
+ovn_encap_type: geneve
+ovn_encap_ip: "{{ ansible_facts['default_ipv4']['address'] }}"
+ovn_chassis_name: "{{ ansible_facts['hostname'] }}"
+ovn_bridge_mappings: ""
+ovn_cms_options: []
+ovn_bridges:
+  - br-int
+
+# The default preserves the original one-system-chassis behavior. Podman
+# instances inherit the container defaults below and may set container_name,
+# container_ip, image, network, volumes or extra_args individually. Unlisted
+# role-managed Podman containers are removed. For example:
+# ovn_chassis_runtime: podman
+# ovn_chassis_container_image: localhost/ovn-chassis
+# ovn_chassis_instances:
+#   - name: chassis-1
+#     container_ip: 192.0.2.11
+ovn_chassis_runtime: system
+ovn_chassis_instances:
+  - name: "{{ ovn_chassis_name }}"
+    runtime: "{{ ovn_chassis_runtime }}"
+
+ovn_chassis_container_prefix: ovn-chassis
+ovn_chassis_container_image: ""
+ovn_chassis_container_network: ""
+ovn_chassis_container_volumes: []
+ovn_chassis_container_extra_args: []
+ovn_chassis_ovs_ctl_path: /usr/share/openvswitch/scripts/ovs-ctl
+ovn_chassis_ovn_ctl_path: /usr/share/ovn/scripts/ovn-ctl
+ovn_chassis_ssl_private_key: /etc/openvswitch/ovn-privkey.pem
+ovn_chassis_ssl_certificate: /etc/openvswitch/ovn-cert.pem
+ovn_chassis_ssl_ca_cert: /etc/openvswitch/cacert.pem

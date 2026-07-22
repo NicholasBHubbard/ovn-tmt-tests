@@ -1,0 +1,19 @@
+- name: Stop stale Podman OVN controller
+  ansible.builtin.command:
+    argv:
+      - podman
+      - exec
+      - "{{ ovn_chassis_stale_container }}"
+      - "{{ ovn_chassis_ovn_ctl_path }}"
+      - stop_controller
+  failed_when: false
+  changed_when: true
+
+- name: Remove stale Podman chassis container
+  ansible.builtin.command:
+    argv:
+      - podman
+      - rm
+      - --force
+      - "{{ ovn_chassis_stale_container }}"
+  changed_when: true

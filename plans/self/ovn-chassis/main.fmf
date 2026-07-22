@@ -1,0 +1,9 @@
+summary: Base configuration for ovn-chassis self-tests
+
+discover:
+  how: fmf
+  test:
+    - /tests/self/ovn-chassis
+
+execute:
+  how: tmt

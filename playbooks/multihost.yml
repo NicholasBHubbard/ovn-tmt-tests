@@ -15,7 +15,7 @@
         {{ ovn_multihost_ssl_ca_cert
            | default('/run/ovn-test-pki/ca-cert.pem') }}
 
-- name: Resolve central for OVN hosts
+- name: Resolve central for OVN chassis
   hosts: compute:gateway
   gather_facts: false
   tasks:
@@ -32,7 +32,7 @@
         port: "{{ ovn_sb_port | default(6642) }}"
         timeout: 2700
 
-- name: Set up OVN host on compute nodes
+- name: Set up OVN chassis on compute nodes
   hosts: compute
   become: true
   roles:
@@ -48,12 +48,12 @@
       ovs_ssl_ca_cert: >-
         {{ ovn_multihost_ssl_ca_cert
            | default('/run/ovn-test-pki/ca-cert.pem') }}
-    - ovn_host
+    - ovn_chassis
   vars:
     ovn_remote: >-
       {{ 'ssl' if ovn_ssl_enabled | default(false) | bool else 'tcp' }}:{{ ovn_central_address }}:{{ ovn_sb_port }}
 
-- name: Set up OVN host on gateway nodes
+- name: Set up OVN chassis on gateway nodes
   hosts: gateway
   become: true
   roles:
@@ -69,7 +69,7 @@
       ovs_ssl_ca_cert: >-
         {{ ovn_multihost_ssl_ca_cert
            | default('/run/ovn-test-pki/ca-cert.pem') }}
-    - ovn_host
+    - ovn_chassis
   vars:
     ovn_remote: >-
       {{ 'ssl' if ovn_ssl_enabled | default(false) | bool else 'tcp' }}:{{ ovn_central_address }}:{{ ovn_sb_port }}

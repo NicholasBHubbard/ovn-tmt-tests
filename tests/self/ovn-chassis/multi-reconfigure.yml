@@ -1,0 +1,19 @@
+- name: Remove one chassis and reconfigure the other
+  hosts: all
+  become: true
+  roles:
+    - ovn_chassis
+  vars:
+    ovn_remote: tcp:host.containers.internal:6642
+    ovn_chassis_runtime: podman
+    ovn_chassis_container_image: localhost/ovn-chassis-selftest
+    ovn_chassis_container_network: ovn-chassis-selftest
+    ovn_chassis_instances:
+      - name: scale-b
+        container_ip: 10.89.0.11
+        bridges:
+          - br-int
+          - br-ex
+        bridge_mappings: provider:br-ex
+        cms_options:
+          - enable-chassis-as-gw

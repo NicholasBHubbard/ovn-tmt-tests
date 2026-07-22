@@ -1,0 +1,250 @@
+- name: Resolve Podman chassis container configuration
+  ansible.builtin.set_fact:
+    ovn_chassis_current_container: >-
+      {{ ovn_chassis_instance.container_name
+         | default(ovn_chassis_container_prefix
+                   ~ '-' ~ ovn_chassis_current_name) }}
+    ovn_chassis_current_image: >-
+      {{ ovn_chassis_instance.image
+         | default(ovn_chassis_container_image) }}
+    ovn_chassis_current_network: >-
+      {{ ovn_chassis_instance.network
+         | default(ovn_chassis_container_network) }}
+    ovn_chassis_current_container_ip: >-
+      {{ ovn_chassis_instance.container_ip | default('') }}
+    ovn_chassis_current_volumes: >-
+      {{ ovn_chassis_instance.volumes
+         | default(ovn_chassis_container_volumes) }}
+    ovn_chassis_current_extra_args: >-
+      {{ ovn_chassis_instance.extra_args
+         | default(ovn_chassis_container_extra_args) }}
+  changed_when: false
+
+- name: Verify Podman chassis image is configured
+  ansible.builtin.assert:
+    that:
+      - ovn_chassis_current_image | length > 0
+    fail_msg: "A container image is required for Podman chassis instances."
+
+- name: Resolve Podman chassis image ID
+  ansible.builtin.command:
+    argv:
+      - podman
+      - image
+      - inspect
+      - --format
+      - "{{ '{{.Id}}' }}"
+      - "{{ ovn_chassis_current_image }}"
+  register: ovn_chassis_current_image_inspect
+  changed_when: false
+
+- name: Resolve Podman chassis TLS volumes
+  ansible.builtin.set_fact:
+    ovn_chassis_current_volumes: >-
+      {{ ovn_chassis_current_volumes
+         + ([ovn_chassis_ssl_private_key ~ ':'
+             ~ ovn_chassis_ssl_private_key ~ ':ro',
+             ovn_chassis_ssl_certificate ~ ':'
+             ~ ovn_chassis_ssl_certificate ~ ':ro',
+             ovn_chassis_ssl_ca_cert ~ ':'
+             ~ ovn_chassis_ssl_ca_cert ~ ':ro']
+            if ovn_chassis_current_remote.startswith('ssl:') else []) }}
+  changed_when: false
+
+- name: Verify Podman chassis TLS files
+  when: ovn_chassis_current_remote.startswith('ssl:')
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ ovn_chassis_ssl_private_key }}"
+    - "{{ ovn_chassis_ssl_certificate }}"
+    - "{{ ovn_chassis_ssl_ca_cert }}"
+  register: ovn_chassis_tls_files
+
+- name: Require Podman chassis TLS files
+  when: ovn_chassis_current_remote.startswith('ssl:')
+  ansible.builtin.assert:
+    that:
+      - ovn_chassis_tls_files.results | map(attribute='stat.exists') | min
+    fail_msg: "Podman chassis TLS files are missing."
+
+- name: Calculate Podman chassis container identity
+  ansible.builtin.set_fact:
+    ovn_chassis_current_container_hash: >-
+      {{ {
+           'name': ovn_chassis_current_name,
+           'image': ovn_chassis_current_image_inspect.stdout,
+           'network': ovn_chassis_current_network,
+           'ip': ovn_chassis_current_container_ip,
+           'volumes': ovn_chassis_current_volumes,
+           'extra_args': ovn_chassis_current_extra_args
+         } | to_json | hash('sha256') }}
+  changed_when: false
+
+- name: Inspect existing Podman chassis container
+  ansible.builtin.command:
+    argv:
+      - podman
+      - inspect
+      - --format
+      - >-
+        {{ '{{ index .Config.Labels "io.ovn-tmt-tests.container-spec" }}' }}
+      - "{{ ovn_chassis_current_container }}"
+  register: ovn_chassis_current_container_inspect
+  failed_when: false
+  changed_when: false
+
+- name: Remove changed Podman chassis container
+  when:
+    - ovn_chassis_current_container_inspect.rc == 0
+    - >-
+      ovn_chassis_current_container_inspect.stdout
+      != ovn_chassis_current_container_hash
+  ansible.builtin.include_tasks: remove_podman.yml
+  vars:
+    ovn_chassis_stale_container: "{{ ovn_chassis_current_container }}"
+
+- name: Recheck Podman chassis container
+  ansible.builtin.command:
+    argv:
+      - podman
+      - container
+      - exists
+      - "{{ ovn_chassis_current_container }}"
+  register: ovn_chassis_current_container_exists
+  failed_when: false
+  changed_when: false
+
+- name: Start Podman chassis container
+  when: ovn_chassis_current_container_exists.rc != 0
+  ansible.builtin.command:
+    argv: >-
+      {{ ['podman', 'run', '--detach', '--pull=never',
+          '--name', ovn_chassis_current_container,
+          '--hostname', ovn_chassis_current_name,
+          '--privileged',
+          '--label', 'io.ovn-tmt-tests.role=ovn_chassis',
+          '--label', 'io.ovn-tmt-tests.chassis-name='
+                     ~ ovn_chassis_current_name,
+          '--label', 'io.ovn-tmt-tests.container-spec='
+                     ~ ovn_chassis_current_container_hash]
+         + (['--network', ovn_chassis_current_network]
+            if ovn_chassis_current_network | length > 0 else [])
+         + (['--ip', ovn_chassis_current_container_ip]
+            if ovn_chassis_current_container_ip | length > 0 else [])
+         + (ovn_chassis_current_volumes
+            | map('regex_replace', '^', '--volume=') | list)
+         + ovn_chassis_current_extra_args
+         + [ovn_chassis_current_image] }}
+  changed_when: true
+
+- name: Check Podman chassis OVS
+  ansible.builtin.command:
+    argv:
+      - podman
+      - exec
+      - "{{ ovn_chassis_current_container }}"
+      - ovs-vsctl
+      - show
+  register: ovn_chassis_container_ovs
+  failed_when: false
+  changed_when: false
+
+- name: Start Podman chassis OVS
+  when: ovn_chassis_container_ovs.rc != 0
+  ansible.builtin.command:
+    argv:
+      - podman
+      - exec
+      - "{{ ovn_chassis_current_container }}"
+      - "{{ ovn_chassis_ovs_ctl_path }}"
+      - "--system-id={{ ovn_chassis_current_name }}"
+      - start
+  changed_when: true
+
+- name: Read Podman chassis address
+  when: ovn_chassis_current_encap_ip | length == 0
+  ansible.builtin.command:
+    argv:
+      - podman
+      - inspect
+      - --format
+      - "{{ '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' }}"
+      - "{{ ovn_chassis_current_container }}"
+  register: ovn_chassis_container_address
+  changed_when: false
+
+- name: Use Podman address for chassis encapsulation
+  when: ovn_chassis_current_encap_ip | length == 0
+  ansible.builtin.set_fact:
+    ovn_chassis_current_encap_ip: "{{ ovn_chassis_container_address.stdout }}"
+  changed_when: false
+
+- name: Verify Podman chassis encapsulation address
+  ansible.builtin.assert:
+    that:
+      - ovn_chassis_current_encap_ip | length > 0
+    fail_msg: "Set encap_ip for a Podman network without assigned addresses."
+
+- name: Set Podman chassis command prefix
+  ansible.builtin.set_fact:
+    ovn_chassis_exec_prefix:
+      - podman
+      - exec
+      - "{{ ovn_chassis_current_container }}"
+  changed_when: false
+
+- name: Configure Podman chassis database
+  ansible.builtin.include_tasks: configure.yml
+
+- name: Configure Podman chassis TLS
+  when: ovn_chassis_current_remote.startswith('ssl:')
+  ansible.builtin.command:
+    argv: >-
+      {{ ovn_chassis_exec_prefix
+         + ['ovs-vsctl', '--', '--id=@ssl', 'create', 'SSL',
+            'private_key=' ~ ovn_chassis_ssl_private_key,
+            'certificate=' ~ ovn_chassis_ssl_certificate,
+            'ca_cert=' ~ ovn_chassis_ssl_ca_cert,
+            '--', 'set', 'Open_vSwitch', '.', 'ssl=@ssl'] }}
+  changed_when: true
+
+- name: Check Podman OVN controller
+  ansible.builtin.command:
+    argv:
+      - podman
+      - exec
+      - "{{ ovn_chassis_current_container }}"
+      - pgrep
+      - --exact
+      - ovn-controller
+  register: ovn_chassis_container_controller
+  failed_when: false
+  changed_when: false
+
+- name: Start Podman OVN controller
+  when: ovn_chassis_container_controller.rc != 0
+  ansible.builtin.command:
+    argv:
+      - podman
+      - exec
+      - "{{ ovn_chassis_current_container }}"
+      - "{{ ovn_chassis_ovn_ctl_path }}"
+      - start_controller
+  changed_when: true
+
+- name: Wait for Podman OVN controller connection
+  ansible.builtin.command:
+    argv:
+      - podman
+      - exec
+      - "{{ ovn_chassis_current_container }}"
+      - ovn-appctl
+      - -t
+      - ovn-controller
+      - connection-status
+  retries: 10
+  delay: 2
+  register: ovn_chassis_container_connected
+  until: ovn_chassis_container_connected.stdout == "connected"
+  changed_when: false

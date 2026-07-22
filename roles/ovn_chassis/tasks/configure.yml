@@ -1,0 +1,76 @@
+- name: Configure chassis OVN remote
+  ansible.builtin.command:
+    argv: >-
+      {{ ovn_chassis_exec_prefix
+         + ['ovs-vsctl', 'set', 'open', '.',
+            'external-ids:ovn-remote=' ~ ovn_chassis_current_remote] }}
+  changed_when: true
+
+- name: Configure chassis encapsulation type
+  ansible.builtin.command:
+    argv: >-
+      {{ ovn_chassis_exec_prefix
+         + ['ovs-vsctl', 'set', 'open', '.',
+            'external-ids:ovn-encap-type='
+            ~ ovn_chassis_current_encap_type] }}
+  changed_when: true
+
+- name: Configure chassis encapsulation address
+  ansible.builtin.command:
+    argv: >-
+      {{ ovn_chassis_exec_prefix
+         + ['ovs-vsctl', 'set', 'open', '.',
+            'external-ids:ovn-encap-ip=' ~ ovn_chassis_current_encap_ip] }}
+  changed_when: true
+
+- name: Configure chassis system ID
+  ansible.builtin.command:
+    argv: >-
+      {{ ovn_chassis_exec_prefix
+         + ['ovs-vsctl', 'set', 'open', '.',
+            'external-ids:system-id=' ~ ovn_chassis_current_name] }}
+  changed_when: true
+
+- name: Configure chassis CMS options
+  when: ovn_chassis_current_cms_options | length > 0
+  ansible.builtin.command:
+    argv: >-
+      {{ ovn_chassis_exec_prefix
+         + ['ovs-vsctl', 'set', 'open', '.',
+            'external-ids:ovn-cms-options='
+            ~ (ovn_chassis_current_cms_options | join(','))] }}
+  changed_when: true
+
+- name: Clear chassis CMS options
+  when: ovn_chassis_current_cms_options | length == 0
+  ansible.builtin.command:
+    argv: >-
+      {{ ovn_chassis_exec_prefix
+         + ['ovs-vsctl', 'remove', 'open', '.', 'external_ids',
+            'ovn-cms-options'] }}
+  changed_when: true
+
+- name: Create chassis bridges
+  ansible.builtin.command:
+    argv: "{{ ovn_chassis_exec_prefix + ['ovs-vsctl', '--may-exist', 'add-br', item] }}"
+  loop: "{{ ovn_chassis_current_bridges }}"
+  changed_when: true
+
+- name: Configure chassis bridge mappings
+  when: ovn_chassis_current_bridge_mappings | length > 0
+  ansible.builtin.command:
+    argv: >-
+      {{ ovn_chassis_exec_prefix
+         + ['ovs-vsctl', 'set', 'open', '.',
+            'external-ids:ovn-bridge-mappings='
+            ~ ovn_chassis_current_bridge_mappings] }}
+  changed_when: true
+
+- name: Clear chassis bridge mappings
+  when: ovn_chassis_current_bridge_mappings | length == 0
+  ansible.builtin.command:
+    argv: >-
+      {{ ovn_chassis_exec_prefix
+         + ['ovs-vsctl', 'remove', 'open', '.', 'external_ids',
+            'ovn-bridge-mappings'] }}
+  changed_when: true

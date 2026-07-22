@@ -1,0 +1,27 @@
+- name: Resolve chassis instance configuration
+  ansible.builtin.set_fact:
+    ovn_chassis_current_name: "{{ ovn_chassis_instance.name }}"
+    ovn_chassis_current_runtime: >-
+      {{ ovn_chassis_instance.runtime | default(ovn_chassis_runtime) }}
+    ovn_chassis_current_remote: >-
+      {{ ovn_chassis_instance.remote | default(ovn_remote) }}
+    ovn_chassis_current_encap_type: >-
+      {{ ovn_chassis_instance.encap_type | default(ovn_encap_type) }}
+    ovn_chassis_current_encap_ip: >-
+      {{ ovn_chassis_instance.encap_ip | default('') }}
+    ovn_chassis_current_bridges: >-
+      {{ ovn_chassis_instance.bridges | default(ovn_bridges) }}
+    ovn_chassis_current_bridge_mappings: >-
+      {{ ovn_chassis_instance.bridge_mappings
+         | default(ovn_bridge_mappings) }}
+    ovn_chassis_current_cms_options: >-
+      {{ ovn_chassis_instance.cms_options | default(ovn_cms_options) }}
+  changed_when: false
+
+- name: Configure system chassis
+  when: ovn_chassis_current_runtime == 'system'
+  ansible.builtin.include_tasks: system.yml
+
+- name: Configure Podman chassis
+  when: ovn_chassis_current_runtime == 'podman'
+  ansible.builtin.include_tasks: podman.yml

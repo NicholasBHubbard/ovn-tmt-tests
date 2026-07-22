@@ -1,0 +1,89 @@
+- name: Verify OVN controller is installed
+  ansible.builtin.command:
+    cmd: which ovn-controller
+  changed_when: false
+
+- name: Verify system OVS is running
+  ansible.builtin.command:
+    cmd: ovs-vsctl show
+  changed_when: false
+
+- name: Use host address for system chassis encapsulation
+  when: ovn_chassis_current_encap_ip | length == 0
+  ansible.builtin.set_fact:
+    ovn_chassis_current_encap_ip: "{{ ovn_encap_ip }}"
+  changed_when: false
+
+- name: Set system chassis command prefix
+  ansible.builtin.set_fact:
+    ovn_chassis_exec_prefix: []
+  changed_when: false
+
+- name: Configure system chassis database
+  ansible.builtin.include_tasks: configure.yml
+
+- name: Gather service facts for system chassis
+  when: ansible_facts["service_mgr"] == 'systemd'
+  ansible.builtin.service_facts:
+
+- name: Set OVN controller service availability
+  ansible.builtin.set_fact:
+    ovn_chassis_has_controller_service: >-
+      {{ ansible_facts["service_mgr"] == 'systemd'
+         and 'ovn-controller.service'
+             in (ansible_facts.services | default({})) }}
+  changed_when: false
+
+- name: Find OVN control script
+  when: not ovn_chassis_has_controller_service
+  ansible.builtin.find:
+    paths:
+      - /usr
+      - /usr/local
+    patterns: ovn-ctl
+    file_type: file
+    recurse: true
+  register: ovn_chassis_ovn_ctl_find
+
+- name: Select OVN control script
+  when: not ovn_chassis_has_controller_service
+  ansible.builtin.set_fact:
+    ovn_chassis_system_ovn_ctl_path: >-
+      {{ (ovn_chassis_ovn_ctl_find.files
+          | map(attribute='path') | list | first) | default('') }}
+  changed_when: false
+
+- name: Verify OVN control script exists
+  when: not ovn_chassis_has_controller_service
+  ansible.builtin.assert:
+    that:
+      - ovn_chassis_system_ovn_ctl_path | length > 0
+    fail_msg: "Could not find ovn-ctl under /usr or /usr/local."
+
+- name: Start OVN controller via systemd
+  when: ovn_chassis_has_controller_service
+  ansible.builtin.service:
+    name: ovn-controller
+    state: started
+    enabled: true
+
+- name: Start OVN controller via control script
+  when: not ovn_chassis_has_controller_service
+  ansible.builtin.command:
+    argv:
+      - "{{ ovn_chassis_system_ovn_ctl_path }}"
+      - start_controller
+  changed_when: true
+
+- name: Wait for system OVN controller connection
+  ansible.builtin.command:
+    argv:
+      - ovn-appctl
+      - -t
+      - ovn-controller
+      - connection-status
+  retries: 10
+  delay: 2
+  register: ovn_chassis_controller_connected
+  until: ovn_chassis_controller_connected.stdout == "connected"
+  changed_when: false

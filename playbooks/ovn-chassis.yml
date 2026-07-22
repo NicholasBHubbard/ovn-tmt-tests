@@ -1,7 +1,7 @@
-- name: Set up OVN host
+- name: Set up OVN chassis
   hosts: all
   become: true
   roles:
     - ovn_install
     - ovs_setup
-    - ovn_host
+    - ovn_chassis
