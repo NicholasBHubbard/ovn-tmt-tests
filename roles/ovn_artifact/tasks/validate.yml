@@ -1,0 +1,85 @@
+- name: Load OVN artifact manifest
+  ansible.builtin.set_fact:
+    ovn_artifact_manifest: >-
+      {{ lookup('ansible.builtin.file', ovn_artifact_manifest_local_path)
+         | from_json }}
+  changed_when: false
+
+- name: Verify OVN artifact target compatibility
+  ansible.builtin.assert:
+    that:
+      - >-
+        ovn_artifact_manifest.distribution
+        == ovn_artifact_expected_distribution
+      - >-
+        ovn_artifact_manifest.distribution_version
+        == ovn_artifact_expected_distribution_version
+      - >-
+        ovn_artifact_manifest.architecture
+        == ovn_artifact_expected_architecture
+    fail_msg: "OVN artifact is incompatible with this host."
+
+- name: Verify OVN artifact build configuration
+  ansible.builtin.assert:
+    that:
+      - >-
+        ovn_artifact_manifest.ovn_git_repo
+        == (ovn_git_repo
+            | default('https://github.com/ovn-org/ovn.git'))
+      - >-
+        ovn_artifact_manifest.ovn_git_version
+        == (ovn_git_version
+            | default(ovn_git_branch | default('main')))
+      - ovn_artifact_manifest.ovn_cc == (ovn_cc | default(''))
+      - >-
+        ovn_artifact_manifest.ovn_configure_flags
+        == (ovn_configure_flags | default(''))
+      - >-
+        ovn_artifact_manifest.ovn_make_flags
+        == (ovn_make_flags | default(''))
+      - >-
+        ovn_artifact_manifest.ovn_werror
+        == (ovn_werror | default(false) | bool)
+      - >-
+        ovn_artifact_manifest.ovn_dpdk
+        == (ovn_dpdk | default(false) | bool)
+      - >-
+        ovn_artifact_manifest.ovn_dpdk_dir
+        == (ovn_dpdk_dir | default('/usr/local/dpdk'))
+      - >-
+        ovn_artifact_manifest.ovn_dpdk_version
+        == (ovn_dpdk_version | default(''))
+      - >-
+        ovn_artifact_manifest.ovn_dpdk_checksum
+        == (ovn_dpdk_checksum | default(''))
+      - >-
+        ovn_artifact_manifest.ovn_dpdk_drivers
+        == (ovn_dpdk_drivers | default(''))
+    fail_msg: "OVN artifact build configuration does not match the request."
+
+- name: Verify OVN artifact source revision
+  when: ovn_artifact_expected_revision | length > 0
+  ansible.builtin.assert:
+    that:
+      - ovn_artifact_manifest.ovn_revision == ovn_artifact_expected_revision
+    fail_msg: "OVN artifact source revision does not match the request."
+
+- name: Check local OVN artifact
+  become: false
+  delegate_to: localhost
+  ansible.builtin.stat:
+    path: "{{ ovn_artifact_local_path }}"
+    checksum_algorithm: sha256
+  register: ovn_artifact_local
+
+- name: Verify local OVN artifact checksum
+  ansible.builtin.assert:
+    that:
+      - ovn_artifact_local.stat.exists
+      - ovn_artifact_local.stat.checksum == ovn_artifact_manifest.sha256
+    fail_msg: "OVN artifact is missing or its checksum does not match."
+
+- name: Export OVN artifact identity
+  ansible.builtin.set_fact:
+    ovn_artifact_identity: "sha256:{{ ovn_artifact_manifest.sha256 }}"
+  changed_when: false

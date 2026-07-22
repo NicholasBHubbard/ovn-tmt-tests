@@ -1,63 +1,9 @@
-- name: Load OVN artifact manifest
-  ansible.builtin.set_fact:
-    ovn_artifact_manifest: >-
-      {{ lookup('ansible.builtin.file', ovn_artifact_manifest_local_path)
-         | from_json }}
-
-- name: Verify OVN artifact host compatibility
-  ansible.builtin.assert:
-    that:
-      - ovn_artifact_manifest.distribution == ansible_distribution
-      - >-
-        ovn_artifact_manifest.distribution_version
-        == ansible_distribution_version
-      - ovn_artifact_manifest.architecture == ansible_architecture
-    fail_msg: "OVN artifact is incompatible with this host."
-
-- name: Verify OVN artifact build configuration
-  ansible.builtin.assert:
-    that:
-      - ovn_artifact_manifest.ovn_git_repo == ovn_git_repo
-      - ovn_artifact_manifest.ovn_git_version == ovn_git_version
-      - ovn_artifact_manifest.ovn_cc == ovn_cc
-      - ovn_artifact_manifest.ovn_configure_flags == ovn_configure_flags
-      - ovn_artifact_manifest.ovn_make_flags == ovn_make_flags
-      - ovn_artifact_manifest.ovn_werror == (ovn_werror | bool)
-      - ovn_artifact_manifest.ovn_dpdk == (ovn_dpdk | bool)
-      - ovn_artifact_manifest.ovn_dpdk_dir == ovn_dpdk_dir
-      - ovn_artifact_manifest.ovn_dpdk_version == ovn_dpdk_version
-      - ovn_artifact_manifest.ovn_dpdk_checksum == ovn_dpdk_checksum
-      - ovn_artifact_manifest.ovn_dpdk_drivers == ovn_dpdk_drivers
-    fail_msg: "OVN artifact build configuration does not match the request."
-
-- name: Require an exact source revision for artifact reuse
-  when: not (ovn_artifact_build | bool)
-  ansible.builtin.assert:
-    that:
-      - ovn_artifact_expected_revision | length > 0
-    fail_msg: "Set ovn_artifact_expected_revision when reusing an OVN artifact."
-
-- name: Verify OVN artifact source revision
-  when: ovn_artifact_expected_revision | length > 0
-  ansible.builtin.assert:
-    that:
-      - ovn_artifact_manifest.ovn_revision == ovn_artifact_expected_revision
-    fail_msg: "OVN artifact source revision does not match the request."
-
-- name: Check local OVN artifact
-  become: false
-  delegate_to: localhost
-  ansible.builtin.stat:
-    path: "{{ ovn_artifact_local_path }}"
-    checksum_algorithm: sha256
-  register: ovn_artifact_local
-
-- name: Verify local OVN artifact checksum
-  ansible.builtin.assert:
-    that:
-      - ovn_artifact_local.stat.exists
-      - ovn_artifact_local.stat.checksum == ovn_artifact_manifest.sha256
-    fail_msg: "OVN artifact is missing or its checksum does not match."
+- name: Validate OVN artifact
+  ansible.builtin.include_role:
+    name: ovn_artifact
+    public: true
+  vars:
+    ovn_artifact_action: validate
 
 - name: Install DPDK runtime dependencies
   when: ovn_dpdk | bool

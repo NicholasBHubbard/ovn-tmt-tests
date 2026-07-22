@@ -147,12 +147,30 @@ for test in tests/ovn-multihost-*/test.sh; do
     fi
 done
 
-artifact_tasks=roles/ovn_install/tasks/artifact.yml
-checksum_line=$(grep -n -m1 '^- name: Verify local OVN artifact checksum' "$artifact_tasks" | cut -d: -f1)
-runtime_line=$(grep -n -m1 '^- name: Install DPDK runtime dependencies' "$artifact_tasks" | cut -d: -f1)
-if [ "$checksum_line" -ge "$runtime_line" ]; then
-    record_failure "OVN artifacts must pass checksum validation before installing runtime dependencies."
+assert_directory roles/ovn_artifact
+assert_file roles/ovn_artifact/defaults/main.yml
+assert_file roles/ovn_artifact/tasks/main.yml
+assert_file roles/ovn_artifact/tasks/build.yml
+assert_file roles/ovn_artifact/tasks/validate.yml
+assert_contains playbooks/ovn-build-artifact.yml '- role: ovn_artifact'
+assert_not_contains playbooks/ovn-build-artifact.yml \
+    '- name: Create OVN artifact'
+assert_contains roles/ovn_install/tasks/artifact.yml 'name: ovn_artifact'
+assert_contains roles/ovn_install/tasks/artifact.yml \
+    'ovn_artifact_action: validate'
+artifact_install_tasks=roles/ovn_install/tasks/artifact.yml
+validation_line=$(grep -n -m1 '^- name: Validate OVN artifact' \
+    "$artifact_install_tasks" | cut -d: -f1)
+runtime_line=$(grep -n -m1 '^- name: Install DPDK runtime dependencies' \
+    "$artifact_install_tasks" | cut -d: -f1)
+if [ -n "$validation_line" ] && [ -n "$runtime_line" ] && \
+   [ "$validation_line" -ge "$runtime_line" ]; then
+    record_failure "OVN artifacts must be validated before installing runtime dependencies."
 fi
+assert_contains roles/ovn_artifact/tasks/validate.yml \
+    '- name: Verify local OVN artifact checksum'
+assert_contains roles/ovn_artifact/tasks/validate.yml \
+    'ovn_artifact_identity:'
 
 artifact_manifest=$(mktemp)
 artifact_file=$(mktemp)
@@ -166,6 +184,19 @@ run_artifact_install() {
         -e ansible_distribution_version=2 \
         -e ansible_architecture=test \
         -e ovn_install_method=artifact \
+        -e ovn_artifact_manifest_local_path="$artifact_manifest" \
+        -e ovn_artifact_local_path="$artifact_file" \
+        "$@" \
+        > "$artifact_output" 2>&1
+}
+
+run_artifact_validation() {
+    ansible-playbook -i localhost, -c local \
+        tests/self/contracts/validate-artifact.yml \
+        -e ansible_become=false \
+        -e ovn_artifact_expected_distribution=test \
+        -e ovn_artifact_expected_distribution_version=2 \
+        -e ovn_artifact_expected_architecture=test \
         -e ovn_artifact_manifest_local_path="$artifact_manifest" \
         -e ovn_artifact_local_path="$artifact_file" \
         "$@" \
@@ -233,6 +264,21 @@ if run_artifact_install; then
     record_failure "OVN artifact installation accepted a bad checksum."
 elif ! grep -F -q 'OVN artifact is missing or its checksum does not match.' "$artifact_output"; then
     record_failure "OVN artifact installation did not report a checksum failure."
+fi
+
+artifact_checksum=$(sha256sum "$artifact_file" | cut -d ' ' -f1)
+printf '%s\n' \
+    "{\"distribution\":\"test\",\"distribution_version\":\"2\",\"architecture\":\"test\",\"ovn_git_repo\":\"https://github.com/ovn-org/ovn.git\",\"ovn_git_version\":\"main\",\"ovn_revision\":\"revision\",\"ovn_cc\":\"\",\"ovn_configure_flags\":\"\",\"ovn_make_flags\":\"\",\"ovn_werror\":false,\"ovn_dpdk\":false,\"ovn_dpdk_dir\":\"/usr/local/dpdk\",\"ovn_dpdk_version\":\"\",\"ovn_dpdk_checksum\":\"\",\"ovn_dpdk_drivers\":\"\",\"sha256\":\"$artifact_checksum\"}" \
+    > "$artifact_manifest"
+
+if ! run_artifact_validation; then
+    record_failure "A non-installing consumer could not validate an OVN artifact."
+fi
+
+if run_artifact_validation -e ovn_artifact_action=invalid; then
+    record_failure "OVN artifact role accepted an invalid action."
+elif ! grep -F -q 'ovn_artifact_action must be build or validate.' "$artifact_output"; then
+    record_failure "OVN artifact role did not report an invalid action."
 fi
 
 if ansible-playbook -i localhost, -c local playbooks/ovn-build-artifact.yml \

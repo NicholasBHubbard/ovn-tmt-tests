@@ -1,0 +1,149 @@
+- name: Check reused OVN artifact
+  when: not (ovn_artifact_build | bool)
+  become: false
+  delegate_to: localhost
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ ovn_artifact_local_path }}"
+    - "{{ ovn_artifact_manifest_local_path }}"
+  register: ovn_artifact_reused_files
+
+- name: Verify reused OVN artifact exists
+  when: not (ovn_artifact_build | bool)
+  ansible.builtin.assert:
+    that:
+      - ovn_artifact_reused_files.results | map(attribute='stat.exists') | min
+    fail_msg: "The requested reusable OVN artifact is missing."
+
+- name: Verify DPDK artifact identity is complete
+  when:
+    - ovn_artifact_build | bool
+    - ovn_dpdk | default(false) | bool
+  ansible.builtin.assert:
+    that:
+      - ovn_dpdk_version | default('') | length > 0
+      - ovn_dpdk_checksum | default('') | length > 0
+      - ovn_dpdk_drivers | default('') | length > 0
+    fail_msg: >-
+      Set ovn_dpdk_version, ovn_dpdk_checksum and ovn_dpdk_drivers
+      when building a DPDK artifact.
+
+- name: Create controller artifact directory
+  when: ovn_artifact_build | bool
+  become: false
+  delegate_to: localhost
+  ansible.builtin.file:
+    path: "{{ ovn_artifact_local_path | dirname }}"
+    state: directory
+    mode: "0755"
+
+- name: Reset OVN artifact staging directory
+  when: ovn_artifact_build | bool
+  ansible.builtin.file:
+    path: "{{ ovn_artifact_staging_dir }}"
+    state: absent
+
+- name: Build DPDK for OVN artifact
+  when:
+    - ovn_artifact_build | bool
+    - ovn_dpdk | default(false) | bool
+  ansible.builtin.include_role:
+    name: dpdk_build
+  vars:
+    dpdk_version: "{{ ovn_dpdk_version }}"
+    dpdk_checksum: "{{ ovn_dpdk_checksum }}"
+    dpdk_drivers: "{{ ovn_dpdk_drivers }}"
+    dpdk_install_dir: "{{ ovn_dpdk_dir | default('/usr/local/dpdk') }}"
+
+- name: Build OVN into artifact staging directory
+  when: ovn_artifact_build | bool
+  ansible.builtin.include_role:
+    name: ovn_install
+    public: true
+  vars:
+    ovn_install_method: git
+    ovn_install_destdir: "{{ ovn_artifact_staging_dir }}"
+
+- name: Read built OVN revision
+  when: ovn_artifact_build | bool
+  ansible.builtin.command:
+    argv:
+      - git
+      - -C
+      - "{{ ovn_source_dir }}"
+      - rev-parse
+      - HEAD
+  register: ovn_artifact_revision
+  changed_when: false
+
+- name: Read built OVS revision
+  when: ovn_artifact_build | bool
+  ansible.builtin.command:
+    argv:
+      - git
+      - -C
+      - "{{ ovn_source_dir }}/ovs"
+      - rev-parse
+      - HEAD
+  register: ovn_artifact_ovs_revision
+  changed_when: false
+
+- name: Create OVN artifact
+  when: ovn_artifact_build | bool
+  ansible.builtin.command:
+    argv:
+      - tar
+      - -C
+      - "{{ ovn_artifact_staging_dir }}"
+      - -czf
+      - "{{ ovn_artifact_remote_path }}"
+      - .
+  changed_when: true
+
+- name: Read OVN artifact checksum
+  when: ovn_artifact_build | bool
+  ansible.builtin.stat:
+    path: "{{ ovn_artifact_remote_path }}"
+    checksum_algorithm: sha256
+  register: ovn_artifact_remote
+
+- name: Create OVN artifact manifest
+  when: ovn_artifact_build | bool
+  ansible.builtin.copy:
+    content: |
+      {{ {
+        'distribution': ansible_distribution,
+        'distribution_version': ansible_distribution_version,
+        'architecture': ansible_architecture,
+        'ovn_git_repo': ovn_git_repo,
+        'ovn_git_version': ovn_git_version,
+        'ovn_revision': ovn_artifact_revision.stdout,
+        'ovs_revision': ovn_artifact_ovs_revision.stdout,
+        'ovn_cc': ovn_cc,
+        'ovn_configure_flags': ovn_configure_flags,
+        'ovn_make_flags': ovn_make_flags,
+        'ovn_werror': ovn_werror | bool,
+        'ovn_dpdk': ovn_dpdk | bool,
+        'ovn_dpdk_dir': ovn_dpdk_dir,
+        'ovn_dpdk_version': ovn_dpdk_version,
+        'ovn_dpdk_checksum': ovn_dpdk_checksum,
+        'ovn_dpdk_drivers': ovn_dpdk_drivers,
+        'sha256': ovn_artifact_remote.stat.checksum
+      } | to_nice_json }}
+    dest: "{{ ovn_artifact_manifest_remote_path }}"
+    mode: "0644"
+
+- name: Fetch OVN artifact
+  when: ovn_artifact_build | bool
+  ansible.builtin.fetch:
+    src: "{{ ovn_artifact_remote_path }}"
+    dest: "{{ ovn_artifact_local_path }}"
+    flat: true
+
+- name: Fetch OVN artifact manifest
+  when: ovn_artifact_build | bool
+  ansible.builtin.fetch:
+    src: "{{ ovn_artifact_manifest_remote_path }}"
+    dest: "{{ ovn_artifact_manifest_local_path }}"
+    flat: true

@@ -1,0 +1,22 @@
+# Build creates or reuses an artifact before validating it. Validate only
+# inspects an existing artifact and does not modify the target host.
+ovn_artifact_action: validate
+ovn_artifact_name: ovn
+ovn_artifact_build: true
+# Reuse requires the exact resolved OVN revision and a matching manifest.
+ovn_artifact_expected_revision: ""
+ovn_artifact_cache_dir: ""
+ovn_artifact_staging_dir: "/var/tmp/{{ ovn_artifact_name }}-root"
+ovn_artifact_remote_path: "/var/tmp/{{ ovn_artifact_name }}.tar.gz"
+ovn_artifact_manifest_remote_path: "/var/tmp/{{ ovn_artifact_name }}.json"
+ovn_artifact_local_path: >-
+  {{ ovn_artifact_cache_dir | default(inventory_dir, true) }}/{{ ovn_artifact_name }}.tar.gz
+ovn_artifact_manifest_local_path: >-
+  {{ ovn_artifact_cache_dir | default(inventory_dir, true) }}/{{ ovn_artifact_name }}.json
+
+# System installation uses the target's facts. Image and VM builders may set
+# these to the identity of the filesystem that will consume the artifact.
+ovn_artifact_expected_distribution: "{{ ansible_distribution }}"
+ovn_artifact_expected_distribution_version: >-
+  {{ ansible_distribution_version }}
+ovn_artifact_expected_architecture: "{{ ansible_architecture }}"

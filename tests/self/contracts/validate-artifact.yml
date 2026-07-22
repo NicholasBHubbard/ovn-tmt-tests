@@ -1,0 +1,13 @@
+- name: Validate an OVN artifact without installing it
+  hosts: all
+  gather_facts: false
+  roles:
+    - role: ovn_artifact
+      ovn_artifact_action: validate
+  post_tasks:
+    - name: Verify stable OVN artifact identity
+      ansible.builtin.assert:
+        that:
+          - >-
+            ovn_artifact_identity
+            == 'sha256:' ~ ovn_artifact_manifest.sha256

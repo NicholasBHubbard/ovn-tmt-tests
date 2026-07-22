@@ -1,0 +1,19 @@
+- name: Verify OVN artifact action
+  ansible.builtin.assert:
+    that:
+      - ovn_artifact_action in ['build', 'validate']
+    fail_msg: "ovn_artifact_action must be build or validate."
+
+- name: Require an exact source revision for artifact reuse
+  when: not (ovn_artifact_build | bool)
+  ansible.builtin.assert:
+    that:
+      - ovn_artifact_expected_revision | length > 0
+    fail_msg: "Set ovn_artifact_expected_revision when reusing an OVN artifact."
+
+- name: Build or reuse OVN artifact
+  when: ovn_artifact_action == 'build'
+  ansible.builtin.include_tasks: build.yml
+
+- name: Validate OVN artifact
+  ansible.builtin.include_tasks: validate.yml
