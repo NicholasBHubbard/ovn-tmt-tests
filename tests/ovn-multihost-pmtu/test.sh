@@ -2,6 +2,7 @@
 set -euo pipefail
 
 source "$TMT_TREE/tests/lib/multihost.sh"
+multihost_run_playbook "$PWD/setup.yml"
 
 case "$OVN_TEST_ENCAP" in
     geneve) system_interface=genev_sys_6081; expected_mtu=942 ;;

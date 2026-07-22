@@ -2,6 +2,7 @@
 set -euo pipefail
 
 source "$TMT_TREE/tests/lib/multihost.sh"
+multihost_run_playbook "$PWD/setup.yml"
 
 wait_for_mac_binding() {
     local address=$1

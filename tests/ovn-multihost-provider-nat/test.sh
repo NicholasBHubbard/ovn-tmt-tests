@@ -2,6 +2,7 @@
 set -euo pipefail
 
 source "$TMT_TREE/tests/lib/multihost.sh"
+multihost_run_playbook "$PWD/setup.yml"
 
 restore_provider_localnet() {
     ovn-nbctl --may-exist lsp-add npl-public npl-localnet \

@@ -2,6 +2,7 @@
 set -euo pipefail
 
 source "$TMT_TREE/tests/lib/multihost.sh"
+multihost_run_playbook "$PWD/setup.yml"
 
 server_code='import socket
 s=socket.socket()

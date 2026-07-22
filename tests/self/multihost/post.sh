@@ -9,6 +9,63 @@ cd_repo_root
 inventory=$(mktemp)
 trap 'rm -f "$inventory"' EXIT
 
+echo "Checking test-scoped Ansible setup..."
+multihost_run_playbook "$TMT_TREE/tests/self/multihost/test-setup.yml"
+if ! grep -Fq 'TASK [Confirm test-scoped setup reaches each guest]' \
+    "$TMT_TEST_DATA/setup.log"; then
+    record_failure "Test-scoped setup log did not contain the Ansible task output"
+fi
+for guest in $TMT_GUEST_NAMES; do
+    guest_log="$TMT_TEST_DATA/setup-$guest.log"
+    if ! grep -Fq 'TASK [Confirm test-scoped setup reaches each guest]' \
+        "$guest_log"; then
+        record_failure "Test-scoped setup did not retain the $guest Ansible log"
+    fi
+    recap_hosts=$(awk '$2 == ":" && $3 ~ /^ok=/ { print $1 }' "$guest_log")
+    if [ "$recap_hosts" != "$guest" ]; then
+        record_failure "$guest setup log contains other guests: $recap_hosts"
+    fi
+done
+
+echo "Checking top-down debug arguments..."
+debug_args=$(mktemp)
+debug_log=$(mktemp)
+if ! (
+    ansible-playbook() {
+        printf '%s\n' "$*" > "$debug_args"
+    }
+    MULTIHOST_SETUP_LOG=$debug_log OVN_TEST_DEBUG=true multihost_run_playbook \
+        "$TMT_TREE/tests/self/multihost/test-setup.yml"
+); then
+    record_failure "Debug playbook invocation failed"
+elif ! grep -Eq '(^| )-vvv( |$)' "$debug_args"; then
+    record_failure "OVN_TEST_DEBUG=true did not enable Ansible -vvv output"
+fi
+rm -f "$debug_args" "$debug_log" "${debug_log%.log}"-*.log
+
+echo "Checking test-scoped setup failure propagation..."
+failure_log=$(mktemp)
+if (
+    ansible-playbook() {
+        return 42
+    }
+    MULTIHOST_SETUP_LOG=$failure_log multihost_run_playbook \
+        "$TMT_TREE/tests/self/multihost/test-setup.yml"
+); then
+    record_failure "Test-scoped setup ignored an Ansible failure"
+elif [ "$?" -ne 42 ]; then
+    record_failure "Test-scoped setup did not preserve the Ansible failure status"
+fi
+rm -f "$failure_log" "${failure_log%.log}"-*.log
+
+echo "Checking top-down shell tracing..."
+if ! trace_output=$(OVN_TEST_DEBUG=true bash -c \
+    'source "$TMT_TREE/tests/lib/multihost.sh"; echo trace-marker' 2>&1); then
+    record_failure "Debug shell tracing failed"
+elif ! grep -Eq '^\+ .*echo trace-marker$' <<< "$trace_output"; then
+    record_failure "OVN_TEST_DEBUG=true did not enable shell tracing"
+fi
+
 echo "Checking OVN central services..."
 assert_process_present ovsdb-server
 assert_process_present ovn-northd

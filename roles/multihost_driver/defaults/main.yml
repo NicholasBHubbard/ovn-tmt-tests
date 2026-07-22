@@ -5,6 +5,8 @@ multihost_driver_controller_public_key_path: >-
   {{ inventory_dir }}/multihost-driver.pub
 multihost_driver_package_names:
   dnf:
+    - ansible-core
     - openssh-clients
   apt:
+    - ansible-core
     - openssh-client

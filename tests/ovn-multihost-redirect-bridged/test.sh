@@ -2,6 +2,7 @@
 set -euo pipefail
 
 source "$TMT_TREE/tests/lib/multihost.sh"
+multihost_run_playbook "$PWD/setup.yml"
 
 redirect_type=$(ovn-nbctl --bare get Logical_Router_Port rr-public options:redirect-type)
 if [ "$redirect_type" != bridged ]; then

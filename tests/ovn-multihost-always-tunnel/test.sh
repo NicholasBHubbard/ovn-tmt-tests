@@ -2,6 +2,7 @@
 set -euo pipefail
 
 source "$TMT_TREE/tests/lib/multihost.sh"
+multihost_run_playbook "$PWD/setup.yml"
 
 run_traffic() {
     multihost_ns_exec compute-1 at-vm1 ping -q -c 3 -W 2 10.60.0.4

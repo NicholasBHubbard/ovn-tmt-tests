@@ -16,6 +16,7 @@ environment:
   OVN_GIT_VERSION: main
   OVN_MAKE_FLAGS: ""
   OVN_SOURCE_DIR: /usr/src/ovn
+  OVN_TEST_DEBUG: "false"
   OVN_WERROR: "true"
 
 prepare:

@@ -17,12 +17,6 @@ provision:
     image: fedora
     connection: system
 
-prepare+:
-  - name: Set up logical-switch test scenario
-    how: ansible
-    order: 80
-    playbook: tests/ovn-multihost-connectivity/setup.yml
-
 discover:
   how: fmf
   where: [central]

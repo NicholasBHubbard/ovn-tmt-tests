@@ -2,6 +2,7 @@
 set -euo pipefail
 
 source "$TMT_TREE/tests/lib/multihost.sh"
+multihost_run_playbook "$PWD/setup.yml"
 
 set_requested_chassis() {
     ovn-nbctl --wait=hv set Logical_Switch_Port mig-port \

@@ -2,6 +2,7 @@
 set -euo pipefail
 
 source "$TMT_TREE/tests/lib/multihost.sh"
+multihost_run_playbook "$PWD/setup.yml"
 
 multihost_exec compute-1 ip netns exec sw0p1 true
 multihost_exec compute-2 ip netns exec sw0p2 true

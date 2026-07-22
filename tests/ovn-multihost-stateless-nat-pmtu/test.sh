@@ -2,6 +2,7 @@
 set -euo pipefail
 
 source "$TMT_TREE/tests/lib/multihost.sh"
+multihost_run_playbook "$PWD/setup.yml"
 
 multihost_wait_for_ping compute-1 snat-internal 172.19.1.2
 multihost_ns_exec gateway-1 snat-router \

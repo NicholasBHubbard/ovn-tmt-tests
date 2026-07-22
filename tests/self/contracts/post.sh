@@ -102,11 +102,19 @@ assert_contains "$multihost_parent" '-e ovn_artifact_build=$OVN_ARTIFACT_BUILD'
 assert_contains "$multihost_parent" '-e ovn_artifact_expected_revision=$OVN_ARTIFACT_EXPECTED_REVISION'
 assert_contains "$multihost_parent" "-e ovn_git_repo=\$OVN_GIT_REPO"
 assert_contains "$multihost_parent" "-e ovn_git_version=\$OVN_GIT_VERSION"
+assert_contains "$multihost_parent" 'OVN_TEST_DEBUG: "false"'
 
 for plan in plans/ovn-multihost/*.fmf; do
     [ "$plan" = "$multihost_parent" ] && continue
-    assert_contains "$plan" 'prepare+:'
     assert_not_contains "$plan" 'playbook: playbooks/multihost.yml'
+done
+
+for test in tests/ovn-multihost-*/test.sh; do
+    assert_contains "$test" 'multihost_run_playbook "$PWD/setup.yml"'
+    setup=${test%/test.sh}/setup.yml
+    if grep -F -q "playbook: $setup" plans/ovn-multihost/*.fmf; then
+        record_failure "Test-scoped setup must not also run as plan preparation: $setup"
+    fi
 done
 
 artifact_tasks=roles/ovn_install/tasks/artifact.yml
