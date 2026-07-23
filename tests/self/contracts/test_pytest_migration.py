@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import yaml
+
 
 ROOT = Path(__file__).parents[3]
 SELF_TESTS = ROOT / "tests" / "self"
@@ -28,6 +30,23 @@ def test_self_test_metadata_runs_pytest():
     assert metadata
     for path in metadata:
         assert "python3 -m pytest" in path.read_text(), path
+
+
+def test_self_test_python_dependencies_support_rpm_and_deb():
+    metadata = yaml.safe_load((SELF_TESTS / "main.fmf").read_text())
+
+    assert metadata["require"] == ["python3-pytest"]
+    assert metadata["recommend"] == ["python3-pyyaml", "python3-yaml"]
+
+
+def test_self_test_suite_dependencies_extend_parent():
+    replacements = [
+        path
+        for path in SELF_TESTS.glob("*/main.fmf")
+        if "require" in yaml.safe_load(path.read_text())
+    ]
+
+    assert not replacements
 
 
 def test_self_test_plans_do_not_run_shell_files():

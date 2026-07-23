@@ -78,7 +78,10 @@ class Runner:
         return self.run("ip", "netns", "exec", namespace, *command, **options)
 
     def succeeds(self, *command, **options):
-        return self.run(*command, check=False, **options).returncode == 0
+        try:
+            return self.run(*command, check=False, **options).returncode == 0
+        except FileNotFoundError:
+            return False
 
     def wait(
         self,

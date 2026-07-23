@@ -2,7 +2,7 @@ summary: Verify multi-host OVN topology is correctly configured
 test: python3 -m pytest -q -s ./test.py::TestResult
 framework: shell
 duration: 10m
-require:
+require+:
   - ansible-core
   - ansible-collection-ansible-posix
   - ansible-collection-community-general

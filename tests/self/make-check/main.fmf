@@ -2,6 +2,6 @@ summary: Verify make_check role
 test: python3 -m pytest -q -s ./test.py::TestResult
 framework: shell
 duration: 5m
-require:
+require+:
   - ansible-core
   - ansible-collection-community-general

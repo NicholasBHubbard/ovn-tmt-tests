@@ -62,6 +62,13 @@ def test_runner_reports_command_success():
     assert not runner.succeeds("false")
 
 
+def test_runner_reports_missing_commands_as_unsuccessful():
+    def execute(command, **kwargs):
+        raise FileNotFoundError(command[0])
+
+    assert not Runner(execute=execute).succeeds("missing")
+
+
 def test_runner_does_not_require_topology_for_local_commands():
     runner = Runner(
         execute=lambda command, **kwargs: subprocess.CompletedProcess(

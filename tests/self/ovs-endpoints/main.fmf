@@ -2,6 +2,6 @@ summary: Verify direct OVS endpoint lifecycle
 test: python3 -m pytest -q -s ./test.py::TestResult
 framework: shell
 duration: 5m
-require:
+require+:
   - iproute
   - iputils
