@@ -294,6 +294,86 @@ elif ! grep -F -q 'The requested reusable OVN artifact is missing.' "$artifact_o
     record_failure "OVN artifact reuse did not report a missing artifact."
 fi
 
+scale_plan=plans/ovn-multihost/scale-density-light.fmf
+scale_test=tests/ovn-scale-density-light/test.sh
+assert_file "$scale_plan"
+assert_file tests/ovn-scale-density-light/main.fmf
+assert_file "$scale_test"
+assert_executable "$scale_test"
+assert_contains "$scale_plan" 'environment+:'
+assert_contains "$scale_plan" 'OVN_SCALE_INITIAL_PORTS:'
+assert_contains "$scale_plan" 'OVN_SCALE_ITERATIONS:'
+assert_contains "$scale_plan" 'OVN_SCALE_TIMEOUT:'
+assert_contains "$scale_plan" 'OVN_SCALE_IPV4:'
+assert_contains "$scale_plan" 'OVN_SCALE_IPV6:'
+assert_contains "$scale_plan" 'OVN_SCALE_MTU:'
+assert_contains "$scale_plan" '/tests/ovn-scale-density-light'
+assert_contains "$scale_test" 'ovn-nbctl --wait=hv'
+assert_contains "$scale_test" 'metrics.csv'
+assert_contains "$scale_test" 'scale_cleanup'
+scale_tracking_line=$(grep -n -m1 'SCALE_ENDPOINT_GUESTS\[index\]=' \
+    "$scale_test" | cut -d: -f1)
+scale_mutation_line=$(grep -n -m1 'ovn-nbctl --may-exist lsp-add' \
+    "$scale_test" | cut -d: -f1)
+if [ -n "$scale_tracking_line" ] && [ -n "$scale_mutation_line" ] && \
+   [ "$scale_tracking_line" -ge "$scale_mutation_line" ]; then
+    record_failure "Scale cleanup must track an endpoint before creating it."
+fi
+
+if [ -f "$scale_test" ]; then
+    # shellcheck disable=SC1090
+    source "$scale_test"
+
+    if ! scale_validate_config 2 1 60 true false 2; then
+        record_failure "Valid scale workload configuration was rejected."
+    fi
+    if ! scale_validate_config 2 1 60 false true 2; then
+        record_failure "Valid IPv6-only scale workload configuration was rejected."
+    fi
+    if ! scale_validate_config 65533 1 60 true true 2; then
+        record_failure "The scale workload rejected its address-space boundary."
+    fi
+    if scale_validate_config 1 1 60 true true 2; then
+        record_failure "Scale workload accepted fewer initial ports than chassis."
+    fi
+    if scale_validate_config 2 0 60 true true 2; then
+        record_failure "Scale workload accepted zero measured iterations."
+    fi
+    if scale_validate_config 2 1 60 false false 2; then
+        record_failure "Scale workload accepted both IP families being disabled."
+    fi
+    if scale_validate_config 2 1 60 maybe true 2; then
+        record_failure "Scale workload accepted an invalid boolean."
+    fi
+    if scale_validate_config 2 1 0 true true 2; then
+        record_failure "Scale workload accepted a zero timeout."
+    fi
+    if scale_validate_config 2 1 60 true true 1; then
+        record_failure "Scale workload accepted fewer than two chassis."
+    fi
+    if scale_validate_config 65534 1 60 true true 2; then
+        record_failure "Scale workload accepted more endpoints than its address space."
+    fi
+    if scale_validate_config 18446744073709551618 1 60 true true 2; then
+        record_failure "Scale workload accepted an overflowing endpoint count."
+    fi
+    if ! scale_validate_mtu 576 false || scale_validate_mtu 575 false || \
+       ! scale_validate_mtu 1280 true || scale_validate_mtu 1279 true || \
+       ! scale_validate_mtu 65535 true || scale_validate_mtu 65536 true || \
+       scale_validate_mtu 18446744073709552192 false || \
+       scale_validate_mtu invalid false; then
+        record_failure "Scale workload MTU boundaries are incorrect."
+    fi
+
+    if [ "$(scale_endpoint_name 0)" != dl00000 ] || \
+       [ "$(scale_host_interface 0)" != dl00000-p ] || \
+       [ "$(scale_mac 0)" != 02:00:00:00:00:01 ] || \
+       [ "$(scale_ipv4 0)" != 10.240.0.1 ] || \
+       [ "$(scale_ipv6 0)" != fd00:240::1 ]; then
+        record_failure "Scale endpoint identity is not deterministic."
+    fi
+fi
+
 if (
     ASSERT_FAILURES=0
     ss() {

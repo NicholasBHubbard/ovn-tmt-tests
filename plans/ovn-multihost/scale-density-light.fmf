@@ -1,0 +1,41 @@
+summary: Measure incremental OVN logical port convergence
+
+environment+:
+  OVN_SCALE_INITIAL_PORTS: "2"
+  OVN_SCALE_ITERATIONS: "3"
+  OVN_SCALE_TIMEOUT: "60"
+  OVN_SCALE_IPV4: "true"
+  OVN_SCALE_IPV6: "true"
+  OVN_SCALE_MTU: "1342"
+
+provision:
+  - name: central
+    role: central
+    how: virtual
+    image: fedora
+    connection: system
+  - name: compute-1
+    role: compute
+    how: virtual
+    image: fedora
+    connection: system
+  - name: compute-2
+    role: compute
+    how: virtual
+    image: fedora
+    connection: system
+
+prepare+:
+  - name: Install scale workload dependencies
+    how: install
+    order: 20
+    where: [compute]
+    package:
+      - iproute
+      - iputils
+
+discover:
+  how: fmf
+  where: [central]
+  test:
+    - /tests/ovn-scale-density-light

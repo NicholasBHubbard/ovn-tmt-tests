@@ -1,0 +1,4 @@
+summary: Measure logical port convergence
+test: ./test.sh
+framework: shell
+duration: 10m
