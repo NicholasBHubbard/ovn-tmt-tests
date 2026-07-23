@@ -1,4 +1,4 @@
 summary: Verify repository test contracts
-test: ./post.sh
+test: python3 -m pytest -q -s .
 framework: shell
-duration: 1m
+duration: 5m

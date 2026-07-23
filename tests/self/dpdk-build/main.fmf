@@ -1,4 +1,4 @@
 summary: Verify DPDK is built and installed
-test: ./post.sh
+test: python3 -m pytest -q -s ./test.py::TestResult
 framework: shell
 duration: 5m

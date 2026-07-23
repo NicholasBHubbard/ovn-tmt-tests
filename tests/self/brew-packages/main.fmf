@@ -1,4 +1,4 @@
 summary: Verify homebrew package installation
-test: ./post.sh
+test: python3 -m pytest -q -s ./test.py::TestResult
 framework: shell
 duration: 5m

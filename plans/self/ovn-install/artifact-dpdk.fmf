@@ -17,11 +17,13 @@ provision:
 prepare:
   - name: Check clean guests
     how: shell
-    script: ./tests/self/ovn-install/pre.sh
+    order: 80
+    script: python3 -m pytest -q -s ./tests/self/ovn-install/test.py::TestPreconditions
 
   - name: Build DPDK artifact
     how: ansible
     where: [builder]
+    order: 90
     playbook: playbooks/ovn-build-artifact.yml
     extra-args: >-
       -e ovn_artifact_builder_hosts=all
@@ -37,6 +39,7 @@ prepare:
   - name: Install DPDK artifact
     how: ansible
     where: [builder, consumer]
+    order: 100
     playbook: playbooks/ovn-install.yml
     extra-args: >-
       -e ovn_install_method=artifact

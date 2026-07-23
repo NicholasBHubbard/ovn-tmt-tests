@@ -16,7 +16,10 @@ prepare:
     extra-args: '-e ovn_install_method=distro -e ovs_setup_install_method=distro'
   - name: Check OVN chassis preconditions
     how: shell
-    script: ./tests/self/ovn-chassis/pre.sh
+    order: 78
+    script: >-
+      python3 -m pytest -q -s
+      ./tests/self/ovn-chassis/test.py::TestPreconditions
   - name: Set up OVN chassis
     how: ansible
     order: 80
@@ -24,7 +27,9 @@ prepare:
   - name: Verify initial gateway configuration
     how: shell
     order: 81
-    script: ./tests/self/ovn-chassis/verify-initial.sh
+    script: >-
+      python3 -m pytest -q -s
+      ./tests/self/ovn-chassis/test.py::TestInitial
   - name: Reconfigure OVN gateway
     how: ansible
     order: 82
@@ -32,7 +37,9 @@ prepare:
   - name: Verify reconfigured gateway
     how: shell
     order: 83
-    script: ./tests/self/ovn-chassis/verify-reconfigured.sh
+    script: >-
+      python3 -m pytest -q -s
+      ./tests/self/ovn-chassis/test.py::TestReconfigured
   - name: Clear OVN gateway configuration
     how: ansible
     order: 84
@@ -44,48 +51,64 @@ prepare:
   - name: Verify invalid chassis configurations are rejected
     how: shell
     order: 86
-    script: ./tests/self/ovn-chassis/verify-invalid.sh
+    script: >-
+      python3 -m pytest -q -s
+      ./tests/self/ovn-chassis/test.py::TestInvalid
   - name: Build synthetic chassis image
-    how: shell
+    how: ansible
     order: 87
-    script: ./tests/self/ovn-chassis/build-container.sh
+    playbook: tests/self/ovn-chassis/build-container.yml
   - name: Create synthetic chassis
     how: ansible
     order: 88
     playbook: tests/self/ovn-chassis/multi.yml
+  - name: Create synthetic chassis packet topology
+    how: ansible
+    order: 89
+    playbook: tests/self/ovn-chassis/traffic.yml
   - name: Verify synthetic chassis traffic
     how: shell
-    order: 89
-    script: ./tests/self/ovn-chassis/verify-multi.sh
+    order: 90
+    script: >-
+      python3 -m pytest -q -s
+      ./tests/self/ovn-chassis/test.py::TestMulti
   - name: Reconfigure synthetic chassis
     how: ansible
-    order: 90
+    order: 91
     playbook: tests/self/ovn-chassis/multi-reconfigure.yml
   - name: Verify synthetic chassis reconfiguration
     how: shell
-    order: 91
-    script: ./tests/self/ovn-chassis/verify-multi-reconfigured.sh
+    order: 92
+    script: >-
+      python3 -m pytest -q -s
+      ./tests/self/ovn-chassis/test.py::TestMultiReconfigured
   - name: Record retained chassis start time
     how: shell
-    order: 92
-    script: ./tests/self/ovn-chassis/record-container.sh
+    order: 93
+    script: >-
+      python3 -m pytest -q -s
+      ./tests/self/ovn-chassis/test.py::TestRecordContainer
   - name: Reapply synthetic chassis configuration
     how: ansible
-    order: 93
+    order: 94
     playbook: tests/self/ovn-chassis/multi-reconfigure.yml
   - name: Verify idempotent synthetic chassis reapplication
     how: shell
-    order: 94
-    script: ./tests/self/ovn-chassis/verify-multi-reconfigured.sh
-  - name: Replace the synthetic chassis image
-    how: shell
     order: 95
-    script: ./tests/self/ovn-chassis/update-container-image.sh
-  - name: Apply the replacement chassis image
+    script: >-
+      python3 -m pytest -q -s
+      ./tests/self/ovn-chassis/test.py::TestMultiReconfigured
+  - name: Replace the synthetic chassis image
     how: ansible
     order: 96
+    playbook: tests/self/ovn-chassis/update-container-image.yml
+  - name: Apply the replacement chassis image
+    how: ansible
+    order: 97
     playbook: tests/self/ovn-chassis/multi-reconfigure.yml
   - name: Verify chassis image replacement
     how: shell
-    order: 97
-    script: ./tests/self/ovn-chassis/verify-image-refresh.sh
+    order: 98
+    script: >-
+      python3 -m pytest -q -s
+      ./tests/self/ovn-chassis/test.py::TestImageRefresh

@@ -2,7 +2,10 @@ summary: Verify repository test contracts
 
 prepare:
   - how: shell
-    script: ./tests/self/contracts/pre.sh
+    order: 80
+    script: >-
+      python3 -m pytest -q -s
+      ./tests/self/contracts/test_repository.py::TestPreconditions
 
 provision:
   how: local

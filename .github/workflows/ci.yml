@@ -17,6 +17,22 @@ permissions:
   contents: read
 
 jobs:
+  python:
+    name: Python checks
+    runs-on: ubuntu-26.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Install Python tooling
+        run: pip install ansible-core pytest pyyaml ruff
+
+      - name: Run Python checks
+        run: |
+          ruff check --show-fixes tests/lib/ovn_test tests/ovn-scale tests/self
+          ruff format --check tests/lib/ovn_test tests/ovn-scale tests/self
+          PYTHONPATH=tests/lib pytest -q tests/self/contracts
+
   actionlint:
     name: GitHub Actions lint
     runs-on: ubuntu-26.04
@@ -159,9 +175,12 @@ jobs:
         run: |
           pipx install ansible-core
           ansible-galaxy collection install ansible.posix community.general
+          python3 -m pip install --user --break-system-packages pytest pyyaml
 
       - name: Run pre-check
-        run: ./tests/self/brew-packages/pre.sh
+        run: >-
+          python3 -m pytest -q -s
+          ./tests/self/brew-packages/test.py::TestPreconditions
         env:
           TMT_TREE: ${{ github.workspace }}
 
@@ -169,6 +188,8 @@ jobs:
         run: ansible-playbook -c local -i localhost, tests/self/brew-packages/install.yml
 
       - name: Run post-check
-        run: ./tests/self/brew-packages/post.sh
+        run: >-
+          python3 -m pytest -q -s
+          ./tests/self/brew-packages/test.py::TestResult
         env:
           TMT_TREE: ${{ github.workspace }}

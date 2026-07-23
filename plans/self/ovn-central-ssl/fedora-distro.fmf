@@ -6,9 +6,15 @@ provision:
 
 prepare:
   - how: shell
-    script: ./tests/self/ovn-central-ssl/pre.sh
-  - how: shell
-    script: ./tests/self/ovn-central-ssl/prepare.sh
+    order: 80
+    script: python3 -m pytest -q -s ./tests/self/ovn-central-ssl/test.py::TestPreconditions
   - how: ansible
+    order: 90
+    playbook: tests/self/ovn-central-ssl/prepare.yml
+  - how: shell
+    order: 100
+    script: python3 -m pytest -q -s ./tests/self/ovn-central-ssl/test.py::TestCredentials
+  - how: ansible
+    order: 110
     playbook: playbooks/ovn-central.yml
     extra-args: '-e ovn_install_method=distro -e ovs_setup_install_method=distro -e ovn_central_ssl_enabled=true'

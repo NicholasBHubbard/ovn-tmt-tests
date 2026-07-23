@@ -5,6 +5,8 @@ provision:
 
 prepare:
   - how: shell
-    script: ./tests/self/brew-packages/pre.sh
+    order: 80
+    script: python3 -m pytest -q -s ./tests/self/brew-packages/test.py::TestPreconditions
   - how: ansible
+    order: 90
     playbook: tests/self/brew-packages/install.yml

@@ -1,0 +1,23 @@
+- name: Prepare make-check fixture
+  hosts: all
+  become: true
+  tasks:
+    - name: Install make
+      ansible.builtin.package:
+        name: make
+        state: present
+
+    - name: Create make-check workspace
+      ansible.builtin.file:
+        path: /tmp/make-check-workspace
+        state: directory
+        mode: "0755"
+
+    - name: Create make-check fixture
+      ansible.builtin.copy:
+        dest: /tmp/make-check-workspace/Makefile
+        mode: "0644"
+        content: |
+          check:
+          {{ "%c" | format(9) }}test "$(PWD)" = "/tmp/make-check-workspace"
+          {{ "%c" | format(9) }}touch /tmp/make-check-passed

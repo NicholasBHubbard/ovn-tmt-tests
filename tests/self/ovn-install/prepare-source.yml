@@ -1,0 +1,17 @@
+- name: Prepare OVN source fixture
+  hosts: all
+  become: true
+  tasks:
+    - name: Install git
+      ansible.builtin.package:
+        name: git
+        state: present
+
+    - name: Clone OVN source
+      ansible.builtin.git:
+        repo: https://github.com/ovn-org/ovn.git
+        dest: /usr/src/ovn
+        depth: 1
+        single_branch: true
+        recursive: true
+        version: main

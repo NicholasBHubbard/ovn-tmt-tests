@@ -1,0 +1,4 @@
+summary: Measure logical port and service convergence
+test: PYTHONPATH="$TMT_TREE/tests/lib" python3 -m pytest -q -s ./test.py
+framework: shell
+duration: 10m

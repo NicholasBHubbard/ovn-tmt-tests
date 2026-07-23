@@ -1,0 +1,64 @@
+- name: Build synthetic chassis images
+  hosts: all
+  become: true
+  tasks:
+    - name: Create synthetic chassis build directory
+      ansible.builtin.file:
+        path: /tmp/ovn-chassis-selftest
+        state: directory
+        mode: "0755"
+
+    - name: Copy synthetic chassis Containerfile
+      ansible.builtin.copy:
+        src: Containerfile
+        dest: /tmp/ovn-chassis-selftest/Containerfile
+        mode: "0644"
+
+    - name: Build default synthetic chassis image
+      ansible.builtin.command:
+        argv:
+          - podman
+          - build
+          - --tag
+          - localhost/ovn-chassis-selftest
+          - --file
+          - /tmp/ovn-chassis-selftest/Containerfile
+          - /tmp/ovn-chassis-selftest
+      changed_when: true
+
+    - name: Build alternate synthetic chassis image
+      ansible.builtin.command:
+        argv:
+          - podman
+          - build
+          - --build-arg
+          - OVN_CHASSIS_IMAGE_MARKER=/ovn-chassis-image-alternate
+          - --tag
+          - localhost/ovn-chassis-selftest-alternate
+          - --file
+          - /tmp/ovn-chassis-selftest/Containerfile
+          - /tmp/ovn-chassis-selftest
+      changed_when: true
+
+    - name: Check synthetic chassis network
+      ansible.builtin.command:
+        argv:
+          - podman
+          - network
+          - exists
+          - ovn-chassis-selftest
+      register: ovn_chassis_selftest_network
+      failed_when: false
+      changed_when: false
+
+    - name: Create synthetic chassis network
+      ansible.builtin.command:
+        argv:
+          - podman
+          - network
+          - create
+          - --subnet
+          - 10.89.0.0/24
+          - ovn-chassis-selftest
+      when: ovn_chassis_selftest_network.rc != 0
+      changed_when: true

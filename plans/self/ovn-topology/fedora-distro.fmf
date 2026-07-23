@@ -11,19 +11,25 @@ prepare:
     extra-args: '-e ovn_install_method=distro -e ovs_setup_install_method=distro'
   - name: Check OVN topology preconditions
     how: shell
-    script: ./tests/self/ovn-topology/pre.sh
+    order: 80
+    script: python3 -m pytest -q -s ./tests/self/ovn-topology/test.py::TestPreconditions
   - name: Apply initial OVN topology
     how: ansible
+    order: 90
     playbook: tests/self/ovn-topology/initial.yml
   - name: Verify initial OVN topology
     how: shell
-    script: ./tests/self/ovn-topology/verify-initial.sh
+    order: 100
+    script: python3 -m pytest -q -s ./tests/self/ovn-topology/test.py::TestInitial
   - name: Reconfigure OVN topology
     how: ansible
+    order: 110
     playbook: tests/self/ovn-topology/reconfigure.yml
   - name: Record reconfigured OVN topology
     how: shell
-    script: ./tests/self/ovn-topology/record-reconfigured.sh
+    order: 120
+    script: python3 -m pytest -q -s ./tests/self/ovn-topology/test.py::TestReconfigured
   - name: Reapply OVN topology
     how: ansible
+    order: 130
     playbook: tests/self/ovn-topology/reconfigure.yml

@@ -5,8 +5,12 @@ provision:
     image: fedora
 
 prepare:
-  - how: shell
-    script: ./tests/self/make-check/pre.sh
   - how: ansible
+    playbook: tests/self/make-check/prepare.yml
+  - how: shell
+    order: 80
+    script: python3 -m pytest -q -s ./tests/self/make-check/test.py::TestFixture
+  - how: ansible
+    order: 90
     playbook: playbooks/make-check.yml
     extra-args: '-e make_check_source_dir=/tmp/make-check-workspace'

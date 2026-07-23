@@ -6,6 +6,8 @@ provision:
 
 prepare:
   - how: shell
-    script: ./tests/self/ovn-unit-test-deps/pre.sh
+    order: 80
+    script: python3 -m pytest -q -s ./tests/self/ovn-unit-test-deps/test.py::TestPreconditions
   - how: ansible
+    order: 90
     playbook: playbooks/ovn-unit-test-deps.yml

@@ -2,7 +2,8 @@ summary: Base configuration for GitHub CI self-tests
 
 prepare:
   - how: shell
-    script: ./tests/self/ci/pre.sh
+    order: 80
+    script: python3 -m pytest -q -s ./tests/self/ci/test.py::TestPreconditions
 
 discover:
   how: fmf

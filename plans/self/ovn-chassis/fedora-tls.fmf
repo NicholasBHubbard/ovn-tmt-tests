@@ -15,20 +15,34 @@ prepare:
     order: 10
   - name: Check OVN chassis preconditions
     how: shell
-    script: ./tests/self/ovn-chassis/pre.sh
+    order: 80
+    script: >-
+      python3 -m pytest -q -s
+      ./tests/self/ovn-chassis/test.py::TestPreconditions
   - name: Create chassis TLS credentials
-    how: shell
-    script: ./tests/self/ovn-central-ssl/prepare.sh
+    how: ansible
+    order: 90
+    playbook: tests/self/ovn-central-ssl/prepare.yml
   - name: Set up TLS OVN central
     how: ansible
+    order: 100
     playbook: playbooks/ovn-central.yml
     extra-args: '-e ovn_install_method=distro -e ovs_setup_install_method=distro -e ovn_central_ssl_enabled=true'
   - name: Build synthetic chassis image
-    how: shell
-    script: ./tests/self/ovn-chassis/build-container.sh
+    how: ansible
+    order: 110
+    playbook: tests/self/ovn-chassis/build-container.yml
   - name: Create synthetic chassis with TLS
     how: ansible
+    order: 120
     playbook: tests/self/ovn-chassis/multi-tls.yml
+  - name: Create TLS synthetic chassis packet topology
+    how: ansible
+    order: 130
+    playbook: tests/self/ovn-chassis/traffic.yml
   - name: Verify TLS synthetic chassis traffic
     how: shell
-    script: ./tests/self/ovn-chassis/verify-multi.sh
+    order: 140
+    script: >-
+      python3 -m pytest -q -s
+      ./tests/self/ovn-chassis/test.py::TestMulti

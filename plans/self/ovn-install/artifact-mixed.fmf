@@ -21,11 +21,13 @@ provision:
 prepare:
   - name: Check clean guests
     how: shell
-    script: ./tests/self/ovn-install/pre.sh
+    order: 80
+    script: python3 -m pytest -q -s ./tests/self/ovn-install/test.py::TestPreconditions
 
   - name: Build Fedora artifact
     how: ansible
     where: [fedora-builder]
+    order: 90
     playbook: playbooks/ovn-build-artifact.yml
     extra-args: >-
       -e ovn_artifact_builder_hosts=all
@@ -37,6 +39,7 @@ prepare:
   - name: Install Fedora artifact
     how: ansible
     where: [fedora-builder, fedora-consumer]
+    order: 100
     playbook: playbooks/ovn-install.yml
     extra-args: >-
       -e ovn_install_method=artifact
@@ -48,6 +51,7 @@ prepare:
   - name: Build Debian artifact
     how: ansible
     where: [debian-builder]
+    order: 110
     playbook: playbooks/ovn-build-artifact.yml
     extra-args: >-
       -e ovn_artifact_builder_hosts=all
@@ -59,6 +63,7 @@ prepare:
   - name: Install Debian artifact
     how: ansible
     where: [debian-builder, debian-consumer]
+    order: 120
     playbook: playbooks/ovn-install.yml
     extra-args: >-
       -e ovn_install_method=artifact

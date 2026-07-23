@@ -35,45 +35,52 @@ prepare:
   - name: Check central preconditions
     how: shell
     where: [central]
-    script: ./tests/self/multihost/pre.sh
+    order: 80
+    script: >-
+      python3 -m pytest -q -s
+      ./tests/self/multihost/test.py::TestPreconditions
 
   - name: Check compute preconditions
     how: shell
     where: [compute]
-    script: ./tests/self/multihost/pre.sh
+    order: 81
+    script: >-
+      python3 -m pytest -q -s
+      ./tests/self/multihost/test.py::TestPreconditions
 
   - name: Set up OVN topology
     how: ansible
+    order: 90
     playbook: playbooks/multihost.yml
     extra-args: '-e ovn_multihost_ssl_enabled=$OTT_SSL_ENABLED'
 
   - name: Create endpoint on compute-1
     how: ansible
-    order: 80
+    order: 100
     playbook: tests/self/multihost/endpoint.yml
     extra-args: '-e ovn_test_endpoint_host=compute-1'
 
   - name: Verify endpoint on compute-1
     how: ansible
-    order: 81
+    order: 110
     playbook: tests/self/multihost/verify-endpoint.yml
     extra-args: '-e ovn_test_endpoint_host=compute-1'
 
   - name: Move endpoint to compute-2
     how: ansible
-    order: 82
+    order: 120
     playbook: tests/self/multihost/endpoint.yml
     extra-args: '-e ovn_test_endpoint_host=compute-2'
 
   - name: Verify endpoint moved to compute-2
     how: ansible
-    order: 83
+    order: 130
     playbook: tests/self/multihost/verify-endpoint.yml
     extra-args: '-e ovn_test_endpoint_host=compute-2'
 
   - name: Set up provider mesh
     how: ansible
-    order: 84
+    order: 140
     playbook: tests/self/multihost/provider.yml
 
 discover:

@@ -21,16 +21,19 @@ prepare:
   - name: Check preconditions on all nodes
     how: shell
     where: [leader, follower]
-    script: ./tests/self/ovn-clustered/pre.sh
+    order: 80
+    script: python3 -m pytest -q -s ./tests/self/ovn-clustered/test.py::TestPreconditions
 
   - name: Set up cluster leader
     how: ansible
+    order: 90
     playbook: playbooks/ovn-clustered.yml
     extra-args: '-e ovn_install_method=distro -e ovs_setup_install_method=distro'
     where: [leader]
 
   - name: Set up cluster followers
     how: ansible
+    order: 100
     playbook: playbooks/ovn-clustered.yml
     extra-args: '-e ovn_install_method=distro -e ovs_setup_install_method=distro'
     where: [follower]

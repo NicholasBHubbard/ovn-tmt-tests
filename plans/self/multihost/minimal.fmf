@@ -41,22 +41,57 @@ prepare:
   - name: Check central preconditions
     how: shell
     where: [central]
-    script: ./tests/self/multihost/pre.sh
+    order: 80
+    script: >-
+      python3 -m pytest -q -s
+      ./tests/self/multihost/test.py::TestPreconditions
 
   - name: Check compute preconditions
     how: shell
     where: [compute]
-    script: ./tests/self/multihost/pre.sh
+    order: 81
+    script: >-
+      python3 -m pytest -q -s
+      ./tests/self/multihost/test.py::TestPreconditions
 
   - name: Set up OVN topology
     how: ansible
+    order: 90
     playbook: playbooks/multihost.yml
     extra-args: '-e ovn_multihost_ssl_enabled=$OTT_SSL_ENABLED'
 
   - name: Create TLS packet endpoints
     how: ansible
-    order: 80
+    order: 100
     playbook: tests/self/multihost/tls.yml
+
+  - name: Verify TLS topology
+    how: shell
+    where: [central]
+    order: 110
+    script: >-
+      python3 -m pytest -q -s
+      ./tests/self/multihost/test.py::TestTLS
+
+  - name: Return OVN topology to TCP
+    how: ansible
+    order: 120
+    playbook: playbooks/multihost.yml
+    extra-args: '-e ovn_multihost_ssl_enabled=false'
+
+  - name: Remove OVN test PKI
+    how: ansible
+    order: 130
+    playbook: playbooks/ovn-test-pki-install.yml
+    extra-args: '-e ovn_test_pki_enabled=false'
+
+  - name: Verify reconfigured TCP topology
+    how: shell
+    where: [central]
+    order: 140
+    script: >-
+      python3 -m pytest -q -s
+      ./tests/self/multihost/test.py::TestTCP
 
 discover:
   - how: fmf

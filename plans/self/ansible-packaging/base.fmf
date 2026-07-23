@@ -2,7 +2,8 @@ summary: Verify Ansible package configuration self-test
 
 prepare:
   - how: shell
-    script: ./tests/self/ansible-packaging/pre.sh
+    order: 80
+    script: python3 -m pytest -q -s ./tests/self/ansible-packaging/test.py::TestPreconditions
 
 provision:
   how: local

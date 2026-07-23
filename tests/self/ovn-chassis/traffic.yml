@@ -1,0 +1,94 @@
+- name: Create synthetic chassis packet topology
+  hosts: all
+  become: true
+  tasks:
+    - name: Replace packet test logical switch
+      ansible.builtin.command:
+        argv:
+          - ovn-nbctl
+          - --if-exists
+          - ls-del
+          - scale-test
+      changed_when: true
+
+    - name: Create packet test logical switch and ports
+      ansible.builtin.command:
+        cmd: >-
+          ovn-nbctl ls-add scale-test
+          -- lsp-add scale-test scale-a-port
+          -- lsp-set-addresses scale-a-port
+          '02:00:00:00:00:0a 192.0.2.10'
+          -- lsp-add scale-test scale-b-port
+          -- lsp-set-addresses scale-b-port
+          '02:00:00:00:00:0b 192.0.2.11'
+      changed_when: true
+
+    - name: Create packet endpoints
+      ansible.builtin.command:
+        cmd: >-
+          podman exec ovn-chassis-scale-{{ item.name }}
+          ovs-vsctl --may-exist add-port br-int endpoint0
+          -- set Interface endpoint0 type=internal
+          external_ids:iface-id=scale-{{ item.name }}-port
+      loop:
+        - name: a
+          mac: "02:00:00:00:00:0a"
+        - name: b
+          mac: "02:00:00:00:00:0b"
+      changed_when: true
+
+    - name: Configure packet endpoint MAC addresses
+      ansible.builtin.command:
+        argv:
+          - podman
+          - exec
+          - "ovn-chassis-scale-{{ item.name }}"
+          - ip
+          - link
+          - set
+          - endpoint0
+          - address
+          - "{{ item.mac }}"
+      loop:
+        - name: a
+          mac: "02:00:00:00:00:0a"
+          address: 192.0.2.10/24
+        - name: b
+          mac: "02:00:00:00:00:0b"
+          address: 192.0.2.11/24
+      changed_when: true
+
+    - name: Configure packet endpoint IP addresses
+      ansible.builtin.command:
+        argv:
+          - podman
+          - exec
+          - "ovn-chassis-scale-{{ item.name }}"
+          - ip
+          - address
+          - replace
+          - "{{ item.address }}"
+          - dev
+          - endpoint0
+      loop:
+        - name: a
+          address: 192.0.2.10/24
+        - name: b
+          address: 192.0.2.11/24
+      changed_when: true
+
+    - name: Enable packet endpoints
+      ansible.builtin.command:
+        argv:
+          - podman
+          - exec
+          - "ovn-chassis-scale-{{ item }}"
+          - ip
+          - link
+          - set
+          - endpoint0
+          - up
+      loop:
+        - a
+        - b
+      changed_when: true

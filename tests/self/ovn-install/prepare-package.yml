@@ -1,0 +1,21 @@
+- name: Prepare OVN package fixture
+  hosts: all
+  become: true
+  tasks:
+    - name: Create package directory
+      ansible.builtin.file:
+        path: /tmp/ovn-packages
+        state: directory
+        mode: "0755"
+
+    - name: Download OVN packages
+      ansible.builtin.command:
+        argv:
+          - dnf
+          - download
+          - --destdir=/tmp/ovn-packages
+          - openvswitch
+          - ovn
+          - ovn-central
+          - ovn-host
+      changed_when: true

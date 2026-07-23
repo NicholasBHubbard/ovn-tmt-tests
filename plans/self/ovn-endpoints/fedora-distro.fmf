@@ -16,11 +16,15 @@ prepare:
   - name: Check endpoint preconditions
     how: shell
     order: 78
-    script: ./tests/self/ovn-endpoints/pre.sh
+    script: >-
+      python3 -m pytest -q -s
+      ./tests/self/ovn-endpoints/test.py::TestPreconditions
   - name: Record host state
     how: shell
     order: 79
-    script: ./tests/self/ovn-endpoints/record-host.sh
+    script: >-
+      python3 -m pytest -q -s
+      ./tests/self/ovn-endpoints/test.py::TestHostState
   - name: Apply initial OVN endpoints
     how: ansible
     order: 80
@@ -28,7 +32,9 @@ prepare:
   - name: Verify initial OVN endpoints
     how: shell
     order: 81
-    script: ./tests/self/ovn-endpoints/verify-initial.sh
+    script: >-
+      python3 -m pytest -q -s
+      ./tests/self/ovn-endpoints/test.py::TestInitial
   - name: Reconfigure OVN endpoints
     how: ansible
     order: 82
@@ -36,7 +42,9 @@ prepare:
   - name: Record reconfigured OVN endpoints
     how: shell
     order: 83
-    script: ./tests/self/ovn-endpoints/record-reconfigured.sh
+    script: >-
+      python3 -m pytest -q -s
+      ./tests/self/ovn-endpoints/test.py::TestReconfigured
   - name: Reapply OVN endpoints
     how: ansible
     order: 84
