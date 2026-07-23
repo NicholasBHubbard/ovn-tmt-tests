@@ -186,7 +186,7 @@ class TestResult:
             "external_ids:ovn-tmt-tests-mesh=self-provider",
             guest=guest,
         )
-        assert len(output.splitlines()) == expected
+        assert len(output.split()) == expected
 
     def test_inventory_name_fallback(self, runner, tree, test_data):
         inventory = test_data / "fallback-inventory.ini"
