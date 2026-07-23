@@ -36,8 +36,8 @@ distcheck:
 MAKEFILE
 
 if TMT_TEST_DATA=$data_dir \
-    OVN_SOURCE_DIR=$source_dir \
-    MAKE_CHECK_TESTSUITEFLAGS=7-9 \
+    OTT_SOURCE_DIR=$source_dir \
+    OTT_MAKE_CHECK_TESTSUITEFLAGS=7-9 \
     ./tests/ovn-make-check/post.sh; then
     make_status=0
 else
@@ -67,31 +67,31 @@ if grep -R -F -q 'playbooks/make-check.yml' plans/ovn-ci; then
 fi
 
 assert_contains plans/ovn-ci/main.fmf \
-    'OVN_GIT_REPO: https://github.com/ovn-org/ovn.git'
-assert_contains plans/ovn-ci/main.fmf 'OVN_GIT_VERSION: main'
+    'OTT_GIT_REPO: https://github.com/ovn-org/ovn.git'
+assert_contains plans/ovn-ci/main.fmf 'OTT_GIT_VERSION: main'
 assert_contains plans/ovn-ci/main.fmf \
-    '-e ovn_git_repo=$OVN_GIT_REPO -e ovn_git_version=$OVN_GIT_VERSION'
+    '-e ovn_install_git_repo=$OTT_GIT_REPO -e ovn_install_git_version=$OTT_GIT_VERSION'
 assert_contains plans/ovn-ci/main.fmf \
-    "-e 'ovn_configure_flags=\$OVN_CONFIGURE_FLAGS'"
-assert_contains plans/ovn-ci/main.fmf 'MAKE_CHECK_TESTSUITEFLAGS: ""'
-assert_contains plans/ovn-ci/main.fmf 'OVN_SOURCE_DIR: /usr/src/ovn'
-assert_contains plans/ovn-ci/main.fmf 'OVN_MAKE_FLAGS: ""'
-assert_contains plans/ovn-ci/main.fmf 'OVN_DPDK_DIR: /usr/local/dpdk'
+    "-e 'ovn_install_configure_flags=\$OTT_CONFIGURE_FLAGS'"
+assert_contains plans/ovn-ci/main.fmf 'OTT_MAKE_CHECK_TESTSUITEFLAGS: ""'
+assert_contains plans/ovn-ci/main.fmf 'OTT_SOURCE_DIR: /usr/src/ovn'
+assert_contains plans/ovn-ci/main.fmf 'OTT_MAKE_FLAGS: ""'
+assert_contains plans/ovn-ci/main.fmf 'OTT_DPDK_DIR: /usr/local/dpdk'
 assert_contains plans/ovn-ci/main.fmf \
-    "-e 'ovn_source_dir=\$OVN_SOURCE_DIR'"
+    "-e 'ovn_install_source_dir=\$OTT_SOURCE_DIR'"
 assert_contains plans/ovn-ci/main.fmf \
-    "-e 'ovn_make_flags=\$OVN_MAKE_FLAGS'"
+    "-e 'ovn_install_make_flags=\$OTT_MAKE_FLAGS'"
 assert_contains plans/ovn-ci/main.fmf \
-    "-e 'ovn_dpdk_dir=\$OVN_DPDK_DIR'"
+    "-e 'ovn_install_dpdk_dir=\$OTT_DPDK_DIR'"
 assert_contains plans/ovn-ci/system-dpdk-gcc.fmf \
-    "-e 'dpdk_install_dir=\$OVN_DPDK_DIR'"
+    "-e 'dpdk_build_install_dir=\$OTT_DPDK_DIR'"
 
-if [ "$(grep -R -F -l 'MAKE_CHECK_TESTSUITEFLAGS: ""' plans/ovn-ci | wc -l)" -ne 1 ]; then
-    record_failure "Empty MAKE_CHECK_TESTSUITEFLAGS default must be defined once."
+if [ "$(grep -R -F -l 'OTT_MAKE_CHECK_TESTSUITEFLAGS: ""' plans/ovn-ci | wc -l)" -ne 1 ]; then
+    record_failure "Empty OTT_MAKE_CHECK_TESTSUITEFLAGS default must be defined once."
 fi
 
 if ! TMT_TEST_DATA=$data_dir \
-    OVN_SOURCE_DIR=$source_dir \
+    OTT_SOURCE_DIR=$source_dir \
     ./tests/ovn-distcheck/post.sh; then
     record_failure "OVN distcheck workload did not produce its archive"
 fi

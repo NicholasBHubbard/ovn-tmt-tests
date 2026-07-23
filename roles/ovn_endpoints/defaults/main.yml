@@ -2,12 +2,12 @@
 # address_mode defaults to static; dynamic configures the logical port as "MAC dynamic".
 # dhcpv4_options and dhcpv6_options refer to ovn_dhcp_options IDs.
 # dhcp4 defaults to false and manages an IPv4 DHCP client in a local endpoint namespace.
-# dhcp_timeout overrides ovn_endpoint_dhcp_timeout for one endpoint.
-# ovn_endpoint_mtu defaults to 1500; mtu overrides it for one endpoint.
+# dhcp_timeout overrides ovn_endpoints_dhcp_timeout for one endpoint.
+# ovn_endpoints_mtu defaults to 1500; mtu overrides it for one endpoint.
 # Omitted options are cleared from listed logical switch ports.
 ovn_endpoints: []
-ovn_endpoint_bridge: br-int
-ovn_endpoint_dhcp_timeout: 30
-ovn_endpoint_mode: local
-ovn_endpoint_mtu: 1500
-ovn_endpoint_runtime_dir: /run/ovn-tmt-tests
+ovn_endpoints_bridge: br-int
+ovn_endpoints_dhcp_timeout: 30
+ovn_endpoints_mode: local
+ovn_endpoints_mtu: 1500
+ovn_endpoints_runtime_dir: /run/ovn-tmt-tests

@@ -8,7 +8,7 @@ prepare:
   - name: Set up OVS
     how: ansible
     playbook: playbooks/ovs-setup.yml
-    extra-args: '-e ovs_install_method=package'
+    extra-args: '-e ovs_setup_install_method=package'
   - name: Check endpoint preconditions
     how: shell
     order: 78

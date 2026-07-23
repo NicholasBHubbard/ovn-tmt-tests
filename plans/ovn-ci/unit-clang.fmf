@@ -1,7 +1,7 @@
 summary: OVN unit tests with clang
 
 environment+:
-  OVN_CC: clang
+  OTT_CC: clang
 
 provision:
   - how: container

@@ -1,11 +1,11 @@
-ovs_endpoint_interface: >-
+ovs_endpoints_interface: >-
   {{ ovs_endpoint.interface
      | default(ovs_endpoint.name
                if ovs_endpoint.name | length <= 15
                else 'eth0') }}
-ovs_endpoint_host_interface: >-
+ovs_endpoints_host_interface: >-
   {{ ovs_endpoint.name ~ '-p'
      if ovs_endpoint.name | length <= 13
      else 'ovse-' ~ (ovs_endpoint.name | hash('sha1'))[:10] }}
-ovs_endpoint_temporary_interface: >-
+ovs_endpoints_temporary_interface: >-
   {{ 'ovst-' ~ (ovs_endpoint.name | hash('sha1'))[:10] }}

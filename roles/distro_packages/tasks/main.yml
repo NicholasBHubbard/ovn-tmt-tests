@@ -15,25 +15,25 @@
   ansible.builtin.set_fact:
     distro_selected_repository_package_names: >-
       {{
-        distro_repository_package_names[distro_package_manager_family] | default([])
-        if distro_repository_package_names is mapping
-        else distro_repository_package_names
+        distro_packages_repository_names[distro_package_manager_family] | default([])
+        if distro_packages_repository_names is mapping
+        else distro_packages_repository_names
       }}
 
 - name: Select packages for package manager
   ansible.builtin.set_fact:
     distro_selected_package_names: >-
       {{
-        distro_package_names[distro_package_manager_family] | default([])
-        if distro_package_names is mapping
-        else distro_package_names
+        distro_packages_names[distro_package_manager_family] | default([])
+        if distro_packages_names is mapping
+        else distro_packages_names
       }}
 
 - name: Verify package list is configured
   ansible.builtin.assert:
     that:
       - distro_selected_package_names | length > 0
-    fail_msg: "Set distro_package_names for the detected package manager."
+    fail_msg: "Set distro_packages_names for the detected package manager."
 
 - name: Install repository packages (dnf)
   when:
@@ -50,24 +50,24 @@
   ansible.builtin.apt:
     name: "{{ distro_selected_repository_package_names }}"
     state: present
-    update_cache: "{{ distro_package_update_cache }}"
+    update_cache: "{{ distro_packages_update_cache }}"
 
 - name: Install packages (dnf)
   when: ansible_facts["pkg_mgr"] in ["dnf", "dnf5", "yum"]
   ansible.builtin.dnf:
     name: "{{ distro_selected_package_names }}"
-    state: "{{ distro_package_state }}"
+    state: "{{ distro_packages_state }}"
 
 - name: Install packages (apt)
   when: ansible_facts["pkg_mgr"] == "apt"
   ansible.builtin.apt:
     name: "{{ distro_selected_package_names }}"
-    state: "{{ distro_package_state }}"
-    update_cache: "{{ distro_package_update_cache }}"
+    state: "{{ distro_packages_state }}"
+    update_cache: "{{ distro_packages_update_cache }}"
 
 - name: Install packages (homebrew)
   when: ansible_facts["pkg_mgr"] == "homebrew"
   become: false
   community.general.homebrew:
     name: "{{ distro_selected_package_names }}"
-    state: "{{ distro_package_state }}"
+    state: "{{ distro_packages_state }}"

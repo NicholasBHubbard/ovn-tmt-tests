@@ -26,13 +26,13 @@ prepare:
   - name: Set up cluster leader
     how: ansible
     playbook: playbooks/ovn-clustered.yml
-    extra-args: '-e install_method=distro'
+    extra-args: '-e ovn_install_method=distro -e ovs_setup_install_method=distro'
     where: [leader]
 
   - name: Set up cluster followers
     how: ansible
     playbook: playbooks/ovn-clustered.yml
-    extra-args: '-e install_method=distro'
+    extra-args: '-e ovn_install_method=distro -e ovs_setup_install_method=distro'
     where: [follower]
 
 discover:

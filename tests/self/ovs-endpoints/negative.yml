@@ -30,7 +30,7 @@
           ansible.builtin.include_role:
             name: ovs_endpoints
           vars:
-            ovs_endpoint_mtu: 0
+            ovs_endpoints_mtu: 0
             ovs_endpoints: []
 
         - name: Fail if zero default MTU was accepted
@@ -42,7 +42,7 @@
             that:
               - >-
                 ansible_failed_result.msg ==
-                'ovs_endpoint_mtu must be a positive integer.'
+                'ovs_endpoints_mtu must be a positive integer.'
             fail_msg: >-
               zero default MTU failed for an unexpected reason:
               {{ ansible_failed_result.msg }}

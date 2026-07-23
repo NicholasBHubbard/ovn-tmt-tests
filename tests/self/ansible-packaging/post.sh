@@ -7,14 +7,14 @@ cd_repo_root
 assert_file roles/distro_packages/defaults/main.yml
 assert_file roles/distro_packages/tasks/main.yml
 
-assert_contains roles/distro_packages/tasks/main.yml 'distro_package_names'
+assert_contains roles/distro_packages/tasks/main.yml 'distro_packages_names'
 assert_contains roles/distro_packages/tasks/main.yml 'ansible_facts["pkg_mgr"] == "apt"'
 assert_contains roles/distro_packages/tasks/main.yml 'ansible_facts["pkg_mgr"] in ["apt", "dnf", "dnf5", "yum", "homebrew"]'
 
-assert_contains roles/ovn_install/defaults/main.yml 'ovn_distro_package_names'
-assert_contains roles/ovn_install/defaults/main.yml 'ovn_distro_repository_package_names'
-assert_contains roles/ovs_setup/defaults/main.yml 'ovs_package_names'
-assert_contains roles/ovs_setup/defaults/main.yml 'ovs_repository_package_names'
+assert_contains roles/ovn_install/defaults/main.yml 'ovn_install_distro_package_names'
+assert_contains roles/ovn_install/defaults/main.yml 'ovn_install_distro_repository_package_names'
+assert_contains roles/ovs_setup/defaults/main.yml 'ovs_setup_package_names'
+assert_contains roles/ovs_setup/defaults/main.yml 'ovs_setup_repository_package_names'
 
 assert_not_contains roles/ovn_central/tasks/main.yml 'distro_packages'
 assert_not_contains roles/ovn_central/defaults/main.yml 'ovn_central_package_names'

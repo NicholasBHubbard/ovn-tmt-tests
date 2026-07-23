@@ -2,7 +2,7 @@
   ansible.builtin.import_playbook: ../../../playbooks/ovs-tunnel-mesh.yml
   vars:
     ovs_tunnel_mesh_hosts: central:compute
-    ovs_tunnel_meshes:
+    ovs_tunnel_mesh_definitions:
       - name: self-provider
         hosts:
           - central

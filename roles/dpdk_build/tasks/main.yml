@@ -1,14 +1,14 @@
 - name: Verify DPDK checksum is configured
   ansible.builtin.assert:
     that:
-      - dpdk_checksum | length > 0
-    fail_msg: "Set dpdk_checksum to the SHA-256 checksum for DPDK {{ dpdk_version }}."
+      - dpdk_build_checksum | length > 0
+    fail_msg: "Set dpdk_build_checksum to the SHA-256 checksum for DPDK {{ dpdk_build_version }}."
 
 - name: Install DPDK build dependencies
   ansible.builtin.include_role:
     name: distro_packages
   vars:
-    distro_package_names:
+    distro_packages_names:
       dnf:
         - gcc
         - meson
@@ -19,21 +19,21 @@
 
 - name: Download DPDK source
   ansible.builtin.get_url:
-    url: "https://fast.dpdk.org/rel/dpdk-{{ dpdk_version }}.tar.xz"
-    dest: "/tmp/dpdk-{{ dpdk_version }}.tar.xz"
-    checksum: "{{ dpdk_checksum }}"
+    url: "https://fast.dpdk.org/rel/dpdk-{{ dpdk_build_version }}.tar.xz"
+    dest: "/tmp/dpdk-{{ dpdk_build_version }}.tar.xz"
+    checksum: "{{ dpdk_build_checksum }}"
     mode: "0644"
 
 - name: Create DPDK source directory
   ansible.builtin.file:
-    path: "{{ dpdk_source_dir }}"
+    path: "{{ dpdk_build_source_dir }}"
     state: directory
     mode: "0755"
 
 - name: Extract DPDK source
   ansible.builtin.unarchive:
-    src: "/tmp/dpdk-{{ dpdk_version }}.tar.xz"
-    dest: "{{ dpdk_source_dir }}"
+    src: "/tmp/dpdk-{{ dpdk_build_version }}.tar.xz"
+    dest: "{{ dpdk_build_source_dir }}"
     remote_src: true
     extra_opts:
       - --strip-components=1
@@ -42,19 +42,19 @@
   ansible.builtin.command:
     cmd: >-
       meson setup build
-      --prefix={{ dpdk_install_dir }}
-      -Denable_drivers={{ dpdk_drivers }}
-    chdir: "{{ dpdk_source_dir }}"
+      --prefix={{ dpdk_build_install_dir }}
+      -Denable_drivers={{ dpdk_build_drivers }}
+    chdir: "{{ dpdk_build_source_dir }}"
   changed_when: true
 
 - name: Build DPDK
   ansible.builtin.command:
     cmd: ninja -C build
-    chdir: "{{ dpdk_source_dir }}"
+    chdir: "{{ dpdk_build_source_dir }}"
   changed_when: true
 
 - name: Install DPDK
   ansible.builtin.command:
     cmd: ninja -C build install
-    chdir: "{{ dpdk_source_dir }}"
+    chdir: "{{ dpdk_build_source_dir }}"
   changed_when: true

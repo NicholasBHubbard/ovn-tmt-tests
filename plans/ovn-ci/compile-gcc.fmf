@@ -1,7 +1,7 @@
 summary: OVN compile test with gcc
 
 environment+:
-  OVN_CONFIGURE_FLAGS: "--disable-ssl"
+  OTT_CONFIGURE_FLAGS: "--disable-ssl"
 
 provision:
   - how: container

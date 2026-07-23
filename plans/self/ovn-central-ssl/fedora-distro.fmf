@@ -11,4 +11,4 @@ prepare:
     script: ./tests/self/ovn-central-ssl/prepare.sh
   - how: ansible
     playbook: playbooks/ovn-central.yml
-    extra-args: '-e install_method=distro -e ovn_ssl_enabled=true'
+    extra-args: '-e ovn_install_method=distro -e ovs_setup_install_method=distro -e ovn_central_ssl_enabled=true'

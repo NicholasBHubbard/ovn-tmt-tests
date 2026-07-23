@@ -4,18 +4,18 @@
     ovn_chassis_current_runtime: >-
       {{ ovn_chassis_instance.runtime | default(ovn_chassis_runtime) }}
     ovn_chassis_current_remote: >-
-      {{ ovn_chassis_instance.remote | default(ovn_remote) }}
+      {{ ovn_chassis_instance.remote | default(ovn_chassis_remote) }}
     ovn_chassis_current_encap_type: >-
-      {{ ovn_chassis_instance.encap_type | default(ovn_encap_type) }}
+      {{ ovn_chassis_instance.encap_type | default(ovn_chassis_encap_type) }}
     ovn_chassis_current_encap_ip: >-
       {{ ovn_chassis_instance.encap_ip | default('') }}
     ovn_chassis_current_bridges: >-
-      {{ ovn_chassis_instance.bridges | default(ovn_bridges) }}
+      {{ ovn_chassis_instance.bridges | default(ovn_chassis_bridges) }}
     ovn_chassis_current_bridge_mappings: >-
       {{ ovn_chassis_instance.bridge_mappings
-         | default(ovn_bridge_mappings) }}
+         | default(ovn_chassis_bridge_mappings) }}
     ovn_chassis_current_cms_options: >-
-      {{ ovn_chassis_instance.cms_options | default(ovn_cms_options) }}
+      {{ ovn_chassis_instance.cms_options | default(ovn_chassis_cms_options) }}
   changed_when: false
 
 - name: Configure system chassis

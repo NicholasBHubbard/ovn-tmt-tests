@@ -11,15 +11,15 @@
 - name: Verify default OVS endpoint MTU
   ansible.builtin.assert:
     that:
-      - ovs_endpoint_mtu is integer
-      - ovs_endpoint_mtu > 0
-    fail_msg: "ovs_endpoint_mtu must be a positive integer."
+      - ovs_endpoints_mtu is integer
+      - ovs_endpoints_mtu > 0
+    fail_msg: "ovs_endpoints_mtu must be a positive integer."
 
 - name: Verify OVS endpoint MTUs
   ansible.builtin.assert:
     that:
-      - (ovs_endpoint.mtu | default(ovs_endpoint_mtu)) is integer
-      - (ovs_endpoint.mtu | default(ovs_endpoint_mtu)) > 0
+      - (ovs_endpoint.mtu | default(ovs_endpoints_mtu)) is integer
+      - (ovs_endpoint.mtu | default(ovs_endpoints_mtu)) > 0
       - >-
         ovs_endpoint.interface
         | default(ovs_endpoint.name if ovs_endpoint.name | length <= 15 else 'eth0')

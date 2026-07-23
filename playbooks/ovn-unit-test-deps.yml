@@ -24,7 +24,7 @@
   roles:
     - role: distro_packages
       vars:
-        distro_package_names: "{{ ovn_unit_test_package_names }}"
+        distro_packages_names: "{{ ovn_unit_test_package_names }}"
   tasks:
     - name: Install Python test dependencies
       ansible.builtin.pip:

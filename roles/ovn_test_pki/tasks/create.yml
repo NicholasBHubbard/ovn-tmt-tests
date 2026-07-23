@@ -3,7 +3,7 @@
   ansible.builtin.include_role:
     name: distro_packages
   vars:
-    distro_package_names: "{{ ovn_test_pki_package_names }}"
+    distro_packages_names: "{{ ovn_test_pki_package_names }}"
 
 - name: Remove disabled OVN test PKI from builder
   when: not (ovn_test_pki_enabled | bool)

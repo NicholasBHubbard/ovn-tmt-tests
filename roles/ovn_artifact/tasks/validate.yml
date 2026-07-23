@@ -24,37 +24,37 @@
     that:
       - >-
         ovn_artifact_manifest.ovn_git_repo
-        == (ovn_git_repo
+        == (ovn_install_git_repo
             | default('https://github.com/ovn-org/ovn.git'))
       - >-
         ovn_artifact_manifest.ovn_git_version
-        == (ovn_git_version
-            | default(ovn_git_branch | default('main')))
-      - ovn_artifact_manifest.ovn_cc == (ovn_cc | default(''))
+        == (ovn_install_git_version
+            | default(ovn_install_git_branch | default('main')))
+      - ovn_artifact_manifest.ovn_cc == (ovn_install_cc | default(''))
       - >-
         ovn_artifact_manifest.ovn_configure_flags
-        == (ovn_configure_flags | default(''))
+        == (ovn_install_configure_flags | default(''))
       - >-
         ovn_artifact_manifest.ovn_make_flags
-        == (ovn_make_flags | default(''))
+        == (ovn_install_make_flags | default(''))
       - >-
         ovn_artifact_manifest.ovn_werror
-        == (ovn_werror | default(false) | bool)
+        == (ovn_install_werror | default(false) | bool)
       - >-
         ovn_artifact_manifest.ovn_dpdk
-        == (ovn_dpdk | default(false) | bool)
+        == (ovn_install_dpdk_enabled | default(false) | bool)
       - >-
         ovn_artifact_manifest.ovn_dpdk_dir
-        == (ovn_dpdk_dir | default('/usr/local/dpdk'))
+        == (ovn_install_dpdk_dir | default('/usr/local/dpdk'))
       - >-
         ovn_artifact_manifest.ovn_dpdk_version
-        == (ovn_dpdk_version | default(''))
+        == (ovn_install_dpdk_version | default(''))
       - >-
         ovn_artifact_manifest.ovn_dpdk_checksum
-        == (ovn_dpdk_checksum | default(''))
+        == (ovn_install_dpdk_checksum | default(''))
       - >-
         ovn_artifact_manifest.ovn_dpdk_drivers
-        == (ovn_dpdk_drivers | default(''))
+        == (ovn_install_dpdk_drivers | default(''))
     fail_msg: "OVN artifact build configuration does not match the request."
 
 - name: Verify OVN artifact source revision

@@ -1,13 +1,13 @@
 # Shared defaults are inherited by every chassis instance. An instance may
 # override remote, encap_type, encap_ip, bridges, bridge_mappings or cms_options.
-ovn_sb_port: 6642
-ovn_remote: "tcp:127.0.0.1:{{ ovn_sb_port }}"
-ovn_encap_type: geneve
-ovn_encap_ip: "{{ ansible_facts['default_ipv4']['address'] }}"
+ovn_chassis_sb_port: 6642
+ovn_chassis_remote: "tcp:127.0.0.1:{{ ovn_chassis_sb_port }}"
+ovn_chassis_encap_type: geneve
+ovn_chassis_encap_ip: "{{ ansible_facts['default_ipv4']['address'] }}"
 ovn_chassis_name: "{{ ansible_facts['hostname'] }}"
-ovn_bridge_mappings: ""
-ovn_cms_options: []
-ovn_bridges:
+ovn_chassis_bridge_mappings: ""
+ovn_chassis_cms_options: []
+ovn_chassis_bridges:
   - br-int
 
 # The default preserves the original one-system-chassis behavior. Podman

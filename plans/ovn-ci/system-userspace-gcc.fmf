@@ -1,7 +1,7 @@
 summary: OVN system-userspace tests with gcc
 
 environment+:
-  MAKE_CHECK_TARGET: check-system-userspace
+  OTT_MAKE_CHECK_TARGET: check-system-userspace
 
 provision:
   - how: virtual

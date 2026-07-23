@@ -1,12 +1,12 @@
 summary: Measure incremental OVN logical port convergence
 
 environment+:
-  OVN_SCALE_INITIAL_PORTS: "2"
-  OVN_SCALE_ITERATIONS: "3"
-  OVN_SCALE_TIMEOUT: "60"
-  OVN_SCALE_IPV4: "true"
-  OVN_SCALE_IPV6: "true"
-  OVN_SCALE_MTU: "1342"
+  OTT_SCALE_INITIAL_PORTS: "2"
+  OTT_SCALE_ITERATIONS: "3"
+  OTT_SCALE_TIMEOUT: "60"
+  OTT_SCALE_IPV4: "true"
+  OTT_SCALE_IPV6: "true"
+  OTT_SCALE_MTU: "1342"
 
 provision:
   - name: central

@@ -1,9 +1,9 @@
 summary: Standard OVN topology (1 central + 2 compute) on Fedora
 
 environment:
-  EXPECTED_CHASSIS: "2"
-  MULTIHOST_TEST_GUEST: compute-1
-  OVN_SSL_ENABLED: "false"
+  OTT_EXPECTED_CHASSIS: "2"
+  OTT_MULTIHOST_TEST_GUEST: compute-1
+  OTT_SSL_ENABLED: "false"
 
 provision:
   - name: central
@@ -45,7 +45,7 @@ prepare:
   - name: Set up OVN topology
     how: ansible
     playbook: playbooks/multihost.yml
-    extra-args: '-e ovn_ssl_enabled=$OVN_SSL_ENABLED'
+    extra-args: '-e ovn_multihost_ssl_enabled=$OTT_SSL_ENABLED'
 
   - name: Create endpoint on compute-1
     how: ansible

@@ -1,7 +1,7 @@
 - name: Find managed DHCP state for {{ ovn_endpoint.name }}
   ansible.builtin.stat:
     path: >-
-      {{ ovn_endpoint_runtime_dir }}/{{ ovn_endpoint.name }}-dhclient4.managed
+      {{ ovn_endpoints_runtime_dir }}/{{ ovn_endpoint.name }}-dhclient4.managed
   register: ovn_endpoint_dhcp_state
 
 - name: Stop managed DHCPv4 client for {{ ovn_endpoint.name }}
@@ -16,22 +16,22 @@
       - -x
       - -pf
       - >-
-        {{ ovn_endpoint_runtime_dir }}/{{ ovn_endpoint.name }}-dhclient4.pid
+        {{ ovn_endpoints_runtime_dir }}/{{ ovn_endpoint.name }}-dhclient4.pid
       - -lf
       - >-
-        {{ ovn_endpoint_runtime_dir }}/{{ ovn_endpoint.name }}-dhclient4.leases
+        {{ ovn_endpoints_runtime_dir }}/{{ ovn_endpoint.name }}-dhclient4.leases
       - "{{ ovn_endpoint.name }}"
     removes: >-
-      {{ ovn_endpoint_runtime_dir }}/{{ ovn_endpoint.name }}-dhclient4.pid
+      {{ ovn_endpoints_runtime_dir }}/{{ ovn_endpoint.name }}-dhclient4.pid
 
 - name: Remove managed DHCP state for {{ ovn_endpoint.name }}
   ansible.builtin.file:
     path: "{{ item }}"
     state: absent
   loop:
-    - "{{ ovn_endpoint_runtime_dir }}/{{ ovn_endpoint.name }}-dhclient4.pid"
-    - "{{ ovn_endpoint_runtime_dir }}/{{ ovn_endpoint.name }}-dhclient4.leases"
-    - "{{ ovn_endpoint_runtime_dir }}/{{ ovn_endpoint.name }}-dhclient4.managed"
+    - "{{ ovn_endpoints_runtime_dir }}/{{ ovn_endpoint.name }}-dhclient4.pid"
+    - "{{ ovn_endpoints_runtime_dir }}/{{ ovn_endpoint.name }}-dhclient4.leases"
+    - "{{ ovn_endpoints_runtime_dir }}/{{ ovn_endpoint.name }}-dhclient4.managed"
 
 - name: Remove managed namespace configuration for {{ ovn_endpoint.name }}
   when:

@@ -30,9 +30,9 @@ prepare:
     extra-args: >-
       -e ovn_artifact_builder_hosts=all
       -e ovn_artifact_name=ovn-fedora
-      -e ovn_artifact_build=$OVN_ARTIFACT_BUILD
-      -e 'ovn_artifact_cache_dir=$OVN_ARTIFACT_CACHE_DIR'
-      -e ovn_artifact_expected_revision=$OVN_ARTIFACT_EXPECTED_REVISION
+      -e ovn_artifact_build=$OTT_ARTIFACT_BUILD
+      -e 'ovn_artifact_cache_dir=$OTT_ARTIFACT_CACHE_DIR'
+      -e ovn_artifact_expected_revision=$OTT_ARTIFACT_EXPECTED_REVISION
 
   - name: Install Fedora artifact
     how: ansible
@@ -41,9 +41,9 @@ prepare:
     extra-args: >-
       -e ovn_install_method=artifact
       -e ovn_artifact_name=ovn-fedora
-      -e ovn_artifact_build=$OVN_ARTIFACT_BUILD
-      -e 'ovn_artifact_cache_dir=$OVN_ARTIFACT_CACHE_DIR'
-      -e ovn_artifact_expected_revision=$OVN_ARTIFACT_EXPECTED_REVISION
+      -e ovn_artifact_build=$OTT_ARTIFACT_BUILD
+      -e 'ovn_artifact_cache_dir=$OTT_ARTIFACT_CACHE_DIR'
+      -e ovn_artifact_expected_revision=$OTT_ARTIFACT_EXPECTED_REVISION
 
   - name: Build Debian artifact
     how: ansible
@@ -52,9 +52,9 @@ prepare:
     extra-args: >-
       -e ovn_artifact_builder_hosts=all
       -e ovn_artifact_name=ovn-debian
-      -e ovn_artifact_build=$OVN_ARTIFACT_BUILD
-      -e 'ovn_artifact_cache_dir=$OVN_ARTIFACT_CACHE_DIR'
-      -e ovn_artifact_expected_revision=$OVN_ARTIFACT_EXPECTED_REVISION
+      -e ovn_artifact_build=$OTT_ARTIFACT_BUILD
+      -e 'ovn_artifact_cache_dir=$OTT_ARTIFACT_CACHE_DIR'
+      -e ovn_artifact_expected_revision=$OTT_ARTIFACT_EXPECTED_REVISION
 
   - name: Install Debian artifact
     how: ansible
@@ -63,6 +63,6 @@ prepare:
     extra-args: >-
       -e ovn_install_method=artifact
       -e ovn_artifact_name=ovn-debian
-      -e ovn_artifact_build=$OVN_ARTIFACT_BUILD
-      -e 'ovn_artifact_cache_dir=$OVN_ARTIFACT_CACHE_DIR'
-      -e ovn_artifact_expected_revision=$OVN_ARTIFACT_EXPECTED_REVISION
+      -e ovn_artifact_build=$OTT_ARTIFACT_BUILD
+      -e 'ovn_artifact_cache_dir=$OTT_ARTIFACT_CACHE_DIR'
+      -e ovn_artifact_expected_revision=$OTT_ARTIFACT_EXPECTED_REVISION

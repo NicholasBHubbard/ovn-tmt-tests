@@ -19,14 +19,14 @@
 - name: Verify DPDK artifact identity is complete
   when:
     - ovn_artifact_build | bool
-    - ovn_dpdk | default(false) | bool
+    - ovn_install_dpdk_enabled | default(false) | bool
   ansible.builtin.assert:
     that:
-      - ovn_dpdk_version | default('') | length > 0
-      - ovn_dpdk_checksum | default('') | length > 0
-      - ovn_dpdk_drivers | default('') | length > 0
+      - ovn_install_dpdk_version | default('') | length > 0
+      - ovn_install_dpdk_checksum | default('') | length > 0
+      - ovn_install_dpdk_drivers | default('') | length > 0
     fail_msg: >-
-      Set ovn_dpdk_version, ovn_dpdk_checksum and ovn_dpdk_drivers
+      Set ovn_install_dpdk_version, ovn_install_dpdk_checksum and ovn_install_dpdk_drivers
       when building a DPDK artifact.
 
 - name: Create controller artifact directory
@@ -47,14 +47,14 @@
 - name: Build DPDK for OVN artifact
   when:
     - ovn_artifact_build | bool
-    - ovn_dpdk | default(false) | bool
+    - ovn_install_dpdk_enabled | default(false) | bool
   ansible.builtin.include_role:
     name: dpdk_build
   vars:
-    dpdk_version: "{{ ovn_dpdk_version }}"
-    dpdk_checksum: "{{ ovn_dpdk_checksum }}"
-    dpdk_drivers: "{{ ovn_dpdk_drivers }}"
-    dpdk_install_dir: "{{ ovn_dpdk_dir | default('/usr/local/dpdk') }}"
+    dpdk_build_version: "{{ ovn_install_dpdk_version }}"
+    dpdk_build_checksum: "{{ ovn_install_dpdk_checksum }}"
+    dpdk_build_drivers: "{{ ovn_install_dpdk_drivers }}"
+    dpdk_build_install_dir: "{{ ovn_install_dpdk_dir | default('/usr/local/dpdk') }}"
 
 - name: Build OVN into artifact staging directory
   when: ovn_artifact_build | bool
@@ -71,7 +71,7 @@
     argv:
       - git
       - -C
-      - "{{ ovn_source_dir }}"
+      - "{{ ovn_install_source_dir }}"
       - rev-parse
       - HEAD
   register: ovn_artifact_revision
@@ -83,7 +83,7 @@
     argv:
       - git
       - -C
-      - "{{ ovn_source_dir }}/ovs"
+      - "{{ ovn_install_source_dir }}/ovs"
       - rev-parse
       - HEAD
   register: ovn_artifact_ovs_revision
@@ -116,19 +116,19 @@
         'distribution': ansible_distribution,
         'distribution_version': ansible_distribution_version,
         'architecture': ansible_architecture,
-        'ovn_git_repo': ovn_git_repo,
-        'ovn_git_version': ovn_git_version,
+        'ovn_git_repo': ovn_install_git_repo,
+        'ovn_git_version': ovn_install_git_version,
         'ovn_revision': ovn_artifact_revision.stdout,
         'ovs_revision': ovn_artifact_ovs_revision.stdout,
-        'ovn_cc': ovn_cc,
-        'ovn_configure_flags': ovn_configure_flags,
-        'ovn_make_flags': ovn_make_flags,
-        'ovn_werror': ovn_werror | bool,
-        'ovn_dpdk': ovn_dpdk | bool,
-        'ovn_dpdk_dir': ovn_dpdk_dir,
-        'ovn_dpdk_version': ovn_dpdk_version,
-        'ovn_dpdk_checksum': ovn_dpdk_checksum,
-        'ovn_dpdk_drivers': ovn_dpdk_drivers,
+        'ovn_cc': ovn_install_cc,
+        'ovn_configure_flags': ovn_install_configure_flags,
+        'ovn_make_flags': ovn_install_make_flags,
+        'ovn_werror': ovn_install_werror | bool,
+        'ovn_dpdk': ovn_install_dpdk_enabled | bool,
+        'ovn_dpdk_dir': ovn_install_dpdk_dir,
+        'ovn_dpdk_version': ovn_install_dpdk_version,
+        'ovn_dpdk_checksum': ovn_install_dpdk_checksum,
+        'ovn_dpdk_drivers': ovn_install_dpdk_drivers,
         'sha256': ovn_artifact_remote.stat.checksum
       } | to_nice_json }}
     dest: "{{ ovn_artifact_manifest_remote_path }}"

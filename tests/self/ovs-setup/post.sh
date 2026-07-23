@@ -6,7 +6,7 @@ source "$TMT_TREE/tests/lib/ovn.sh"
 cd_repo_root
 
 assert_contains roles/ovs_setup/tasks/git.yml \
-    'refspec: "+{{ ovs_git_version }}:refs/ovs-tmt/{{ ovs_git_version }}"'
+    'refspec: "+{{ ovs_setup_git_version }}:refs/ovs-tmt/{{ ovs_setup_git_version }}"'
 
 echo "Checking ovs-vsctl..."
 assert_ovs_configured

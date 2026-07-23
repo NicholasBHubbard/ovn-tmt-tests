@@ -4,6 +4,6 @@
 # endpoint name when that fits Linux's limit, and to eth0 otherwise.
 # Routes need to; via, family, metric and table are optional.
 # Listed endpoints default to present; absent removes them. Unlisted endpoints are untouched.
-# ovs_endpoint_mtu defaults to 1500; mtu overrides it for one endpoint.
+# ovs_endpoints_mtu defaults to 1500; mtu overrides it for one endpoint.
 ovs_endpoints: []
-ovs_endpoint_mtu: 1500
+ovs_endpoints_mtu: 1500

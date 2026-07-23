@@ -4,7 +4,7 @@ set -euo pipefail
 source "$TMT_TREE/tests/lib/assert.sh"
 source "$TMT_TREE/tests/lib/ovn.sh"
 
-if [ "${OVN_CHASSIS_TEST_MODE:-system}" = tls ]; then
+if [ "${OTT_CHASSIS_TEST_MODE:-system}" = tls ]; then
     for chassis in scale-a scale-b; do
         if ! podman container exists "ovn-chassis-$chassis"; then
             record_failure "Expected TLS chassis container: $chassis"

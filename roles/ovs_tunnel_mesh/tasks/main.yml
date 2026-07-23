@@ -2,7 +2,7 @@
   ansible.builtin.assert:
     that:
       - >-
-        ovs_tunnel_meshes
+        ovs_tunnel_mesh_definitions
         | map(attribute='state', default='present')
         | difference(['present', 'absent'])
         | length == 0
@@ -10,7 +10,7 @@
 
 - name: Configure OVS tunnel meshes
   ansible.builtin.include_tasks: mesh.yml
-  loop: "{{ ovs_tunnel_meshes }}"
+  loop: "{{ ovs_tunnel_mesh_definitions }}"
   loop_control:
     loop_var: ovs_tunnel_mesh
     label: "{{ ovs_tunnel_mesh.name }}"

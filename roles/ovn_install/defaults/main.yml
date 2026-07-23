@@ -1,17 +1,17 @@
-ovn_install_method: "{{ install_method | default('distro') }}"
-ovn_cc: ""
+ovn_install_method: distro
+ovn_install_cc: ""
 
 # source: build from local source directory
-ovn_source_dir: /usr/src/ovn
-ovn_configure_flags: ""
-ovn_make_flags: ""
-ovn_werror: false
-ovn_dpdk: false
-ovn_dpdk_dir: /usr/local/dpdk
-ovn_dpdk_version: ""
-ovn_dpdk_checksum: ""
-ovn_dpdk_drivers: ""
-ovn_dpdk_runtime_package_names:
+ovn_install_source_dir: /usr/src/ovn
+ovn_install_configure_flags: ""
+ovn_install_make_flags: ""
+ovn_install_werror: false
+ovn_install_dpdk_enabled: false
+ovn_install_dpdk_dir: /usr/local/dpdk
+ovn_install_dpdk_version: ""
+ovn_install_dpdk_checksum: ""
+ovn_install_dpdk_drivers: ""
+ovn_install_dpdk_runtime_package_names:
   dnf:
     - libpcap
     - numactl-libs
@@ -19,7 +19,7 @@ ovn_dpdk_runtime_package_names:
     - libpcap0.8
     - libnuma1
 ovn_install_destdir: ""
-ovn_build_dependency_package_names:
+ovn_install_build_dependency_package_names:
   dnf:
     - autoconf
     - automake
@@ -37,15 +37,15 @@ ovn_build_dependency_package_names:
   brew:
     - automake
     - libtool
-ovn_build_repository_package_names:
+ovn_install_build_repository_package_names:
   dnf: []
   apt: []
 
 # git: clone from repo, then build
-ovn_git_repo: https://github.com/ovn-org/ovn.git
-ovn_git_branch: main
-ovn_git_version: "{{ ovn_git_branch }}"
-ovn_git_package_names:
+ovn_install_git_repo: https://github.com/ovn-org/ovn.git
+ovn_install_git_branch: main
+ovn_install_git_version: "{{ ovn_install_git_branch }}"
+ovn_install_git_package_names:
   dnf:
     - git
   apt:
@@ -54,8 +54,8 @@ ovn_git_package_names:
     - git
 
 # distro: install from distro repos (auto-detects dnf/apt)
-ovn_distro_version: latest
-ovn_distro_package_names:
+ovn_install_distro_version: latest
+ovn_install_distro_package_names:
   dnf:
     - openvswitch
     - ovn
@@ -66,10 +66,10 @@ ovn_distro_package_names:
     - ovn-common
     - ovn-central
     - ovn-host
-ovn_distro_repository_package_names:
+ovn_install_distro_repository_package_names:
   dnf: []
   apt: []
 
 # package: install from specific package files or a directory of packages
-ovn_package_files: []
-ovn_package_dir: ""
+ovn_install_package_files: []
+ovn_install_package_dir: ""

@@ -1,81 +1,81 @@
 - name: Set build environment
   ansible.builtin.set_fact:
-    _ovn_build_env: "{{ {'CC': ovn_cc} if ovn_cc else {} }}"
-    _ovn_werror_flag: "{{ '--enable-Werror' if ovn_werror | bool else '' }}"
+    _ovn_build_env: "{{ {'CC': ovn_install_cc} if ovn_install_cc else {} }}"
+    _ovn_werror_flag: "{{ '--enable-Werror' if ovn_install_werror | bool else '' }}"
 
 - name: Install selected compiler
-  when: ovn_cc != "" and ovn_cc != "gcc"
+  when: ovn_install_cc != "" and ovn_install_cc != "gcc"
   ansible.builtin.include_role:
     name: distro_packages
   vars:
-    distro_package_names:
+    distro_packages_names:
       dnf:
-        - "{{ ovn_cc }}"
+        - "{{ ovn_install_cc }}"
       apt:
-        - "{{ ovn_cc }}"
+        - "{{ ovn_install_cc }}"
       brew:
-        - "{{ ovn_cc }}"
+        - "{{ ovn_install_cc }}"
 
 - name: Install build dependencies
   ansible.builtin.include_role:
     name: distro_packages
   vars:
-    distro_package_names: "{{ ovn_build_dependency_package_names }}"
-    distro_repository_package_names: "{{ ovn_build_repository_package_names }}"
+    distro_packages_names: "{{ ovn_install_build_dependency_package_names }}"
+    distro_packages_repository_names: "{{ ovn_install_build_repository_package_names }}"
 
 - name: Bootstrap OVS submodule
   ansible.builtin.command:
     cmd: ./boot.sh
-    chdir: "{{ ovn_source_dir }}/ovs"
+    chdir: "{{ ovn_install_source_dir }}/ovs"
   changed_when: true
 
 - name: Build OVS with DPDK (first pass)
-  when: ovn_dpdk | bool
+  when: ovn_install_dpdk_enabled | bool
   block:
     - name: Configure OVS with DPDK
       ansible.builtin.command:
         cmd: "./configure --with-dpdk=static {{ _ovn_werror_flag }}"
-        chdir: "{{ ovn_source_dir }}/ovs"
-      environment: "{{ _ovn_build_env | combine({'PKG_CONFIG_PATH': ovn_dpdk_dir + '/lib64/pkgconfig'}) }}"
+        chdir: "{{ ovn_install_source_dir }}/ovs"
+      environment: "{{ _ovn_build_env | combine({'PKG_CONFIG_PATH': ovn_install_dpdk_dir + '/lib64/pkgconfig'}) }}"
       changed_when: true
 
     - name: Build OVS with DPDK
       ansible.builtin.command:
-        cmd: make -j{{ ansible_facts["processor_vcpus"] }} {{ ovn_make_flags }}
-        chdir: "{{ ovn_source_dir }}/ovs"
-      environment: "{{ _ovn_build_env | combine({'PKG_CONFIG_PATH': ovn_dpdk_dir + '/lib64/pkgconfig'}) }}"
+        cmd: make -j{{ ansible_facts["processor_vcpus"] }} {{ ovn_install_make_flags }}
+        chdir: "{{ ovn_install_source_dir }}/ovs"
+      environment: "{{ _ovn_build_env | combine({'PKG_CONFIG_PATH': ovn_install_dpdk_dir + '/lib64/pkgconfig'}) }}"
       changed_when: true
 
     - name: Save DPDK-enabled ovs-vswitchd
       ansible.builtin.copy:
-        src: "{{ ovn_source_dir }}/ovs/vswitchd/ovs-vswitchd"
-        dest: "{{ ovn_source_dir }}/ovs/vswitchd/ovs-vswitchd_with_dpdk"
+        src: "{{ ovn_install_source_dir }}/ovs/vswitchd/ovs-vswitchd"
+        dest: "{{ ovn_install_source_dir }}/ovs/vswitchd/ovs-vswitchd_with_dpdk"
         remote_src: true
         mode: "0755"
 
     - name: Clean OVS DPDK build
       ansible.builtin.command:
         cmd: make distclean
-        chdir: "{{ ovn_source_dir }}/ovs"
+        chdir: "{{ ovn_install_source_dir }}/ovs"
       changed_when: true
 
     - name: Re-bootstrap OVS after distclean
       ansible.builtin.command:
         cmd: ./boot.sh
-        chdir: "{{ ovn_source_dir }}/ovs"
+        chdir: "{{ ovn_install_source_dir }}/ovs"
       changed_when: true
 
 - name: Configure OVS submodule
   ansible.builtin.command:
     cmd: "./configure {{ _ovn_werror_flag }}"
-    chdir: "{{ ovn_source_dir }}/ovs"
+    chdir: "{{ ovn_install_source_dir }}/ovs"
   environment: "{{ _ovn_build_env }}"
   changed_when: true
 
 - name: Build OVS submodule
   ansible.builtin.command:
-    cmd: make -j{{ ansible_facts["processor_vcpus"] }} {{ ovn_make_flags }}
-    chdir: "{{ ovn_source_dir }}/ovs"
+    cmd: make -j{{ ansible_facts["processor_vcpus"] }} {{ ovn_install_make_flags }}
+    chdir: "{{ ovn_install_source_dir }}/ovs"
   environment: "{{ _ovn_build_env }}"
   changed_when: true
 
@@ -84,21 +84,21 @@
     cmd: >-
       make install
       {{ ('DESTDIR=' ~ ovn_install_destdir) if ovn_install_destdir else '' }}
-    chdir: "{{ ovn_source_dir }}/ovs"
+    chdir: "{{ ovn_install_source_dir }}/ovs"
   changed_when: true
 
 - name: Restore DPDK-enabled ovs-vswitchd in source tree
-  when: ovn_dpdk | bool
+  when: ovn_install_dpdk_enabled | bool
   ansible.builtin.copy:
-    src: "{{ ovn_source_dir }}/ovs/vswitchd/ovs-vswitchd_with_dpdk"
-    dest: "{{ ovn_source_dir }}/ovs/vswitchd/ovs-vswitchd"
+    src: "{{ ovn_install_source_dir }}/ovs/vswitchd/ovs-vswitchd_with_dpdk"
+    dest: "{{ ovn_install_source_dir }}/ovs/vswitchd/ovs-vswitchd"
     remote_src: true
     mode: "0755"
 
 - name: Swap in DPDK-enabled ovs-vswitchd
-  when: ovn_dpdk | bool
+  when: ovn_install_dpdk_enabled | bool
   ansible.builtin.copy:
-    src: "{{ ovn_source_dir }}/ovs/vswitchd/ovs-vswitchd_with_dpdk"
+    src: "{{ ovn_install_source_dir }}/ovs/vswitchd/ovs-vswitchd_with_dpdk"
     dest: >-
       {{ (ovn_install_destdir ~ '/usr/local/sbin/ovs-vswitchd')
          if ovn_install_destdir
@@ -109,20 +109,20 @@
 - name: Bootstrap OVN
   ansible.builtin.command:
     cmd: ./boot.sh
-    chdir: "{{ ovn_source_dir }}"
+    chdir: "{{ ovn_install_source_dir }}"
   changed_when: true
 
 - name: Configure OVN
   ansible.builtin.command:
-    cmd: "./configure {{ ovn_configure_flags }} {{ _ovn_werror_flag }}"
-    chdir: "{{ ovn_source_dir }}"
+    cmd: "./configure {{ ovn_install_configure_flags }} {{ _ovn_werror_flag }}"
+    chdir: "{{ ovn_install_source_dir }}"
   environment: "{{ _ovn_build_env }}"
   changed_when: true
 
 - name: Build OVN
   ansible.builtin.command:
-    cmd: make -j{{ ansible_facts["processor_vcpus"] }} {{ ovn_make_flags }}
-    chdir: "{{ ovn_source_dir }}"
+    cmd: make -j{{ ansible_facts["processor_vcpus"] }} {{ ovn_install_make_flags }}
+    chdir: "{{ ovn_install_source_dir }}"
   environment: "{{ _ovn_build_env }}"
   changed_when: true
 
@@ -131,7 +131,7 @@
     cmd: >-
       make install
       {{ ('DESTDIR=' ~ ovn_install_destdir) if ovn_install_destdir else '' }}
-    chdir: "{{ ovn_source_dir }}"
+    chdir: "{{ ovn_install_source_dir }}"
   changed_when: true
 
 - name: Mark OVS as installed (built as OVN submodule)

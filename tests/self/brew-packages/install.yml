@@ -3,7 +3,7 @@
   roles:
     - role: distro_packages
       vars:
-        distro_package_names:
+        distro_packages_names:
           brew:
             - automake
             - libtool

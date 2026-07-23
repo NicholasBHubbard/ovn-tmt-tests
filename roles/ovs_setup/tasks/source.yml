@@ -2,29 +2,29 @@
   ansible.builtin.include_role:
     name: distro_packages
   vars:
-    distro_package_names: "{{ ovs_build_dependency_package_names }}"
-    distro_repository_package_names: "{{ ovs_build_repository_package_names }}"
+    distro_packages_names: "{{ ovs_setup_build_dependency_package_names }}"
+    distro_packages_repository_names: "{{ ovs_setup_build_repository_package_names }}"
 
 - name: Bootstrap OVS
   ansible.builtin.command:
     cmd: ./boot.sh
-    chdir: "{{ ovs_source_dir }}"
+    chdir: "{{ ovs_setup_source_dir }}"
   changed_when: true
 
 - name: Configure OVS
   ansible.builtin.command:
-    cmd: "./configure {{ ovs_configure_flags }}"
-    chdir: "{{ ovs_source_dir }}"
+    cmd: "./configure {{ ovs_setup_configure_flags }}"
+    chdir: "{{ ovs_setup_source_dir }}"
   changed_when: true
 
 - name: Build OVS
   ansible.builtin.command:
-    cmd: make -j{{ ansible_facts["processor_vcpus"] }} {{ ovs_make_flags }}
-    chdir: "{{ ovs_source_dir }}"
+    cmd: make -j{{ ansible_facts["processor_vcpus"] }} {{ ovs_setup_make_flags }}
+    chdir: "{{ ovs_setup_source_dir }}"
   changed_when: true
 
 - name: Install OVS
   ansible.builtin.command:
     cmd: make install
-    chdir: "{{ ovs_source_dir }}"
+    chdir: "{{ ovs_setup_source_dir }}"
   changed_when: true

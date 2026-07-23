@@ -3,6 +3,6 @@ test: ./test.sh
 framework: shell
 duration: 10m
 environment:
-  OVN_TEST_ENCAP: geneve
+  OTT_TEST_ENCAP: geneve
 require:
   - iputils

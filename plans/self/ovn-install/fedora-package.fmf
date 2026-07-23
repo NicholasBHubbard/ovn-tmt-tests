@@ -11,4 +11,4 @@ prepare:
     script: ./tests/self/ovn-install/prepare-package.sh
   - how: ansible
     playbook: playbooks/ovn-install.yml
-    extra-args: '-e ovn_install_method=package -e ovn_package_dir=/tmp/ovn-packages'
+    extra-args: '-e ovn_install_method=package -e ovn_install_package_dir=/tmp/ovn-packages'

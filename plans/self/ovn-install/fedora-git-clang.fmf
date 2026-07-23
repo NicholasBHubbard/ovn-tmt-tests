@@ -9,4 +9,4 @@ prepare:
     script: ./tests/self/ovn-install/pre.sh
   - how: ansible
     playbook: playbooks/ovn-install.yml
-    extra-args: '-e ovn_install_method=git -e ovn_cc=clang'
+    extra-args: '-e ovn_install_method=git -e ovn_install_cc=clang'

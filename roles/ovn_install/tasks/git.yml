@@ -2,17 +2,17 @@
   ansible.builtin.include_role:
     name: distro_packages
   vars:
-    distro_package_names: "{{ ovn_git_package_names }}"
-    distro_repository_package_names: "{{ ovn_build_repository_package_names }}"
+    distro_packages_names: "{{ ovn_install_git_package_names }}"
+    distro_packages_repository_names: "{{ ovn_install_build_repository_package_names }}"
 
 - name: Clone OVN repository
   ansible.builtin.git:
-    repo: "{{ ovn_git_repo }}"
-    dest: "{{ ovn_source_dir }}"
-    version: "{{ ovn_git_version }}"
+    repo: "{{ ovn_install_git_repo }}"
+    dest: "{{ ovn_install_source_dir }}"
+    version: "{{ ovn_install_git_version }}"
     depth: 1
     single_branch: true
-    refspec: "+{{ ovn_git_version }}:refs/ovn-tmt/{{ ovn_git_version }}"
+    refspec: "+{{ ovn_install_git_version }}:refs/ovn-tmt/{{ ovn_install_git_version }}"
     recursive: true
 
 - name: Build and install from cloned source

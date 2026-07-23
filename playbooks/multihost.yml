@@ -5,13 +5,16 @@
     - ovn_install
     - ovs_setup
     - role: ovn_central
-      ovn_ssl_private_key: >-
+      ovn_central_sb_port: "{{ ovn_multihost_sb_port | default(6642) }}"
+      ovn_central_ssl_enabled: >-
+        {{ ovn_multihost_ssl_enabled | default(false) | bool }}
+      ovn_central_ssl_private_key: >-
         {{ ovn_multihost_ssl_private_key
            | default('/run/ovn-test-pki/private-key.pem') }}
-      ovn_ssl_certificate: >-
+      ovn_central_ssl_certificate: >-
         {{ ovn_multihost_ssl_certificate
            | default('/run/ovn-test-pki/certificate.pem') }}
-      ovn_ssl_ca_cert: >-
+      ovn_central_ssl_ca_cert: >-
         {{ ovn_multihost_ssl_ca_cert
            | default('/run/ovn-test-pki/ca-cert.pem') }}
 
@@ -29,7 +32,7 @@
     - name: Wait for SB database to be reachable on central
       ansible.builtin.wait_for:
         host: "{{ ovn_central_address }}"
-        port: "{{ ovn_sb_port | default(6642) }}"
+        port: "{{ ovn_multihost_sb_port | default(6642) }}"
         timeout: 2700
 
 - name: Set up OVN chassis on compute nodes
@@ -38,20 +41,24 @@
   roles:
     - ovn_install
     - role: ovs_setup
-      ovs_ssl_enabled: "{{ ovn_ssl_enabled | default(false) | bool }}"
-      ovs_ssl_private_key: >-
+      ovs_setup_ssl_enabled: >-
+        {{ ovn_multihost_ssl_enabled | default(false) | bool }}
+      ovs_setup_ssl_private_key: >-
         {{ ovn_multihost_ssl_private_key
            | default('/run/ovn-test-pki/private-key.pem') }}
-      ovs_ssl_certificate: >-
+      ovs_setup_ssl_certificate: >-
         {{ ovn_multihost_ssl_certificate
            | default('/run/ovn-test-pki/certificate.pem') }}
-      ovs_ssl_ca_cert: >-
+      ovs_setup_ssl_ca_cert: >-
         {{ ovn_multihost_ssl_ca_cert
            | default('/run/ovn-test-pki/ca-cert.pem') }}
     - ovn_chassis
   vars:
-    ovn_remote: >-
-      {{ 'ssl' if ovn_ssl_enabled | default(false) | bool else 'tcp' }}:{{ ovn_central_address }}:{{ ovn_sb_port }}
+    ovn_chassis_sb_port: "{{ ovn_multihost_sb_port | default(6642) }}"
+    ovn_chassis_remote: >-
+      {{ 'ssl'
+         if ovn_multihost_ssl_enabled | default(false) | bool
+         else 'tcp' }}:{{ ovn_central_address }}:{{ ovn_multihost_sb_port | default(6642) }}
 
 - name: Set up OVN chassis on gateway nodes
   hosts: gateway
@@ -59,25 +66,29 @@
   roles:
     - ovn_install
     - role: ovs_setup
-      ovs_ssl_enabled: "{{ ovn_ssl_enabled | default(false) | bool }}"
-      ovs_ssl_private_key: >-
+      ovs_setup_ssl_enabled: >-
+        {{ ovn_multihost_ssl_enabled | default(false) | bool }}
+      ovs_setup_ssl_private_key: >-
         {{ ovn_multihost_ssl_private_key
            | default('/run/ovn-test-pki/private-key.pem') }}
-      ovs_ssl_certificate: >-
+      ovs_setup_ssl_certificate: >-
         {{ ovn_multihost_ssl_certificate
            | default('/run/ovn-test-pki/certificate.pem') }}
-      ovs_ssl_ca_cert: >-
+      ovs_setup_ssl_ca_cert: >-
         {{ ovn_multihost_ssl_ca_cert
            | default('/run/ovn-test-pki/ca-cert.pem') }}
     - ovn_chassis
   vars:
-    ovn_remote: >-
-      {{ 'ssl' if ovn_ssl_enabled | default(false) | bool else 'tcp' }}:{{ ovn_central_address }}:{{ ovn_sb_port }}
+    ovn_chassis_sb_port: "{{ ovn_multihost_sb_port | default(6642) }}"
+    ovn_chassis_remote: >-
+      {{ 'ssl'
+         if ovn_multihost_ssl_enabled | default(false) | bool
+         else 'tcp' }}:{{ ovn_central_address }}:{{ ovn_multihost_sb_port | default(6642) }}
     ovn_chassis_name: >-
       {{ ovn_gateway_chassis_name | default(inventory_hostname) }}
-    ovn_bridges: >-
+    ovn_chassis_bridges: >-
       {{ ovn_gateway_bridges | default(['br-int', 'br-ex']) }}
-    ovn_bridge_mappings: >-
+    ovn_chassis_bridge_mappings: >-
       {{ ovn_gateway_bridge_mappings | default('public:br-ex') }}
-    ovn_cms_options: >-
+    ovn_chassis_cms_options: >-
       {{ ovn_gateway_cms_options | default(['enable-chassis-as-gw']) }}

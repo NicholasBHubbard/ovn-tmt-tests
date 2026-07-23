@@ -1,7 +1,7 @@
 summary: Test ovn-install role with git method on Fedora
 
 environment:
-  EXPECT_WERROR: "true"
+  OTT_EXPECT_WERROR: "true"
 
 provision:
   - how: virtual
@@ -12,4 +12,4 @@ prepare:
     script: ./tests/self/ovn-install/pre.sh
   - how: ansible
     playbook: playbooks/ovn-install.yml
-    extra-args: '-e ovn_install_method=git -e ovn_werror=true'
+    extra-args: '-e ovn_install_method=git -e ovn_install_werror=true'

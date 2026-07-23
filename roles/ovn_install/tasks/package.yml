@@ -6,10 +6,10 @@
 
 - name: Find packages in directory
   when:
-    - ovn_package_files | length == 0
-    - ovn_package_dir | length > 0
+    - ovn_install_package_files | length == 0
+    - ovn_install_package_dir | length > 0
   ansible.builtin.find:
-    paths: "{{ ovn_package_dir }}"
+    paths: "{{ ovn_install_package_dir }}"
     patterns: "*.rpm,*.deb"
     file_type: file
   register: ovn_package_dir_find
@@ -17,18 +17,18 @@
 - name: Set package files from directory
   when: ovn_package_dir_find is not skipped
   ansible.builtin.set_fact:
-    ovn_package_files: "{{ ovn_package_dir_find.files | map(attribute='path') | list }}"
+    ovn_install_package_files: "{{ ovn_package_dir_find.files | map(attribute='path') | list }}"
 
 - name: Verify package files are specified
   ansible.builtin.assert:
     that:
-      - ovn_package_files | length > 0
-    fail_msg: "No package files specified. Set ovn_package_files or ovn_package_dir."
+      - ovn_install_package_files | length > 0
+    fail_msg: "No package files specified. Set ovn_install_package_files or ovn_install_package_dir."
 
 - name: Install OVN from package files (rpm)
   when: ansible_facts["pkg_mgr"] in ["dnf", "dnf5", "yum"]
   ansible.builtin.dnf:
-    name: "{{ ovn_package_files }}"
+    name: "{{ ovn_install_package_files }}"
     state: present
     disable_gpg_check: true
 
@@ -36,4 +36,4 @@
   when: ansible_facts["pkg_mgr"] == "apt"
   ansible.builtin.apt:
     deb: "{{ item }}"
-  loop: "{{ ovn_package_files }}"
+  loop: "{{ ovn_install_package_files }}"

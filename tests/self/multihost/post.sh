@@ -34,12 +34,12 @@ if ! (
     ansible-playbook() {
         printf '%s\n' "$*" > "$debug_args"
     }
-    MULTIHOST_SETUP_LOG=$debug_log OVN_TEST_DEBUG=true multihost_run_playbook \
+    MULTIHOST_SETUP_LOG=$debug_log OTT_TEST_DEBUG=true multihost_run_playbook \
         "$TMT_TREE/tests/self/multihost/test-setup.yml"
 ); then
     record_failure "Debug playbook invocation failed"
 elif ! grep -Eq '(^| )-vvv( |$)' "$debug_args"; then
-    record_failure "OVN_TEST_DEBUG=true did not enable Ansible -vvv output"
+    record_failure "OTT_TEST_DEBUG=true did not enable Ansible -vvv output"
 fi
 rm -f "$debug_args" "$debug_log" "${debug_log%.log}"-*.log
 
@@ -59,11 +59,11 @@ fi
 rm -f "$failure_log" "${failure_log%.log}"-*.log
 
 echo "Checking top-down shell tracing..."
-if ! trace_output=$(OVN_TEST_DEBUG=true bash -c \
+if ! trace_output=$(OTT_TEST_DEBUG=true bash -c \
     'source "$TMT_TREE/tests/lib/multihost.sh"; echo trace-marker' 2>&1); then
     record_failure "Debug shell tracing failed"
 elif ! grep -Eq '^\+ .*echo trace-marker$' <<< "$trace_output"; then
-    record_failure "OVN_TEST_DEBUG=true did not enable shell tracing"
+    record_failure "OTT_TEST_DEBUG=true did not enable shell tracing"
 fi
 
 echo "Checking OVN central services..."
@@ -79,7 +79,7 @@ assert_ovn_sb_available
 echo "Checking for registered chassis..."
 assert_ovn_chassis_present
 
-if [ "${OVN_SSL_ENABLED:-false}" = true ]; then
+if [ "${OTT_SSL_ENABLED:-false}" = true ]; then
     echo "Checking end-to-end OVN TLS..."
     central_address=$(multihost_guest_hostname central)
     if [[ $(ovn-nbctl get-connection) != *pssl:* ]]; then
@@ -119,7 +119,7 @@ if [ "${OVN_SSL_ENABLED:-false}" = true ]; then
 
     echo "Checking TLS to TCP reconfiguration..."
     multihost_run_playbook "$TMT_TREE/playbooks/multihost.yml" \
-        -e ovn_ssl_enabled=false
+        -e ovn_multihost_ssl_enabled=false
     multihost_run_playbook "$TMT_TREE/playbooks/ovn-test-pki-install.yml" \
         -e ovn_test_pki_enabled=false
     if [[ $(ovn-nbctl get-connection) != *ptcp:* ]]; then
@@ -156,13 +156,13 @@ if [ "${OVN_SSL_ENABLED:-false}" = true ]; then
 fi
 
 echo "Checking cross-guest command execution..."
-if [ -n "${MULTIHOST_TEST_GUEST:-}" ]; then
-    remote_name=$(multihost_exec "$MULTIHOST_TEST_GUEST" hostname)
+if [ -n "${OTT_MULTIHOST_TEST_GUEST:-}" ]; then
+    remote_name=$(multihost_exec "$OTT_MULTIHOST_TEST_GUEST" hostname)
     if [ -z "$remote_name" ]; then
         record_failure "Cross-guest command returned an empty hostname"
     fi
 
-    if multihost_exec "$MULTIHOST_TEST_GUEST" false; then
+    if multihost_exec "$OTT_MULTIHOST_TEST_GUEST" false; then
         record_failure "Cross-guest command did not preserve a failure exit status"
     fi
 fi
@@ -184,11 +184,11 @@ if ! (
     record_failure "Connectivity helpers accepted mocked failure"
 fi
 
-if [ -n "${EXPECTED_CHASSIS:-}" ]; then
-    assert_ovn_chassis_count "$EXPECTED_CHASSIS"
+if [ -n "${OTT_EXPECTED_CHASSIS:-}" ]; then
+    assert_ovn_chassis_count "$OTT_EXPECTED_CHASSIS"
 fi
 
-if [ "${EXPECTED_CHASSIS:-}" = 2 ]; then
+if [ "${OTT_EXPECTED_CHASSIS:-}" = 2 ]; then
     echo "Checking provider mesh connectivity..."
     if ! multihost_wait_for_ping compute-1 self-provider-1 192.0.2.2; then
         record_failure "Provider mesh did not carry endpoint traffic"

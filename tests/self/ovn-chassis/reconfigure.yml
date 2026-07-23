@@ -4,9 +4,9 @@
   roles:
     - ovn_chassis
   vars:
-    ovn_bridges:
+    ovn_chassis_bridges:
       - br-int
       - br-ex
-    ovn_bridge_mappings: provider:br-ex
-    ovn_cms_options:
+    ovn_chassis_bridge_mappings: provider:br-ex
+    ovn_chassis_cms_options:
       - enable-chassis-as-gw

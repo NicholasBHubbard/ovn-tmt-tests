@@ -1,8 +1,8 @@
 summary: OVN system-dpdk tests with gcc
 
 environment+:
-  MAKE_CHECK_TARGET: check-system-dpdk
-  OVN_DPDK: "true"
+  OTT_MAKE_CHECK_TARGET: check-system-dpdk
+  OTT_DPDK: "true"
 
 provision:
   - how: virtual
@@ -12,7 +12,7 @@ provision:
 prepare+<:
   - how: ansible
     playbook: playbooks/dpdk-build.yml
-    extra-args: "-e 'dpdk_install_dir=$OVN_DPDK_DIR'"
+    extra-args: "-e 'dpdk_build_install_dir=$OTT_DPDK_DIR'"
 
 prepare+:
   - how: ansible

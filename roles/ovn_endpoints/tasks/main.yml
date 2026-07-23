@@ -21,15 +21,15 @@
 - name: Verify default endpoint MTU
   ansible.builtin.assert:
     that:
-      - ovn_endpoint_mtu is integer
-      - ovn_endpoint_mtu > 0
-    fail_msg: "ovn_endpoint_mtu must be a positive integer."
+      - ovn_endpoints_mtu is integer
+      - ovn_endpoints_mtu > 0
+    fail_msg: "ovn_endpoints_mtu must be a positive integer."
 
 - name: Verify endpoint MTUs
   ansible.builtin.assert:
     that:
-      - (ovn_endpoint.mtu | default(ovn_endpoint_mtu)) is integer
-      - (ovn_endpoint.mtu | default(ovn_endpoint_mtu)) > 0
+      - (ovn_endpoint.mtu | default(ovn_endpoints_mtu)) is integer
+      - (ovn_endpoint.mtu | default(ovn_endpoints_mtu)) > 0
     fail_msg: "Endpoint MTUs must be positive integers."
   loop: "{{ ovn_endpoints }}"
   loop_control:
@@ -43,7 +43,7 @@
       - >-
         not (ovn_endpoint.dhcp4 | default(false))
         or (ovn_endpoint.dhcp_timeout
-            | default(ovn_endpoint_dhcp_timeout) | int) > 0
+            | default(ovn_endpoints_dhcp_timeout) | int) > 0
     fail_msg: "Endpoint dhcp4 must be boolean and its DHCP timeout must be positive."
   loop: "{{ ovn_endpoints }}"
   loop_control:
@@ -51,7 +51,7 @@
     label: "{{ ovn_endpoint.name | default(ovn_endpoint.iface_id) }}"
 
 - name: Configure OVN logical switch ports
-  when: ovn_endpoint_mode == "ports"
+  when: ovn_endpoints_mode == "ports"
   ansible.builtin.include_tasks: port.yml
   loop: "{{ ovn_endpoints }}"
   loop_control:
@@ -60,7 +60,7 @@
 
 - name: Remove absent or moved local endpoints
   when:
-    - ovn_endpoint_mode == "local"
+    - ovn_endpoints_mode == "local"
     - >-
       ovn_endpoint.state | default('present') == 'absent'
       or ovn_endpoint.host | default('') != inventory_hostname
@@ -72,7 +72,7 @@
 
 - name: Configure OVN namespace endpoints
   when:
-    - ovn_endpoint_mode == "local"
+    - ovn_endpoints_mode == "local"
     - ovn_endpoint.state | default('present') == 'present'
     - ovn_endpoint.host == inventory_hostname
   ansible.builtin.include_tasks: endpoint.yml

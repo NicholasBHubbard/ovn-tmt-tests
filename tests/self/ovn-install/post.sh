@@ -8,14 +8,14 @@ export PATH="/usr/local/sbin:$PATH"
 assert_ovn_binaries_installed
 
 assert_contains "$TMT_TREE/roles/ovn_install/tasks/git.yml" \
-    'refspec: "+{{ ovn_git_version }}:refs/ovn-tmt/{{ ovn_git_version }}"'
+    'refspec: "+{{ ovn_install_git_version }}:refs/ovn-tmt/{{ ovn_install_git_version }}"'
 
-if [ "${EXPECT_WERROR:-false}" = true ]; then
+if [ "${OTT_EXPECT_WERROR:-false}" = true ]; then
     assert_contains /usr/src/ovn/ovs/config.log "--enable-Werror"
     assert_contains /usr/src/ovn/config.log "--enable-Werror"
 fi
 
-if [ "${EXPECT_DPDK:-false}" = true ] && \
+if [ "${OTT_EXPECT_DPDK:-false}" = true ] && \
    ! ovs-vswitchd --version | grep -F -q 'DPDK'; then
     record_failure "Expected ovs-vswitchd to report DPDK support."
 fi

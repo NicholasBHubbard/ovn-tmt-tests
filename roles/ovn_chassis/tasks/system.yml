@@ -11,7 +11,7 @@
 - name: Use host address for system chassis encapsulation
   when: ovn_chassis_current_encap_ip | length == 0
   ansible.builtin.set_fact:
-    ovn_chassis_current_encap_ip: "{{ ovn_encap_ip }}"
+    ovn_chassis_current_encap_ip: "{{ ovn_chassis_encap_ip }}"
   changed_when: false
 
 - name: Set system chassis command prefix

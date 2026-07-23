@@ -13,7 +13,7 @@ prepare:
   - name: Set up OVN central
     how: ansible
     playbook: playbooks/ovn-central.yml
-    extra-args: '-e install_method=distro'
+    extra-args: '-e ovn_install_method=distro -e ovs_setup_install_method=distro'
   - name: Check OVN chassis preconditions
     how: shell
     script: ./tests/self/ovn-chassis/pre.sh

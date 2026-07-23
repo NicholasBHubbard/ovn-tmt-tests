@@ -1,18 +1,18 @@
-ovs_install_method: "{{ install_method | default('package') }}"
-ovs_package_names:
+ovs_setup_install_method: package
+ovs_setup_package_names:
   dnf:
     - openvswitch
   apt:
     - openvswitch-switch
-ovs_repository_package_names:
+ovs_setup_repository_package_names:
   dnf: []
   apt: []
 
 # source: build from local source directory
-ovs_source_dir: /usr/src/ovs
-ovs_configure_flags: ""
-ovs_make_flags: ""
-ovs_build_dependency_package_names:
+ovs_setup_source_dir: /usr/src/ovs
+ovs_setup_configure_flags: ""
+ovs_setup_make_flags: ""
+ovs_setup_build_dependency_package_names:
   dnf:
     - autoconf
     - automake
@@ -29,23 +29,23 @@ ovs_build_dependency_package_names:
     - make
     - libssl-dev
     - python3
-ovs_build_repository_package_names:
+ovs_setup_build_repository_package_names:
   dnf: []
   apt: []
 
 # git: clone from repo, then build
-ovs_git_repo: https://github.com/openvswitch/ovs.git
-ovs_git_branch: main
-ovs_git_version: "{{ ovs_git_branch }}"
-ovs_git_package_names:
+ovs_setup_git_repo: https://github.com/openvswitch/ovs.git
+ovs_setup_git_branch: main
+ovs_setup_git_version: "{{ ovs_setup_git_branch }}"
+ovs_setup_git_package_names:
   dnf:
     - git
   apt:
     - git
 
 # configure: bridge and SSL settings
-ovs_bridges: []
-ovs_ssl_enabled: false
-ovs_ssl_private_key: /etc/openvswitch/ovs-privkey.pem
-ovs_ssl_certificate: /etc/openvswitch/ovs-cert.pem
-ovs_ssl_ca_cert: /etc/openvswitch/cacert.pem
+ovs_setup_bridges: []
+ovs_setup_ssl_enabled: false
+ovs_setup_ssl_private_key: /etc/openvswitch/ovs-privkey.pem
+ovs_setup_ssl_certificate: /etc/openvswitch/ovs-cert.pem
+ovs_setup_ssl_ca_cert: /etc/openvswitch/cacert.pem

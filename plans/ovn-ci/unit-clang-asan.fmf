@@ -1,8 +1,8 @@
 summary: OVN unit tests with clang+ASAN
 
 environment+:
-  OVN_CC: clang
-  OVN_CONFIGURE_FLAGS: "--enable-address-sanitizer"
+  OTT_CC: clang
+  OTT_CONFIGURE_FLAGS: "--enable-address-sanitizer"
 
 provision:
   - how: container

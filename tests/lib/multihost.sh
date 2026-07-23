@@ -8,7 +8,7 @@ MULTIHOST_DRIVER_KEY=${MULTIHOST_DRIVER_KEY:-/run/ovn-tmt-tests/multihost-driver
 MULTIHOST_DRIVER_USER=${MULTIHOST_DRIVER_USER:-root}
 
 multihost_debug_enabled() {
-    case "${OVN_TEST_DEBUG:-false}" in
+    case "${OTT_TEST_DEBUG:-false}" in
         true | yes | 1) return 0 ;;
         *) return 1 ;;
     esac

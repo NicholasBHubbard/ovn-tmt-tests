@@ -1,10 +1,10 @@
-ovn_nb_port: 6641
-ovn_sb_port: 6642
-ovn_cluster_members: []
-ovn_ssl_enabled: false
-ovn_log_level: info
-ovn_db_dir: /var/lib/openvswitch
+ovn_central_nb_port: 6641
+ovn_central_sb_port: 6642
+ovn_central_cluster_members: []
+ovn_central_ssl_enabled: false
+ovn_central_log_level: info
+ovn_central_db_dir: /var/lib/openvswitch
 
-ovn_ssl_private_key: /etc/openvswitch/ovn-privkey.pem
-ovn_ssl_certificate: /etc/openvswitch/ovn-cert.pem
-ovn_ssl_ca_cert: /etc/openvswitch/cacert.pem
+ovn_central_ssl_private_key: /etc/openvswitch/ovn-privkey.pem
+ovn_central_ssl_certificate: /etc/openvswitch/ovn-cert.pem
+ovn_central_ssl_ca_cert: /etc/openvswitch/cacert.pem

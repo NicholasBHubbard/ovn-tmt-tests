@@ -9,7 +9,7 @@
                 else 4) }}
       route replace {{ ovs_route.to }}
       {% if ovs_route.via is defined %}via {{ ovs_route.via }}{% endif %}
-      dev {{ ovs_endpoint_interface }}
+      dev {{ ovs_endpoints_interface }}
       {% if ovs_route.metric is defined %}metric {{ ovs_route.metric }}{% endif %}
       {% if ovs_route.table is defined %}table {{ ovs_route.table }}{% endif %}
   loop: "{{ ovs_endpoint.routes | default([]) }}"

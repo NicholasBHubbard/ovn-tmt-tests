@@ -3,11 +3,11 @@
   become: true
   roles:
     - role: ovn_endpoints
-      ovn_endpoint_mode: ports
+      ovn_endpoints_mode: ports
 
 - name: Configure OVN namespace endpoints
   hosts: "{{ ovn_endpoint_compute_hosts | default('compute') }}"
   become: true
   roles:
     - role: ovn_endpoints
-      ovn_endpoint_mode: local
+      ovn_endpoints_mode: local

@@ -8,11 +8,11 @@ prepare:
   - name: Set up OVN central
     how: ansible
     playbook: playbooks/ovn-central.yml
-    extra-args: '-e install_method=distro'
+    extra-args: '-e ovn_install_method=distro -e ovs_setup_install_method=distro'
   - name: Set up OVN chassis
     how: ansible
     playbook: playbooks/ovn-chassis.yml
-    extra-args: '-e install_method=distro'
+    extra-args: '-e ovn_install_method=distro -e ovs_setup_install_method=distro'
   - name: Check endpoint preconditions
     how: shell
     order: 78

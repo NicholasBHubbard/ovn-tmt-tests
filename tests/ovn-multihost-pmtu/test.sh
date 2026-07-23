@@ -4,10 +4,10 @@ set -euo pipefail
 source "$TMT_TREE/tests/lib/multihost.sh"
 multihost_run_playbook "$PWD/setup.yml"
 
-case "$OVN_TEST_ENCAP" in
+case "$OTT_TEST_ENCAP" in
     geneve) system_interface=genev_sys_6081; expected_mtu=942 ;;
     vxlan) system_interface=vxlan_sys_4789; expected_mtu=950 ;;
-    *) echo "Unsupported encapsulation: $OVN_TEST_ENCAP" >&2; exit 2 ;;
+    *) echo "Unsupported encapsulation: $OTT_TEST_ENCAP" >&2; exit 2 ;;
 esac
 
 compute_2_ip=$(multihost_guest_hostname compute-2)
@@ -46,7 +46,7 @@ trap restore_test_state EXIT
 
 for guest in compute-1 compute-2 gateway-1; do
     multihost_exec "$guest" ovs-vsctl set open . \
-        "external-ids:ovn-encap-type=$OVN_TEST_ENCAP"
+        "external-ids:ovn-encap-type=$OTT_TEST_ENCAP"
 done
 
 for _ in {1..30}; do

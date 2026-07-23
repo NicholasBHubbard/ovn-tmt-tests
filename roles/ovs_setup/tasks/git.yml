@@ -2,17 +2,17 @@
   ansible.builtin.include_role:
     name: distro_packages
   vars:
-    distro_package_names: "{{ ovs_git_package_names }}"
-    distro_repository_package_names: "{{ ovs_build_repository_package_names }}"
+    distro_packages_names: "{{ ovs_setup_git_package_names }}"
+    distro_packages_repository_names: "{{ ovs_setup_build_repository_package_names }}"
 
 - name: Clone OVS repository
   ansible.builtin.git:
-    repo: "{{ ovs_git_repo }}"
-    dest: "{{ ovs_source_dir }}"
-    version: "{{ ovs_git_version }}"
+    repo: "{{ ovs_setup_git_repo }}"
+    dest: "{{ ovs_setup_source_dir }}"
+    version: "{{ ovs_setup_git_version }}"
     depth: 1
     single_branch: true
-    refspec: "+{{ ovs_git_version }}:refs/ovs-tmt/{{ ovs_git_version }}"
+    refspec: "+{{ ovs_setup_git_version }}:refs/ovs-tmt/{{ ovs_setup_git_version }}"
 
 - name: Build and install from cloned source
   ansible.builtin.include_tasks: source.yml

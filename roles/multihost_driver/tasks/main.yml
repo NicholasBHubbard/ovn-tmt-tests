@@ -2,7 +2,7 @@
   ansible.builtin.include_role:
     name: distro_packages
   vars:
-    distro_package_names: "{{ multihost_driver_package_names }}"
+    distro_packages_names: "{{ multihost_driver_package_names }}"
 
 - name: Create multihost driver directory
   ansible.builtin.file:

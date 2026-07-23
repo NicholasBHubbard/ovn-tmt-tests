@@ -12,7 +12,7 @@
   vars:
     ovn_endpoint_central_hosts: all
     ovn_endpoint_compute_hosts: all
-    ovn_endpoint_bridge: self-br
+    ovn_endpoints_bridge: self-br
     ovn_endpoints:
       - name: self-vm1
         host: default-0

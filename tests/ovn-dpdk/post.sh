@@ -3,8 +3,8 @@ set -euo pipefail
 
 source "$TMT_TREE/tests/lib/assert.sh"
 
-ovn_source_dir=${OVN_SOURCE_DIR:-/usr/src/ovn}
-ovs_vswitchd="$ovn_source_dir/ovs/vswitchd/ovs-vswitchd"
+source_dir=${OTT_SOURCE_DIR:-/usr/src/ovn}
+ovs_vswitchd="$source_dir/ovs/vswitchd/ovs-vswitchd"
 
 assert_executable "$ovs_vswitchd"
 

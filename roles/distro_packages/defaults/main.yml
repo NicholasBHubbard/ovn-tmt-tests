@@ -1,4 +1,4 @@
-distro_package_names: []
-distro_repository_package_names: []
-distro_package_state: present
-distro_package_update_cache: true
+distro_packages_names: []
+distro_packages_repository_names: []
+distro_packages_state: present
+distro_packages_update_cache: true

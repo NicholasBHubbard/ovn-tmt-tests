@@ -2,7 +2,7 @@
   ansible.builtin.import_playbook: ../../playbooks/ovs-tunnel-mesh.yml
   vars:
     ovs_tunnel_mesh_hosts: compute-1:compute-2:gateway-1
-    ovs_tunnel_meshes:
+    ovs_tunnel_mesh_definitions:
       - name: upstream-provider
         hosts:
           - compute-1

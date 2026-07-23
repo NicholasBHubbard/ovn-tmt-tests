@@ -7,13 +7,13 @@
     tasks_from: namespace.yml
   vars:
     ovs_endpoint: >-
-      {{ ovn_endpoint | combine({'bridge': ovn_endpoint_bridge}) }}
-    ovs_endpoint_mtu: "{{ ovn_endpoint_mtu }}"
+      {{ ovn_endpoint | combine({'bridge': ovn_endpoints_bridge}) }}
+    ovs_endpoints_mtu: "{{ ovn_endpoints_mtu }}"
 
 - name: Create DHCP runtime directory for {{ ovn_endpoint.name }}
   when: ovn_endpoint.dhcp4 | default(false)
   ansible.builtin.file:
-    path: "{{ ovn_endpoint_runtime_dir }}"
+    path: "{{ ovn_endpoints_runtime_dir }}"
     state: directory
     mode: "0755"
 
@@ -40,7 +40,7 @@
   when: ovn_endpoint.dhcp4 | default(false)
   ansible.builtin.file:
     path: >-
-      {{ ovn_endpoint_runtime_dir }}/{{ ovn_endpoint.name }}-dhclient4.managed
+      {{ ovn_endpoints_runtime_dir }}/{{ ovn_endpoint.name }}-dhclient4.managed
     state: touch
     mode: "0600"
 
@@ -58,13 +58,13 @@
       - --timeout
       - >-
         {{ ovn_endpoint.dhcp_timeout
-           | default(ovn_endpoint_dhcp_timeout) | string }}
+           | default(ovn_endpoints_dhcp_timeout) | string }}
       - -pf
       - >-
-        {{ ovn_endpoint_runtime_dir }}/{{ ovn_endpoint.name }}-dhclient4.pid
+        {{ ovn_endpoints_runtime_dir }}/{{ ovn_endpoint.name }}-dhclient4.pid
       - -lf
       - >-
-        {{ ovn_endpoint_runtime_dir }}/{{ ovn_endpoint.name }}-dhclient4.leases
+        {{ ovn_endpoints_runtime_dir }}/{{ ovn_endpoint.name }}-dhclient4.leases
       - "{{ ovn_endpoint.name }}"
   changed_when: true
 

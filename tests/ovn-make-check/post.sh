@@ -1,12 +1,12 @@
 #!/bin/bash
 set -uo pipefail
 
-source_dir=${OVN_SOURCE_DIR:-/usr/src/ovn}
-target=${MAKE_CHECK_TARGET:-check}
+source_dir=${OTT_SOURCE_DIR:-/usr/src/ovn}
+target=${OTT_MAKE_CHECK_TARGET:-check}
 make_args=(-j "$(nproc)" "$target")
 
-if [ -n "${MAKE_CHECK_TESTSUITEFLAGS:-}" ]; then
-    make_args+=("TESTSUITEFLAGS=$MAKE_CHECK_TESTSUITEFLAGS")
+if [ -n "${OTT_MAKE_CHECK_TESTSUITEFLAGS:-}" ]; then
+    make_args+=("TESTSUITEFLAGS=$OTT_MAKE_CHECK_TESTSUITEFLAGS")
 fi
 
 status=0

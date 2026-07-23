@@ -53,7 +53,7 @@ if ! clustered_output=$(ansible-playbook -v -i "$inventory" \
     playbooks/ovn-clustered.yml --check --tags topology-resolution \
     -e ansible_become=false 2>&1); then
     record_failure "Cluster inventory-name fallback failed: $clustered_output"
-elif ! grep -F -q '"ovn_cluster_members": ["leader-node", "follower-node"]' \
+elif ! grep -F -q '"ovn_central_cluster_members": ["leader-node", "follower-node"]' \
     <<< "$clustered_output"; then
     record_failure "Cluster topology did not fall back to inventory names"
 fi

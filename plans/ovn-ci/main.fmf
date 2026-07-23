@@ -1,26 +1,26 @@
 summary: Base configuration for OVN CI plans
 
 environment:
-  MAKE_CHECK_TESTSUITEFLAGS: ""
-  OVN_CC: gcc
-  OVN_CONFIGURE_FLAGS: ""
-  OVN_DPDK: "false"
-  OVN_DPDK_DIR: /usr/local/dpdk
-  OVN_GIT_REPO: https://github.com/ovn-org/ovn.git
-  OVN_GIT_VERSION: main
-  OVN_MAKE_FLAGS: ""
-  OVN_SOURCE_DIR: /usr/src/ovn
-  OVN_WERROR: "true"
+  OTT_MAKE_CHECK_TESTSUITEFLAGS: ""
+  OTT_CC: gcc
+  OTT_CONFIGURE_FLAGS: ""
+  OTT_DPDK: "false"
+  OTT_DPDK_DIR: /usr/local/dpdk
+  OTT_GIT_REPO: https://github.com/ovn-org/ovn.git
+  OTT_GIT_VERSION: main
+  OTT_MAKE_FLAGS: ""
+  OTT_SOURCE_DIR: /usr/src/ovn
+  OTT_WERROR: "true"
 
 prepare:
   - how: ansible
     playbook: playbooks/ovn-install.yml
     extra-args: >-
-      -e ovn_install_method=git -e ovn_cc=$OVN_CC -e ovn_werror=$OVN_WERROR
-      -e ovn_dpdk=$OVN_DPDK -e 'ovn_configure_flags=$OVN_CONFIGURE_FLAGS'
-      -e ovn_git_repo=$OVN_GIT_REPO -e ovn_git_version=$OVN_GIT_VERSION
-      -e 'ovn_source_dir=$OVN_SOURCE_DIR' -e 'ovn_make_flags=$OVN_MAKE_FLAGS'
-      -e 'ovn_dpdk_dir=$OVN_DPDK_DIR'
+      -e ovn_install_method=git -e ovn_install_cc=$OTT_CC -e ovn_install_werror=$OTT_WERROR
+      -e ovn_install_dpdk_enabled=$OTT_DPDK -e 'ovn_install_configure_flags=$OTT_CONFIGURE_FLAGS'
+      -e ovn_install_git_repo=$OTT_GIT_REPO -e ovn_install_git_version=$OTT_GIT_VERSION
+      -e 'ovn_install_source_dir=$OTT_SOURCE_DIR' -e 'ovn_install_make_flags=$OTT_MAKE_FLAGS'
+      -e 'ovn_install_dpdk_dir=$OTT_DPDK_DIR'
 
 execute:
   how: tmt

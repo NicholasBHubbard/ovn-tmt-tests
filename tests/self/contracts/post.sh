@@ -7,6 +7,41 @@ cd_repo_root
 assert_file tests/lib/assert.sh
 assert_file tests/lib/multihost.sh
 assert_file tests/lib/ovn.sh
+assert_file tools/check-naming.py
+
+naming_tree=$(mktemp -d)
+mkdir -p "$naming_tree/plans" "$naming_tree/roles/example/defaults"
+printf '%s\n' 'example: []' \
+    > "$naming_tree/roles/example/defaults/main.yaml"
+printf '%s\n' 'environment:' '  OTT_EXAMPLE: value' \
+    > "$naming_tree/plans/main.fmf"
+if ! python3 tools/check-naming.py "$naming_tree" > /dev/null; then
+    record_failure "Naming checker rejected valid names."
+fi
+
+printf '%s\n' 'wrong_name: true' \
+    > "$naming_tree/roles/example/defaults/main.yaml"
+if [ -f tools/check-naming.py ] && \
+   python3 tools/check-naming.py "$naming_tree" > /dev/null 2>&1; then
+    record_failure "Naming checker accepted an incorrectly prefixed role variable."
+fi
+
+printf '%s\n' 'example: []' \
+    > "$naming_tree/roles/example/defaults/main.yaml"
+printf '%s\n' 'environment:' '  WRONG_NAME: value' \
+    > "$naming_tree/plans/main.fmf"
+if python3 tools/check-naming.py "$naming_tree" > /dev/null 2>&1; then
+    record_failure "Naming checker accepted an incorrectly prefixed environment variable."
+fi
+
+if python3 tools/check-naming.py "$naming_tree/missing" > /dev/null 2>&1; then
+    record_failure "Naming checker accepted a missing repository root."
+fi
+rm -rf "$naming_tree"
+
+if ! python3 tools/check-naming.py "$TMT_TREE"; then
+    record_failure "Repository naming convention failed."
+fi
 
 assert_directory roles/ovn_chassis
 assert_file roles/ovn_chassis/defaults/main.yml
@@ -107,19 +142,19 @@ assert_contains "$multihost_parent" 'playbook: playbooks/ovn-build-artifact.yml'
 assert_contains "$multihost_parent" 'playbook: playbooks/multihost-driver.yml'
 assert_contains "$multihost_parent" 'playbook: playbooks/multihost-driver-authorize.yml'
 assert_contains "$multihost_parent" '-e ovn_install_method=artifact'
-assert_contains "$multihost_parent" '-e ovn_artifact_build=$OVN_ARTIFACT_BUILD'
-assert_contains "$multihost_parent" '-e ovn_artifact_expected_revision=$OVN_ARTIFACT_EXPECTED_REVISION'
-assert_contains "$multihost_parent" "-e ovn_git_repo=\$OVN_GIT_REPO"
-assert_contains "$multihost_parent" "-e ovn_git_version=\$OVN_GIT_VERSION"
-assert_contains "$multihost_parent" 'OVN_SSL_ENABLED: "false"'
-assert_contains "$multihost_parent" 'OVN_TEST_DEBUG: "false"'
+assert_contains "$multihost_parent" '-e ovn_artifact_build=$OTT_ARTIFACT_BUILD'
+assert_contains "$multihost_parent" '-e ovn_artifact_expected_revision=$OTT_ARTIFACT_EXPECTED_REVISION'
+assert_contains "$multihost_parent" "-e ovn_install_git_repo=\$OTT_GIT_REPO"
+assert_contains "$multihost_parent" "-e ovn_install_git_version=\$OTT_GIT_VERSION"
+assert_contains "$multihost_parent" 'OTT_SSL_ENABLED: "false"'
+assert_contains "$multihost_parent" 'OTT_TEST_DEBUG: "false"'
 assert_contains "$multihost_parent" 'playbook: playbooks/ovn-test-pki-create.yml'
 assert_contains "$multihost_parent" 'playbook: playbooks/ovn-test-pki-install.yml'
-assert_contains "$multihost_parent" '-e ovn_test_pki_enabled=$OVN_SSL_ENABLED'
+assert_contains "$multihost_parent" '-e ovn_test_pki_enabled=$OTT_SSL_ENABLED'
 
 multihost_topology_prepare=$(sed -n \
     '/  - name: Set up OVN topology/,/^$/p' "$multihost_parent")
-if [[ "$multihost_topology_prepare" != *'-e ovn_ssl_enabled=$OVN_SSL_ENABLED'* ]]; then
+if [[ "$multihost_topology_prepare" != *'-e ovn_multihost_ssl_enabled=$OTT_SSL_ENABLED'* ]]; then
     record_failure "OVN TLS setting is not passed to multihost topology setup"
 fi
 
@@ -129,10 +164,10 @@ assert_file roles/ovn_test_pki/defaults/main.yml
 assert_file roles/ovn_test_pki/tasks/create.yml
 assert_file roles/ovn_test_pki/tasks/install.yml
 assert_contains playbooks/multihost.yml \
-    "'ssl' if ovn_ssl_enabled | default(false) | bool else 'tcp'"
+    'if ovn_multihost_ssl_enabled | default(false) | bool'
 assert_contains roles/ovn_central/tasks/main.yml 'del-ssl'
 assert_contains roles/ovs_setup/tasks/configure.yml 'del-ssl'
-assert_contains plans/self/multihost/minimal.fmf 'OVN_SSL_ENABLED: "true"'
+assert_contains plans/self/multihost/minimal.fmf 'OTT_SSL_ENABLED: "true"'
 
 for plan in plans/ovn-multihost/*.fmf; do
     [ "$plan" = "$multihost_parent" ] && continue
@@ -247,10 +282,10 @@ printf '%s\n' \
     > "$artifact_manifest"
 
 if run_artifact_install \
-    -e ovn_dpdk=true \
-    -e ovn_dpdk_version=24.11.1 \
-    -e ovn_dpdk_checksum=checksum \
-    -e ovn_dpdk_drivers=drivers; then
+    -e ovn_install_dpdk_enabled=true \
+    -e ovn_install_dpdk_version=24.11.1 \
+    -e ovn_install_dpdk_checksum=checksum \
+    -e ovn_install_dpdk_drivers=drivers; then
     record_failure "OVN artifact installation accepted the wrong DPDK identity."
 elif ! grep -F -q 'OVN artifact build configuration does not match the request.' "$artifact_output"; then
     record_failure "OVN artifact installation did not report a DPDK identity failure."
@@ -301,12 +336,12 @@ assert_file tests/ovn-scale-density-light/main.fmf
 assert_file "$scale_test"
 assert_executable "$scale_test"
 assert_contains "$scale_plan" 'environment+:'
-assert_contains "$scale_plan" 'OVN_SCALE_INITIAL_PORTS:'
-assert_contains "$scale_plan" 'OVN_SCALE_ITERATIONS:'
-assert_contains "$scale_plan" 'OVN_SCALE_TIMEOUT:'
-assert_contains "$scale_plan" 'OVN_SCALE_IPV4:'
-assert_contains "$scale_plan" 'OVN_SCALE_IPV6:'
-assert_contains "$scale_plan" 'OVN_SCALE_MTU:'
+assert_contains "$scale_plan" 'OTT_SCALE_INITIAL_PORTS:'
+assert_contains "$scale_plan" 'OTT_SCALE_ITERATIONS:'
+assert_contains "$scale_plan" 'OTT_SCALE_TIMEOUT:'
+assert_contains "$scale_plan" 'OTT_SCALE_IPV4:'
+assert_contains "$scale_plan" 'OTT_SCALE_IPV6:'
+assert_contains "$scale_plan" 'OTT_SCALE_MTU:'
 assert_contains "$scale_plan" '/tests/ovn-scale-density-light'
 assert_contains "$scale_test" 'ovn-nbctl --wait=hv'
 assert_contains "$scale_test" 'metrics.csv'

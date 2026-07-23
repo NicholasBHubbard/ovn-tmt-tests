@@ -293,12 +293,12 @@ scale_verify_cleanup() {
 scale_main() {
     local index guest start end
 
-    SCALE_INITIAL_PORTS=${OVN_SCALE_INITIAL_PORTS:-2}
-    SCALE_ITERATIONS=${OVN_SCALE_ITERATIONS:-3}
-    SCALE_TIMEOUT=${OVN_SCALE_TIMEOUT:-60}
-    SCALE_IPV4=${OVN_SCALE_IPV4:-true}
-    SCALE_IPV6=${OVN_SCALE_IPV6:-true}
-    SCALE_MTU=${OVN_SCALE_MTU:-1342}
+    SCALE_INITIAL_PORTS=${OTT_SCALE_INITIAL_PORTS:-2}
+    SCALE_ITERATIONS=${OTT_SCALE_ITERATIONS:-3}
+    SCALE_TIMEOUT=${OTT_SCALE_TIMEOUT:-60}
+    SCALE_IPV4=${OTT_SCALE_IPV4:-true}
+    SCALE_IPV6=${OTT_SCALE_IPV6:-true}
+    SCALE_MTU=${OTT_SCALE_MTU:-1342}
     SCALE_SWITCH=scale-density-light
     SCALE_METRICS_FILE="${TMT_TEST_DATA:?}/metrics.csv"
     SCALE_CLEANED=false
@@ -318,7 +318,7 @@ scale_main() {
         return 2
     fi
     if ! scale_validate_mtu "$SCALE_MTU" "$SCALE_IPV6"; then
-        echo "OVN_SCALE_MTU must be 576-65535, or 1280-65535 with IPv6" >&2
+        echo "OTT_SCALE_MTU must be 576-65535, or 1280-65535 with IPv6" >&2
         return 2
     fi
 

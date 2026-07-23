@@ -6,11 +6,11 @@
     ovn_artifact_action: validate
 
 - name: Install DPDK runtime dependencies
-  when: ovn_dpdk | bool
+  when: ovn_install_dpdk_enabled | bool
   ansible.builtin.include_role:
     name: distro_packages
   vars:
-    distro_package_names: "{{ ovn_dpdk_runtime_package_names }}"
+    distro_packages_names: "{{ ovn_install_dpdk_runtime_package_names }}"
 
 - name: Install OVN artifact
   ansible.builtin.unarchive:
