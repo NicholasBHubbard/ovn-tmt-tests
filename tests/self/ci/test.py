@@ -103,6 +103,7 @@ class TestResult:
             "tmt lint plans tests",
             "pip install ansible-lint",
             "ansible-lint --strict playbooks roles",
+            "pip install ansible-core pytest pyyaml ruff==0.15.22",
             "ruff check --show-fixes tests/lib/ovn_test tests/ovn-scale tests/self",
             "ruff format --check tests/lib/ovn_test tests/ovn-scale tests/self",
         ):
