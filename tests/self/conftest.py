@@ -25,4 +25,9 @@ def test_data(tmp_path):
 def snapshots(test_data):
     from ovn_test.state import Snapshots
 
-    return Snapshots(test_data / "snapshots")
+    return Snapshots.from_environment(
+        {
+            **os.environ,
+            "TMT_TEST_DATA": str(test_data),
+        }
+    )

@@ -185,6 +185,30 @@ def test_snapshots_use_tmt_test_data(tmp_path):
     assert (tmp_path / "snapshots" / "switch-id").read_text() == "uuid-2"
 
 
+def test_snapshots_prefer_stable_tmt_plan_data(tmp_path):
+    plan_data = tmp_path / "plan"
+    test_data = tmp_path / "test"
+    snapshots = Snapshots.from_environment(
+        {
+            "TMT_PLAN_DATA": str(plan_data),
+            "TMT_TEST_DATA": str(test_data),
+        }
+    )
+
+    snapshots.save("switch-id", "uuid-3")
+
+    assert (plan_data / "snapshots" / "switch-id").read_text() == "uuid-3"
+    assert not test_data.exists()
+
+
+def test_snapshots_accept_tmt_plan_data_without_test_data(tmp_path):
+    snapshots = Snapshots.from_environment({"TMT_PLAN_DATA": str(tmp_path)})
+
+    snapshots.save("switch-id", "uuid-4")
+
+    assert (tmp_path / "snapshots" / "switch-id").read_text() == "uuid-4"
+
+
 def test_ovsdb_decodes_json_rows():
     payload = {
         "headings": ["name", "ports", "external_ids", "_uuid"],

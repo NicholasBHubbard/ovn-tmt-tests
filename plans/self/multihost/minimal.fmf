@@ -17,7 +17,7 @@ provision:
     image: fedora
     connection: system
 
-prepare:
+prepare+:
   - name: Set up cross-guest test driver
     how: ansible
     where: [central]

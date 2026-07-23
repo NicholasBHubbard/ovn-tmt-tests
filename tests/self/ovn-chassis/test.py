@@ -58,8 +58,14 @@ class TestPreconditions:
         assert not runner.succeeds("ovs-vsctl", "br-exists", bridge)
 
     @pytest.mark.parametrize("key", EXTERNAL_IDS)
-    def test_external_id_is_absent(self, ovs, key):
-        assert key not in external_ids(ovs)
+    def test_external_id_is_absent(self, runner, key):
+        assert not runner.succeeds(
+            "ovs-vsctl",
+            "get",
+            "open",
+            ".",
+            f"external-ids:{key}",
+        )
 
 
 class TestInitial:

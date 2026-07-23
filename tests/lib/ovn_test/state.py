@@ -9,7 +9,8 @@ class Snapshots:
     @classmethod
     def from_environment(cls, environment=None):
         environment = os.environ if environment is None else environment
-        return cls(Path(environment["TMT_TEST_DATA"]) / "snapshots")
+        data = environment.get("TMT_PLAN_DATA") or environment["TMT_TEST_DATA"]
+        return cls(Path(data) / "snapshots")
 
     def path(self, name):
         path = self.root / name

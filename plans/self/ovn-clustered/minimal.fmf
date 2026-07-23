@@ -17,7 +17,7 @@ provision:
     image: fedora
     connection: system
 
-prepare:
+prepare+:
   - name: Check preconditions on all nodes
     how: shell
     where: [leader, follower]

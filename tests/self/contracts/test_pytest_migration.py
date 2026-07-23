@@ -49,6 +49,25 @@ def test_self_test_suite_dependencies_extend_parent():
     assert not replacements
 
 
+def test_multiguest_pytest_dependencies_apply_to_every_guest():
+    for suite in ("multihost", "ovn-clustered"):
+        base = yaml.safe_load((SELF_PLANS / suite / "main.fmf").read_text())
+        packages = {
+            package
+            for phase in base["prepare"]
+            if phase["how"] == "install"
+            for package in phase["package"]
+        }
+        assert packages == {"python3-pytest", "python3-pyyaml"}
+
+        for path in (SELF_PLANS / suite).glob("*.fmf"):
+            if path.name == "main.fmf":
+                continue
+            metadata = yaml.safe_load(path.read_text())
+            assert "prepare" not in metadata, path
+            assert "prepare+" in metadata, path
+
+
 def test_self_test_plans_do_not_run_shell_files():
     references = [
         path for path in SELF_PLANS.rglob("*.fmf") if ".sh" in path.read_text()

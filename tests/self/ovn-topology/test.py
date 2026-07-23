@@ -92,7 +92,7 @@ class TestInitial:
         }
         assert switch_port["type"] == "router"
         assert switch_port["options"]["router-port"] == "self-rp"
-        assert switch_port["addresses"] == ["router"]
+        assert switch_port["addresses"] == "router"
         assert attached_to(nb, "Logical_Router", "ports", port["_uuid"]) == ["self-r1"]
         assert attached_to(nb, "Logical_Switch", "ports", switch_port["_uuid"]) == [
             "self-sw"
@@ -125,7 +125,7 @@ class TestInitial:
         assert localnet["type"] == "localnet"
         assert localnet["options"]["network_name"] == "self-provider"
         assert localnet["tag"] == 100
-        assert localnet["addresses"] == ["unknown"]
+        assert localnet["addresses"] == "unknown"
         assert attached_to(nb, "Logical_Switch", "ports", localnet["_uuid"]) == [
             "self-sw"
         ]
@@ -242,7 +242,7 @@ class TestInitial:
             "192.0.2.101:80": "192.0.2.3:8080",
         }
         assert load_balancer["options"]["reject"] == "true"
-        assert load_balancer["selection_fields"] == ["ip_src"]
+        assert load_balancer["selection_fields"] == "ip_src"
         assert sorted(
             attached_to(
                 nb,
@@ -368,7 +368,7 @@ class TestResult:
         assert port["options"] == {"gateway_mtu": "1300"}
         assert switch_port["type"] == "router"
         assert switch_port["options"] == {"router-port": "self-rp"}
-        assert switch_port["addresses"] == ["router"]
+        assert switch_port["addresses"] == "router"
         assert attached_to(nb, "Logical_Router", "ports", port["_uuid"]) == ["self-r3"]
         assert attached_to(nb, "Logical_Switch", "ports", switch_port["_uuid"]) == [
             "self-moved"
@@ -399,7 +399,7 @@ class TestResult:
         assert localnet["type"] == "localnet"
         assert localnet["options"]["network_name"] == "self-provider-moved"
         assert localnet["tag"] == []
-        assert localnet["addresses"] == ["unknown"]
+        assert localnet["addresses"] == "unknown"
         assert attached_to(nb, "Logical_Switch", "ports", localnet["_uuid"]) == [
             "self-moved"
         ]
@@ -541,7 +541,7 @@ class TestResult:
         assert load_balancer["protocol"] == "tcp"
         assert load_balancer["vips"] == {"198.51.100.100:443": "198.51.100.10:8443"}
         assert load_balancer["options"] == {"reject": "false"}
-        assert load_balancer["selection_fields"] == ["ip_dst"]
+        assert load_balancer["selection_fields"] == "ip_dst"
         assert load_balancer["_uuid"] == snapshots.load("load-balancer")
         assert attached_to(
             nb,

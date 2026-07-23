@@ -63,7 +63,7 @@ def assert_logical_port(nb, name, switch, mac, addresses):
         columns=("name",),
     )
     assert [row["name"] for row in switches] == [switch]
-    assert port["addresses"] == [" ".join((mac, *addresses))]
+    assert port["addresses"] == " ".join((mac, *addresses))
 
 
 class TestPreconditions:
@@ -124,9 +124,10 @@ class TestInitial:
         )
 
     def test_port_configuration(self, nb):
-        assert named(nb, "Logical_Switch_Port", "self-port3", "addresses")[
-            "addresses"
-        ] == ["02:00:00:00:03:01 dynamic"]
+        assert (
+            named(nb, "Logical_Switch_Port", "self-port3", "addresses")["addresses"]
+            == "02:00:00:00:03:01 dynamic"
+        )
         options = named(nb, "Logical_Switch_Port", "self-port1", "options")["options"]
         assert options["requested-chassis"] == "default-0"
         assert options["mcast_flood"] == "false"
