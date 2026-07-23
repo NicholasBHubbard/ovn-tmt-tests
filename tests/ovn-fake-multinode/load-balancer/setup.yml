@@ -1,5 +1,5 @@
 - name: Apply multi-chassis load-balancer topology
-  ansible.builtin.import_playbook: ../../playbooks/ovn-topology.yml
+  ansible.builtin.import_playbook: ../../../playbooks/ovn-topology.yml
   vars:
     ovn_switches:
       - name: lb-backend-switch
@@ -49,7 +49,7 @@
           - lb-router
 
 - name: Apply multi-chassis load-balancer endpoints
-  ansible.builtin.import_playbook: ../../playbooks/ovn-endpoints.yml
+  ansible.builtin.import_playbook: ../../../playbooks/ovn-endpoints.yml
   vars:
     ovn_endpoints:
       - name: lb-backend-a
@@ -74,7 +74,7 @@
             via: 10.80.0.1
 
 - name: Apply load-balancer external client
-  ansible.builtin.import_playbook: ../../playbooks/ovs-endpoints.yml
+  ansible.builtin.import_playbook: ../../../playbooks/ovs-endpoints.yml
   vars:
     ovs_endpoint_hosts: compute
     ovs_endpoints:

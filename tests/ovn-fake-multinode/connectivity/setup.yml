@@ -1,5 +1,5 @@
 - name: Apply the top-down topology configuration
-  ansible.builtin.import_playbook: ../../playbooks/ovn-topology.yml
+  ansible.builtin.import_playbook: ../../../playbooks/ovn-topology.yml
   vars:
     ovn_switches:
       - name: sw0
@@ -25,7 +25,7 @@
           - 2000::a/64
 
 - name: Apply the top-down endpoint configuration
-  ansible.builtin.import_playbook: ../../playbooks/ovn-endpoints.yml
+  ansible.builtin.import_playbook: ../../../playbooks/ovn-endpoints.yml
   vars:
     ovn_endpoints:
       - name: sw0p1

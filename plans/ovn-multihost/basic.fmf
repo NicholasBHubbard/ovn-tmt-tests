@@ -21,4 +21,4 @@ discover:
   how: fmf
   where: [central]
   test:
-    - /tests/ovn-multihost-connectivity
+    - /tests/ovn-fake-multinode/connectivity

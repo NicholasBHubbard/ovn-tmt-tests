@@ -1,5 +1,5 @@
 - name: Apply gateway NAT topology
-  ansible.builtin.import_playbook: ../../playbooks/ovn-topology.yml
+  ansible.builtin.import_playbook: ../../../playbooks/ovn-topology.yml
   vars:
     ovn_switches:
       - name: nat-private
@@ -38,7 +38,7 @@
         logical_ip: 10.0.0.10
 
 - name: Apply internal endpoint
-  ansible.builtin.import_playbook: ../../playbooks/ovn-endpoints.yml
+  ansible.builtin.import_playbook: ../../../playbooks/ovn-endpoints.yml
   vars:
     ovn_endpoints:
       - name: nat-internal
@@ -53,7 +53,7 @@
             via: 10.0.0.1
 
 - name: Apply external endpoint
-  ansible.builtin.import_playbook: ../../playbooks/ovs-endpoints.yml
+  ansible.builtin.import_playbook: ../../../playbooks/ovs-endpoints.yml
   vars:
     ovs_endpoint_hosts: gateway
     ovs_endpoints:

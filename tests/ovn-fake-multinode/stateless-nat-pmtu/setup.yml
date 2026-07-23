@@ -1,5 +1,5 @@
 - name: Apply stateless NAT PMTU topology
-  ansible.builtin.import_playbook: ../../playbooks/ovn-topology.yml
+  ansible.builtin.import_playbook: ../../../playbooks/ovn-topology.yml
   vars:
     ovn_switches:
       - name: snat-private
@@ -42,7 +42,7 @@
         nexthop: 172.19.0.1
 
 - name: Apply stateless NAT PMTU endpoint
-  ansible.builtin.import_playbook: ../../playbooks/ovn-endpoints.yml
+  ansible.builtin.import_playbook: ../../../playbooks/ovn-endpoints.yml
   vars:
     ovn_endpoints:
       - name: snat-internal

@@ -1,5 +1,5 @@
 - name: Apply always-tunnel topology
-  ansible.builtin.import_playbook: ../../playbooks/ovn-topology.yml
+  ansible.builtin.import_playbook: ../../../playbooks/ovn-topology.yml
   vars:
     ovn_switches:
       - name: at-sw0
@@ -32,7 +32,7 @@
           - 20.60.0.1/24
 
 - name: Apply always-tunnel endpoints
-  ansible.builtin.import_playbook: ../../playbooks/ovn-endpoints.yml
+  ansible.builtin.import_playbook: ../../../playbooks/ovn-endpoints.yml
   vars:
     ovn_endpoints:
       - name: at-vm1

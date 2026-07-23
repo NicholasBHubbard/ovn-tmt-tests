@@ -1,5 +1,5 @@
 - name: Apply IPv6 NA topology
-  ansible.builtin.import_playbook: ../../playbooks/ovn-topology.yml
+  ansible.builtin.import_playbook: ../../../playbooks/ovn-topology.yml
   vars:
     ovn_switches:
       - name: na-internal-a
@@ -58,7 +58,7 @@
         external_mac: "0a:0a:56:96:02:11"
 
 - name: Apply IPv6 NA internal endpoints
-  ansible.builtin.import_playbook: ../../playbooks/ovn-endpoints.yml
+  ansible.builtin.import_playbook: ../../../playbooks/ovn-endpoints.yml
   vars:
     ovn_endpoints:
       - name: na-internal1
@@ -102,7 +102,7 @@
             via: 2001:92::a
 
 - name: Apply IPv6 NA external endpoints
-  ansible.builtin.import_playbook: ../../playbooks/ovs-endpoints.yml
+  ansible.builtin.import_playbook: ../../../playbooks/ovs-endpoints.yml
   vars:
     ovs_endpoint_hosts: compute
     ovs_endpoints:

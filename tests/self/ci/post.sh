@@ -26,7 +26,7 @@ assert_file "$change_selector"
 assert_executable "$change_selector"
 
 assert_change_selection true "an OVN-CI plan change" plans/ovn-ci/main.fmf
-assert_change_selection true "an OVN workload test change" tests/ovn-make-check/post.sh
+assert_change_selection true "an OVN workload test change" tests/ovn-ci/make-check/post.sh
 assert_change_selection true "an unknown future code path" components/new/config.yml
 assert_change_selection true "mixed documentation and code changes" README.md roles/ovn_install/tasks/main.yml
 assert_change_selection false "non-functional changes" README.md Unified-OVN-Test-System-Proposal.md LICENSE LICENSE.txt COPYING COPYING.md .gitignore docs/guide.md

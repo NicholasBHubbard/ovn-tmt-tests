@@ -174,7 +174,8 @@ for plan in plans/ovn-multihost/*.fmf; do
     assert_not_contains "$plan" 'playbook: playbooks/multihost.yml'
 done
 
-for test in tests/ovn-multihost-*/test.sh; do
+for test in tests/ovn-fake-multinode/*/test.sh; do
+    [ "$test" = tests/ovn-fake-multinode/gateway-nat/test.sh ] && continue
     assert_contains "$test" 'multihost_run_playbook "$PWD/setup.yml"'
     setup=${test%/test.sh}/setup.yml
     if grep -F -q "playbook: $setup" plans/ovn-multihost/*.fmf; then
@@ -330,9 +331,9 @@ elif ! grep -F -q 'The requested reusable OVN artifact is missing.' "$artifact_o
 fi
 
 scale_plan=plans/ovn-multihost/scale-density-light.fmf
-scale_test=tests/ovn-scale-density-light/test.sh
+scale_test=tests/ovn-scale/density-light/test.sh
 assert_file "$scale_plan"
-assert_file tests/ovn-scale-density-light/main.fmf
+assert_file tests/ovn-scale/density-light/main.fmf
 assert_file "$scale_test"
 assert_executable "$scale_test"
 assert_contains "$scale_plan" 'environment+:'
@@ -342,7 +343,7 @@ assert_contains "$scale_plan" 'OTT_SCALE_TIMEOUT:'
 assert_contains "$scale_plan" 'OTT_SCALE_IPV4:'
 assert_contains "$scale_plan" 'OTT_SCALE_IPV6:'
 assert_contains "$scale_plan" 'OTT_SCALE_MTU:'
-assert_contains "$scale_plan" '/tests/ovn-scale-density-light'
+assert_contains "$scale_plan" '/tests/ovn-scale/density-light'
 assert_contains "$scale_test" 'ovn-nbctl --wait=hv'
 assert_contains "$scale_test" 'metrics.csv'
 assert_contains "$scale_test" 'scale_cleanup'

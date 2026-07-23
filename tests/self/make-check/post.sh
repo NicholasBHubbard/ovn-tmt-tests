@@ -38,7 +38,7 @@ MAKEFILE
 if TMT_TEST_DATA=$data_dir \
     OTT_SOURCE_DIR=$source_dir \
     OTT_MAKE_CHECK_TESTSUITEFLAGS=7-9 \
-    ./tests/ovn-make-check/post.sh; then
+    ./tests/ovn-ci/make-check/post.sh; then
     make_status=0
 else
     make_status=$?
@@ -92,7 +92,7 @@ fi
 
 if ! TMT_TEST_DATA=$data_dir \
     OTT_SOURCE_DIR=$source_dir \
-    ./tests/ovn-distcheck/post.sh; then
+    ./tests/ovn-ci/distcheck/post.sh; then
     record_failure "OVN distcheck workload did not produce its archive"
 fi
 

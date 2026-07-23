@@ -38,4 +38,4 @@ discover:
   how: fmf
   where: [central]
   test:
-    - /tests/ovn-scale-density-light
+    - /tests/ovn-scale/density-light

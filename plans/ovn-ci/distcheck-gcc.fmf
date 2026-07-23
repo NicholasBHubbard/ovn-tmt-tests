@@ -14,4 +14,4 @@ prepare+:
 discover:
   how: fmf
   test:
-    - /tests/ovn-distcheck
+    - /tests/ovn-ci/distcheck

@@ -21,16 +21,16 @@ prepare+:
   - name: Set up gateway NAT test scenario
     how: ansible
     order: 80
-    playbook: tests/ovn-gateway-nat/setup.yml
+    playbook: tests/ovn-fake-multinode/gateway-nat/setup.yml
 
 discover:
   - name: compute
     how: fmf
     where: compute
     test:
-      - /tests/ovn-gateway-nat
+      - /tests/ovn-fake-multinode/gateway-nat
   - name: gateway
     how: fmf
     where: gateway
     test:
-      - /tests/ovn-gateway-nat
+      - /tests/ovn-fake-multinode/gateway-nat

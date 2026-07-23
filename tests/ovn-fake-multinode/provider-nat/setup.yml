@@ -1,5 +1,5 @@
 - name: Apply provider NAT topology
-  ansible.builtin.import_playbook: ../../playbooks/ovn-topology.yml
+  ansible.builtin.import_playbook: ../../../playbooks/ovn-topology.yml
   vars:
     ovn_switches:
       - name: npl-private-a
@@ -63,7 +63,7 @@
         logical_ip: 20.40.0.0/24
 
 - name: Apply provider NAT endpoints
-  ansible.builtin.import_playbook: ../../playbooks/ovn-endpoints.yml
+  ansible.builtin.import_playbook: ../../../playbooks/ovn-endpoints.yml
   vars:
     ovn_endpoints:
       - name: npl-private-a1

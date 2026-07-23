@@ -86,7 +86,7 @@ discover:
   where:
     - compute
   test:
-    - /tests/ovn-multihost-connectivity
+    - /tests/ovn-fake-multinode/connectivity
 
 execute:
   how: tmt

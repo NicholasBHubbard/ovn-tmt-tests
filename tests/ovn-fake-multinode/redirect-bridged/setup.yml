@@ -1,5 +1,5 @@
 - name: Apply redirect-bridged topology
-  ansible.builtin.import_playbook: ../../playbooks/ovn-topology.yml
+  ansible.builtin.import_playbook: ../../../playbooks/ovn-topology.yml
   vars:
     ovn_switches:
       - name: rr-local
@@ -34,7 +34,7 @@
         priority: 50
 
 - name: Apply redirect-bridged endpoints
-  ansible.builtin.import_playbook: ../../playbooks/ovn-endpoints.yml
+  ansible.builtin.import_playbook: ../../../playbooks/ovn-endpoints.yml
   vars:
     ovn_endpoints:
       - name: rr-vm1
