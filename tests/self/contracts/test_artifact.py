@@ -238,3 +238,17 @@ def test_missing_reusable_artifact_is_rejected(tree, tmp_path, manifest):
         },
     )
     assert_rejected(result, "The requested reusable OVN artifact is missing.")
+
+
+def test_disabled_artifact_build_skips_role(tree):
+    result = playbook(
+        Runner(),
+        tree,
+        "playbooks/ovn-build-artifact.yml",
+        {
+            "ovn_artifact_builder_hosts": "all",
+            "ovn_artifact_enabled": False,
+            "ovn_artifact_action": "invalid",
+        },
+    )
+    assert result.returncode == 0

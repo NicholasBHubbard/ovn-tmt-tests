@@ -4,3 +4,4 @@
   roles:
     - role: ovn_artifact
       ovn_artifact_action: build
+      when: ovn_artifact_enabled | default(true) | bool

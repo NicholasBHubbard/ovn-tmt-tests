@@ -1,3 +1,5 @@
+import shlex
+
 import pytest
 import yaml
 
@@ -132,13 +134,38 @@ def test_ovn_ci_children_inherit_execution(tree):
             assert "\nexecute:" not in f"\n{plan.read_text()}"
 
 
+def test_plan_role_configuration_is_top_down(tree):
+    for path, default in (
+        ("plans/ovn-ci/main.fmf", "git"),
+        ("plans/ovn-multihost/main.fmf", "artifact"),
+    ):
+        text = content(tree, path)
+        assert f"OTT_INSTALL_METHOD: {default}" in text
+        assert "-e ovn_install_method=$OTT_INSTALL_METHOD" in text
+
+    plans = tree / "plans"
+    for path in plans.rglob("*.fmf"):
+        if path.is_relative_to(plans / "self"):
+            continue
+        metadata = yaml.safe_load(path.read_text()) or {}
+        for key in ("prepare", "prepare+", "prepare+<"):
+            phases = metadata.get(key, [])
+            for phase in phases if isinstance(phases, list) else [phases]:
+                arguments = shlex.split(phase.get("extra-args", ""))
+                for option, assignment in zip(arguments, arguments[1:]):
+                    if option == "-e" and "=" in assignment:
+                        assert "$OTT_" in assignment, (path, assignment)
+
+
 def test_multihost_parent_propagates_configuration(tree):
     path = "plans/ovn-multihost/main.fmf"
     expected = (
         "playbook: playbooks/ovn-build-artifact.yml",
         "playbook: playbooks/multihost-driver.yml",
         "playbook: playbooks/multihost-driver-authorize.yml",
-        "-e ovn_install_method=artifact",
+        "OTT_INSTALL_METHOD: artifact",
+        '-e \'ovn_artifact_enabled={{ "$OTT_INSTALL_METHOD" == "artifact" }}\'',
+        "-e ovn_install_method=$OTT_INSTALL_METHOD",
         "-e ovn_artifact_build=$OTT_ARTIFACT_BUILD",
         "-e ovn_artifact_expected_revision=$OTT_ARTIFACT_EXPECTED_REVISION",
         "-e ovn_install_git_repo=$OTT_GIT_REPO",

@@ -8,6 +8,7 @@ environment:
   OTT_DPDK_DIR: /usr/local/dpdk
   OTT_GIT_REPO: https://github.com/ovn-org/ovn.git
   OTT_GIT_VERSION: main
+  OTT_INSTALL_METHOD: git
   OTT_MAKE_FLAGS: ""
   OTT_SOURCE_DIR: /usr/src/ovn
   OTT_WERROR: "true"
@@ -16,7 +17,8 @@ prepare:
   - how: ansible
     playbook: playbooks/ovn-install.yml
     extra-args: >-
-      -e ovn_install_method=git -e ovn_install_cc=$OTT_CC -e ovn_install_werror=$OTT_WERROR
+      -e ovn_install_method=$OTT_INSTALL_METHOD
+      -e ovn_install_cc=$OTT_CC -e ovn_install_werror=$OTT_WERROR
       -e ovn_install_dpdk_enabled=$OTT_DPDK -e 'ovn_install_configure_flags=$OTT_CONFIGURE_FLAGS'
       -e ovn_install_git_repo=$OTT_GIT_REPO -e ovn_install_git_version=$OTT_GIT_VERSION
       -e 'ovn_install_source_dir=$OTT_SOURCE_DIR' -e 'ovn_install_make_flags=$OTT_MAKE_FLAGS'
