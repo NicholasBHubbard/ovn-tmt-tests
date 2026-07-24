@@ -35,13 +35,6 @@ prepare+:
     package:
       - iproute
       - iputils
-  - name: Install Python test dependencies
-    how: install
-    order: 20
-    where: [central]
-    package:
-      - python3-pytest
-      - python3-pyyaml
 
 discover:
   how: fmf

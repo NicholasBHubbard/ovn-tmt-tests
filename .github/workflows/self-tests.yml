@@ -27,8 +27,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y podman qemu-system-x86 \
-            libvirt-daemon-system libvirt-dev pkg-config genisoimage ansible-core \
-            python3-pytest python3-yaml
+            libvirt-daemon-system libvirt-dev pkg-config genisoimage ansible-core
           ansible-galaxy collection install ansible.posix community.general
           pipx install 'tmt[provision-container,provision-virtual]'
 

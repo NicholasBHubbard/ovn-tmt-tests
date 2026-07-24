@@ -1,3 +1,0 @@
-require:
-  - python3-pytest
-  - python3-pyyaml

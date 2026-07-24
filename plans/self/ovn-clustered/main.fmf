@@ -1,12 +1,12 @@
 summary: Base configuration for OVN clustered-mode self-tests
 
 prepare:
-  - name: Install Python self-test dependencies
+  - name: Install Python prepare dependencies
     how: install
     order: 75
+    where: [follower]
     package:
       - python3-pytest
-      - python3-pyyaml
 
 discover:
   how: fmf
