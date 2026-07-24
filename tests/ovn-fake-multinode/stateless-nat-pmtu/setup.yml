@@ -111,14 +111,26 @@
           - snat-router
       changed_when: true
 
+    - name: Find downstream link
+      ansible.builtin.command:
+        argv: [ip, -n, snat-router, link, show, snat-down]
+      register: snat_down
+      failed_when: false
+      changed_when: false
+
     - name: Create downstream link
-      ansible.builtin.shell:
-        cmd: |
-          if ! ip -n snat-router link show snat-down >/dev/null 2>&1; then
-              ip link add snat-down type veth peer name snat-far
-              ip link set snat-down netns snat-router
-              ip link set snat-far netns snat-far
-          fi
+      when: snat_down.rc != 0
+      ansible.builtin.command:
+        argv: [ip, link, add, snat-down, type, veth, peer, name, snat-far]
+      changed_when: true
+
+    - name: Move downstream interfaces into namespaces
+      when: snat_down.rc != 0
+      ansible.builtin.command:
+        argv: "{{ item }}"
+      loop:
+        - [ip, link, set, snat-down, netns, snat-router]
+        - [ip, link, set, snat-far, netns, snat-far]
       changed_when: true
 
     - name: Configure external router interfaces

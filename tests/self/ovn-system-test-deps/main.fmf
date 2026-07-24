@@ -1,4 +1,3 @@
 summary: Verify OVN system test dependencies are installed
 test: python3 -m pytest -q -s ./test.py::TestResult
-framework: shell
 duration: 5m

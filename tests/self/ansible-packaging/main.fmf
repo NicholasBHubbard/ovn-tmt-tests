@@ -1,4 +1,3 @@
 summary: Verify Ansible package configuration
 test: python3 -m pytest -q -s ./test.py::TestResult
-framework: shell
 duration: 1m

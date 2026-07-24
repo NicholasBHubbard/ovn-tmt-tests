@@ -1,6 +1,3 @@
-import os
-import stat
-
 from ovn_test.command import Runner
 
 
@@ -38,51 +35,6 @@ class TestResult:
             in result.stdout + result.stderr
         )
 
-    def test_workload_preserves_status_and_artifacts(self, tree, tmp_path):
-        source = tmp_path / "source"
-        data = tmp_path / "data"
-        source.mkdir()
-        data.mkdir()
-        (source / "Makefile").write_text(
-            """\
-check:
-\ttest "$(TESTSUITEFLAGS)" = "7-9"
-\tmkdir -p tests/failed-testsuite.dir
-\ttouch tests/failed-testsuite.log
-\ttouch tests/failed-testsuite.dir/details.log
-\tchmod 700 tests/failed-testsuite.dir
-\tchmod 600 tests/failed-testsuite.log tests/failed-testsuite.dir/details.log
-\tfalse
-
-distcheck:
-\ttest "$(PWD)" = "$(CURDIR)"
-\ttouch ovn-fixture.tar.gz
-"""
-        )
-        environment = {
-            **os.environ,
-            "TMT_TEST_DATA": str(data),
-            "OTT_SOURCE_DIR": str(source),
-            "OTT_MAKE_CHECK_TESTSUITEFLAGS": "7-9",
-        }
-
-        result = Runner().run(
-            tree / "tests/ovn-ci/make-check/post.sh",
-            env=environment,
-            check=False,
-        )
-
-        assert result.returncode == 2
-        assert (data / "tests/failed-testsuite.log").is_file()
-        assert (data / "tests/failed-testsuite.dir").is_dir()
-        assert (data / "tests/failed-testsuite.dir/details.log").is_file()
-        for path in data.rglob("*"):
-            mode = path.stat().st_mode
-            if path.is_dir():
-                assert mode & stat.S_IROTH and mode & stat.S_IXOTH
-            else:
-                assert mode & stat.S_IROTH
-
     def test_ci_configuration(self, tree):
         plans = tree / "plans/ovn-ci"
         main = (plans / "main.fmf").read_text()
@@ -109,28 +61,3 @@ distcheck:
             in (plans / "system-dpdk-gcc.fmf").read_text()
         )
         assert all_plans.count('OTT_MAKE_CHECK_TESTSUITEFLAGS: ""') == 1
-
-    def test_distcheck_workload(self, tree, tmp_path):
-        source = tmp_path / "source"
-        data = tmp_path / "data"
-        source.mkdir()
-        data.mkdir()
-        (source / "Makefile").write_text(
-            """\
-distcheck:
-\ttouch ovn-fixture.tar.gz
-"""
-        )
-
-        result = Runner().run(
-            tree / "tests/ovn-ci/distcheck/post.sh",
-            env={
-                **os.environ,
-                "TMT_TEST_DATA": str(data),
-                "OTT_SOURCE_DIR": str(source),
-            },
-            check=False,
-        )
-
-        assert result.returncode == 0
-        assert (source / "ovn-fixture.tar.gz").is_file()

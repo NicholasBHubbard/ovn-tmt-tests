@@ -1,4 +1,5 @@
 summary: Run OVN make check
-test: ./post.sh
-framework: shell
+test: >-
+  PYTHONPATH="$TMT_TREE/tests/lib"
+  python3 -m pytest -p ovn_test.pytest_ovn_ci -q -s ./test.py
 duration: 5h

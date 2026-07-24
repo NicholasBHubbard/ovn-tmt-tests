@@ -8,8 +8,9 @@ provision:
     image: fedora
 
 prepare+<:
-  - how: shell
-    script: dnf install -y jemalloc-devel
+  - how: install
+    package:
+      - jemalloc-devel
 
 prepare+:
   - how: ansible

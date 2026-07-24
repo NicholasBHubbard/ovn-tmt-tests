@@ -22,7 +22,7 @@ class TestResult:
     def configure_paths(self, tree):
         self.ci = tree / ".github/workflows/ci.yml"
         self.self_tests = tree / ".github/workflows/self-tests.yml"
-        self.selector = tree / ".github/scripts/self-test-changes.sh"
+        self.selector = tree / ".github/scripts/self-test-changes.py"
 
     def test_files_exist(self):
         assert self.ci.is_file()
@@ -34,7 +34,7 @@ class TestResult:
         ("expected", "paths"),
         [
             ("true", ("plans/ovn-ci/main.fmf",)),
-            ("true", ("tests/ovn-ci/make-check/post.sh",)),
+            ("true", ("tests/ovn-ci/make-check/test.py",)),
             ("true", ("components/new/config.yml",)),
             ("true", ("README.md", "roles/ovn_install/tasks/main.yml")),
             (
@@ -71,7 +71,7 @@ class TestResult:
         assert "changed: ${{ steps.self_test_changes.outputs.changed }}" in text
         assert "needs.self-test-changes.outputs.changed == 'true'" in text
         assert (
-            'git diff --name-only "$base" HEAD | .github/scripts/self-test-changes.sh'
+            'git diff --name-only "$base" HEAD | .github/scripts/self-test-changes.py'
         ) in text
         for output in (
             "outputs.shell",
@@ -88,11 +88,6 @@ class TestResult:
         text = self.ci.read_text()
 
         for expected in (
-            "*.sh",
-            "*.bash",
-            "find tests .github/scripts",
-            "sudo apt-get install -y shellcheck",
-            "shellcheck --severity=warning --shell=bash -x -e SC1091",
             "name: GitHub Actions lint",
             "github.com/rhysd/actionlint/cmd/actionlint@v1.7.12",
             '"$(go env GOPATH)/bin/actionlint"',
@@ -104,13 +99,16 @@ class TestResult:
             "pip install ansible-lint",
             "ansible-lint --strict playbooks roles",
             "pip install ansible-core pytest pyyaml ruff==0.15.22",
-            "ruff check --show-fixes tests/lib/ovn_test tests/ovn-scale tests/self",
-            "ruff format --check tests/lib/ovn_test tests/ovn-scale tests/self",
+            "ruff check --show-fixes tests/lib/ovn_test tests/ovn-ci "
+            "tests/ovn-fake-multinode tests/ovn-scale tests/self",
+            "ruff format --check tests/lib/ovn_test tests/ovn-ci "
+            "tests/ovn-fake-multinode tests/ovn-scale tests/self",
         ):
             assert expected in text
 
         for obsolete in (
             "bash -n",
+            "shellcheck",
             "pipx install ansible-lint",
             "ansible-playbook --syntax-check",
             "ansible-lint --profile min",

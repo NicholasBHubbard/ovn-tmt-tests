@@ -201,11 +201,13 @@ def test_fake_multinode_setup_is_test_scoped(tree):
     plans = "\n".join(
         path.read_text() for path in (tree / "plans/ovn-multihost").glob("*.fmf")
     )
-    for test in (tree / "tests/ovn-fake-multinode").glob("*/test.sh"):
-        if test.parent.name == "gateway-nat":
+    for setup in (tree / "tests/ovn-fake-multinode").glob("*/setup.yml"):
+        if setup.parent.name in {"gateway-nat", "provider-network"}:
             continue
-        assert 'multihost_run_playbook "$PWD/setup.yml"' in test.read_text()
-        assert str(test.parent / "setup.yml").removeprefix(f"{tree}/") not in plans
+        test = setup.with_name("test.py")
+        assert test.is_file()
+        assert 'pytest.mark.usefixtures("setup_scenario")' in test.read_text()
+        assert str(setup).removeprefix(f"{tree}/") not in plans
 
 
 def test_artifact_role_contract(tree):

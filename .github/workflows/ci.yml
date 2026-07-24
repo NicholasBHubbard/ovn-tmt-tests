@@ -29,8 +29,8 @@ jobs:
 
       - name: Run Python checks
         run: |
-          ruff check --show-fixes tests/lib/ovn_test tests/ovn-scale tests/self
-          ruff format --check tests/lib/ovn_test tests/ovn-scale tests/self
+          ruff check --show-fixes tests/lib/ovn_test tests/ovn-ci tests/ovn-fake-multinode tests/ovn-scale tests/self
+          ruff format --check tests/lib/ovn_test tests/ovn-ci tests/ovn-fake-multinode tests/ovn-scale tests/self
           PYTHONPATH=tests/lib pytest -q tests/self/contracts
 
   actionlint:
@@ -74,7 +74,7 @@ jobs:
             base=$(git rev-list --max-parents=0 HEAD)
           fi
 
-          changed=$(git diff --name-only "$base" HEAD | .github/scripts/self-test-changes.sh)
+          changed=$(git diff --name-only "$base" HEAD | .github/scripts/self-test-changes.py)
           echo "changed=$changed" >> "$GITHUB_OUTPUT"
 
       - name: Discover self-test plans
@@ -84,23 +84,6 @@ jobs:
             | grep -v 'brew-packages' \
             | sed 's|^/plans/self/||' | jq -Rc . | jq -sc .)
           echo "plans=$plans" >> "$GITHUB_OUTPUT"
-
-  shell:
-    name: Shell syntax
-    runs-on: ubuntu-26.04
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v5
-
-      - name: Install shell tooling
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y shellcheck
-
-      - name: Run ShellCheck
-        run: >-
-          find tests .github/scripts \( -name '*.sh' -o -name '*.bash' \)
-          -exec shellcheck --severity=warning --shell=bash -x -e SC1091 {} +
 
   yaml:
     name: YAML lint

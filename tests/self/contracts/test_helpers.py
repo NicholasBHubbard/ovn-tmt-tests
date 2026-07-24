@@ -425,6 +425,28 @@ def test_network_treats_a_missing_route_table_as_empty():
     )
 
 
+def test_network_waits_for_ping_and_reports_failure():
+    results = iter(
+        [
+            subprocess.CompletedProcess([], 1, "", "unreachable"),
+            subprocess.CompletedProcess([], 0, "", ""),
+            subprocess.CompletedProcess([], 1, "", "unreachable"),
+        ]
+    )
+    sleeps = []
+    network = Network(
+        Runner(
+            execute=lambda command, **kwargs: next(results),
+            sleep=sleeps.append,
+        )
+    )
+
+    network.wait_for_ping("vm1", "192.0.2.2", attempts=2)
+
+    assert not network.ping("vm1", "192.0.2.3", count=2)
+    assert sleeps == [1]
+
+
 def test_system_observes_exact_processes_and_tcp_ports():
     calls = []
 

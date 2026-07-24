@@ -6,6 +6,16 @@ import yaml
 ROOT = Path(__file__).parents[3]
 SELF_TESTS = ROOT / "tests" / "self"
 SELF_PLANS = ROOT / "plans" / "self"
+PYTEST_SUITES = {
+    ROOT / "tests" / "ovn-ci": (
+        ["python3-pytest"],
+        "ovn_test.pytest_ovn_ci",
+    ),
+    ROOT / "tests" / "ovn-fake-multinode": (
+        ["python3-pytest", "python3-pyyaml"],
+        "ovn_test.pytest_multihost",
+    ),
+}
 
 
 def test_every_self_test_has_python_tests():
@@ -30,6 +40,16 @@ def test_self_test_metadata_runs_pytest():
     assert metadata
     for path in metadata:
         assert "python3 -m pytest" in path.read_text(), path
+
+
+def test_test_metadata_uses_default_framework():
+    explicit = [
+        path
+        for path in (ROOT / "tests").rglob("*.fmf")
+        if (yaml.safe_load(path.read_text()) or {}).get("framework") == "shell"
+    ]
+
+    assert not explicit
 
 
 def test_self_test_python_dependencies_support_rpm_and_deb():
@@ -74,3 +94,33 @@ def test_self_test_plans_do_not_run_shell_files():
     ]
 
     assert not references
+
+
+def test_repository_has_no_shell_source_files():
+    excluded = {
+        ".agent-state",
+        ".git",
+        "SYSTEMS_TO_REPLACE",
+        "ovn-tmt-ci-experiment",
+    }
+    shell = sorted(
+        path.relative_to(ROOT)
+        for pattern in ("*.sh", "*.bash")
+        for path in ROOT.rglob(pattern)
+        if not excluded.intersection(path.parts)
+    )
+
+    assert not shell
+
+
+def test_remaining_workloads_run_pytest():
+    for suite, (packages, plugin) in PYTEST_SUITES.items():
+        base = yaml.safe_load((suite / "main.fmf").read_text())
+        assert base["require"] == packages
+
+        for path in suite.glob("*/main.fmf"):
+            metadata = yaml.safe_load(path.read_text())
+            assert "python3 -m pytest" in metadata["test"], path
+            assert f"-p {plugin}" in metadata["test"], path
+            assert "framework" not in metadata, path
+            assert "require" not in metadata, path

@@ -10,6 +10,38 @@ class Network:
         result = self.runner.namespace(namespace, "true", guest=self.guest, check=False)
         return result.returncode == 0
 
+    def ping(self, namespace, destination, count=1, timeout=1):
+        result = self.runner.namespace(
+            namespace,
+            "ping",
+            "-q",
+            "-c",
+            count,
+            "-W",
+            timeout,
+            destination,
+            guest=self.guest,
+            check=False,
+        )
+        return result.returncode == 0
+
+    def wait_for_ping(self, namespace, destination, attempts=30):
+        return self.runner.wait(
+            "ip",
+            "netns",
+            "exec",
+            namespace,
+            "ping",
+            "-q",
+            "-c",
+            "1",
+            "-W",
+            "1",
+            destination,
+            guest=self.guest,
+            attempts=attempts,
+        )
+
     def link(self, interface, namespace=None):
         command = ["ip", "-j"]
         if namespace:
