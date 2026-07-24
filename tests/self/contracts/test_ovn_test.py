@@ -126,6 +126,27 @@ def test_runner_executes_locally_and_over_ssh(capsys):
     assert "+ ovn-nbctl show" in capsys.readouterr().out
 
 
+def test_runner_uses_configured_driver_connection():
+    calls = []
+
+    def execute(command, **kwargs):
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    runner = Runner(
+        Topology(topology_data()),
+        execute=execute,
+        environment={
+            "OTT_DRIVER_USER": "tester",
+            "OTT_DRIVER_RUNTIME_DIR": "/custom/driver",
+        },
+    )
+    runner.run("true", guest="compute-1")
+
+    assert calls[0][calls[0].index("-i") + 1] == "/custom/driver/id_ed25519"
+    assert "tester@192.0.2.2" in calls[0]
+
+
 def test_workload_identity_is_deterministic(tmp_path):
     workload = Workload(
         FakeRunner(),

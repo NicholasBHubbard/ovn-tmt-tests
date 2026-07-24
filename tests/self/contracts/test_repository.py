@@ -35,6 +35,32 @@ def assert_contains(tree, path, expected):
     assert expected in content(tree, path), path
 
 
+def prepare_phase(tree, path, name=None, playbook=None):
+    metadata = yaml.safe_load(content(tree, path)) or {}
+    phases = []
+    for key in ("prepare", "prepare+", "prepare+<"):
+        value = metadata.get(key, [])
+        phases.extend(value if isinstance(value, list) else [value])
+    if name is None and playbook is None:
+        assert len(phases) == 1
+        return phases[0]
+    return next(
+        phase
+        for phase in phases
+        if (name is None or phase.get("name") == name)
+        and (playbook is None or phase.get("playbook") == playbook)
+    )
+
+
+def extra_variables(phase):
+    arguments = shlex.split(phase.get("extra-args", ""))
+    return {
+        assignment.split("=", 1)[0]: assignment.split("=", 1)[1]
+        for option, assignment in zip(arguments, arguments[1:])
+        if option == "-e" and "=" in assignment
+    }
+
+
 def run_naming(tree, root):
     return Runner().run(
         "python3",
@@ -157,6 +183,40 @@ def test_plan_role_configuration_is_top_down(tree):
                         assert "$OTT_" in assignment, (path, assignment)
 
 
+@pytest.mark.parametrize(
+    ("path", "phase"),
+    [
+        ("plans/ovn-ci/main.fmf", None),
+        ("plans/ovn-multihost/main.fmf", "Set up OVN topology"),
+    ],
+)
+def test_install_configuration_is_complete(tree, path, phase):
+    variables = extra_variables(prepare_phase(tree, path, phase))
+    expected = {
+        "ovn_install_method": "$OTT_INSTALL_METHOD",
+        "ovn_install_cc": "$OTT_CC",
+        "ovn_install_werror": "$OTT_WERROR",
+        "ovn_install_dpdk_enabled": "$OTT_DPDK",
+        "ovn_install_configure_flags": "$OTT_CONFIGURE_FLAGS",
+        "ovn_install_git_repo": "$OTT_GIT_REPO",
+        "ovn_install_git_version": "$OTT_GIT_VERSION",
+        "ovn_install_source_dir": "$OTT_SOURCE_DIR",
+        "ovn_install_make_flags": "$OTT_MAKE_FLAGS",
+        "ovn_install_dpdk_dir": "$OTT_DPDK_DIR",
+        "ovn_install_dpdk_version": "$OTT_DPDK_VERSION",
+        "ovn_install_dpdk_checksum": "$OTT_DPDK_CHECKSUM",
+        "ovn_install_dpdk_drivers": "$OTT_DPDK_DRIVERS",
+        "ovn_install_dpdk_source_dir": "$OTT_DPDK_SOURCE_DIR",
+        "ovn_install_distro_version": "$OTT_DISTRO_VERSION",
+        "ovn_install_package_dir": "$OTT_PACKAGE_DIR",
+        "ovn_install_package_files": "$OTT_PACKAGE_FILES",
+        "ovn_artifact_name": "$OTT_ARTIFACT_NAME",
+        "ovn_artifact_cache_dir": "$OTT_ARTIFACT_CACHE_DIR",
+        "ovn_artifact_expected_revision": "$OTT_ARTIFACT_EXPECTED_REVISION",
+    }
+    assert variables.items() >= expected.items()
+
+
 def test_multihost_parent_propagates_configuration(tree):
     path = "plans/ovn-multihost/main.fmf"
     expected = (
@@ -170,12 +230,17 @@ def test_multihost_parent_propagates_configuration(tree):
         "-e ovn_artifact_expected_revision=$OTT_ARTIFACT_EXPECTED_REVISION",
         "-e ovn_install_git_repo=$OTT_GIT_REPO",
         "-e ovn_install_git_version=$OTT_GIT_VERSION",
+        "-e 'ovn_install_source_dir=$OTT_SOURCE_DIR'",
+        "-e 'ovn_install_package_dir=$OTT_PACKAGE_DIR'",
+        "-e 'ovn_install_package_files=$OTT_PACKAGE_FILES'",
         'OTT_SSL_ENABLED: "false"',
         'OTT_TEST_DEBUG: "false"',
         "playbook: playbooks/ovn-test-pki-create.yml",
         "playbook: playbooks/ovn-test-pki-install.yml",
         "-e ovn_test_pki_enabled=$OTT_SSL_ENABLED",
+        "-e 'ovn_test_pki_remote_dir=$OTT_PKI_REMOTE_DIR'",
         "-e ovn_multihost_ssl_enabled=$OTT_SSL_ENABLED",
+        "-e 'ovn_multihost_pki_dir=$OTT_PKI_REMOTE_DIR'",
     )
     for value in expected:
         assert_contains(tree, path, value)
@@ -196,12 +261,81 @@ def test_multihost_tls_contract(tree):
         "playbooks/multihost.yml",
         "if ovn_multihost_ssl_enabled | default(false) | bool",
     )
+    assert_contains(tree, "playbooks/multihost.yml", "ovn_multihost_pki_dir")
     assert_contains(tree, "roles/ovn_central/tasks/main.yml", "del-ssl")
     assert_contains(tree, "roles/ovs_setup/tasks/configure.yml", "del-ssl")
     assert_contains(
         tree,
         "plans/self/multihost/minimal.fmf",
         'OTT_SSL_ENABLED: "true"',
+    )
+
+
+def test_multihost_runtime_configuration_is_complete(tree):
+    path = "plans/ovn-multihost/main.fmf"
+    driver = extra_variables(
+        prepare_phase(tree, path, "Set up cross-guest test driver")
+    )
+    authorize = extra_variables(
+        prepare_phase(tree, path, "Authorize cross-guest test driver")
+    )
+    topology = extra_variables(prepare_phase(tree, path, "Set up OVN topology"))
+
+    assert driver["multihost_driver_user"] == "$OTT_DRIVER_USER"
+    assert driver["multihost_driver_runtime_dir"] == "$OTT_DRIVER_RUNTIME_DIR"
+    assert "$OTT_DRIVER_KEY_PATH" in driver["multihost_driver_key_path"]
+    assert "$OTT_DRIVER_RUNTIME_DIR" in driver["multihost_driver_key_path"]
+    assert authorize == {"multihost_driver_user": "$OTT_DRIVER_USER"}
+    assert (
+        topology.items()
+        >= {
+            "ovn_multihost_sb_port": "$OTT_SB_PORT",
+            "ovn_multihost_sb_wait_timeout": "$OTT_SB_WAIT_TIMEOUT",
+            "ovn_gateway_chassis_name": "$OTT_GATEWAY_CHASSIS_NAME",
+            "ovn_gateway_bridges": "$OTT_GATEWAY_BRIDGES",
+            "ovn_gateway_bridge_mappings": "$OTT_GATEWAY_BRIDGE_MAPPINGS",
+            "ovn_gateway_cms_options": "$OTT_GATEWAY_CMS_OPTIONS",
+        }.items()
+    )
+
+    playbook = content(tree, "playbooks/multihost.yml")
+    assert "ovn_multihost_sb_wait_timeout | default(2700)" in playbook
+    assert "ovn_gateway_chassis_name | default(inventory_hostname, true)" in playbook
+    assert "ovn_gateway_bridges | from_yaml" in playbook
+    assert "ovn_gateway_cms_options | from_yaml" in playbook
+
+
+def test_package_file_configuration_accepts_cli_list(tree):
+    assert_contains(
+        tree,
+        "roles/ovn_install/tasks/package.yml",
+        'ovn_install_package_files: "{{ (ovn_install_package_files | from_yaml) or [] }}"',
+    )
+
+
+def test_dpdk_plan_configuration_is_complete(tree):
+    path = "plans/ovn-ci/system-dpdk-gcc.fmf"
+    build = extra_variables(
+        prepare_phase(tree, path, playbook="playbooks/dpdk-build.yml")
+    )
+    hugepages = extra_variables(
+        prepare_phase(tree, path, playbook="playbooks/dpdk-hugepages.yml")
+    )
+    assert (
+        build.items()
+        >= {
+            "dpdk_build_install_dir": "$OTT_DPDK_DIR",
+            "dpdk_build_version": "$OTT_DPDK_VERSION",
+            "dpdk_build_checksum": "$OTT_DPDK_CHECKSUM",
+            "dpdk_build_drivers": "$OTT_DPDK_DRIVERS",
+            "dpdk_build_source_dir": "$OTT_DPDK_SOURCE_DIR",
+        }.items()
+    )
+    assert hugepages["dpdk_hugepages_count"] == "$OTT_DPDK_HUGEPAGES"
+    assert_contains(
+        tree,
+        "roles/ovn_artifact/tasks/build.yml",
+        'dpdk_build_source_dir: "{{ ovn_install_dpdk_source_dir',
     )
 
 
@@ -282,12 +416,15 @@ def test_scale_workload_contract(tree, plan, test, settings):
     for setting in settings:
         assert setting in plan_path.read_text()
     assert f"/tests/scale/{test}" in plan_path.read_text()
+    assert "duration: $OTT_SCALE_DURATION" in plan_path.read_text()
     assert "python3 -m pytest" in (test_dir / "main.fmf").read_text()
+    assert "duration:" not in (test_dir / "main.fmf").read_text()
 
 
 def test_scale_workloads_inherit_common_configuration(tree):
     parent = content(tree, "plans/ovn-multihost/ovn-scale-testing/main.fmf")
     for setting in (
+        "OTT_SCALE_DURATION:",
         "OTT_SCALE_TIMEOUT:",
         "OTT_SCALE_IPV4:",
         "OTT_SCALE_IPV6:",

@@ -5,5 +5,5 @@
     - name: Reserve hugepages
       ansible.posix.sysctl:
         name: vm.nr_hugepages
-        value: "2048"
+        value: "{{ dpdk_hugepages_count | default(2048) }}"
         sysctl_set: true

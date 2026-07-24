@@ -3,7 +3,7 @@ import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from ovn_test.config import read_bool
+from ovn_test.config import driver_connection, read_bool
 from ovn_test.topology import Topology
 
 
@@ -15,8 +15,8 @@ class Ansible:
         data,
         execute=subprocess.run,
         environment=None,
-        key="/run/ovn-tmt-tests/multihost-driver/id_ed25519",
-        user="root",
+        key=None,
+        user=None,
     ):
         self.topology = topology
         self.tree = Path(tree)
@@ -25,8 +25,9 @@ class Ansible:
         self.environment = os.environ.copy()
         if environment is not None:
             self.environment.update(environment)
-        self.key = key
-        self.user = user
+        configured_user, configured_key = driver_connection(self.environment)
+        self.key = configured_key if key is None else key
+        self.user = configured_user if user is None else user
 
     @classmethod
     def from_environment(

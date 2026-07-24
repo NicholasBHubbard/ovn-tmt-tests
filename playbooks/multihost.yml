@@ -10,13 +10,16 @@
         {{ ovn_multihost_ssl_enabled | default(false) | bool }}
       ovn_central_ssl_private_key: >-
         {{ ovn_multihost_ssl_private_key
-           | default('/run/ovn-test-pki/private-key.pem') }}
+           | default((ovn_multihost_pki_dir | default('/run/ovn-test-pki'))
+                     ~ '/private-key.pem') }}
       ovn_central_ssl_certificate: >-
         {{ ovn_multihost_ssl_certificate
-           | default('/run/ovn-test-pki/certificate.pem') }}
+           | default((ovn_multihost_pki_dir | default('/run/ovn-test-pki'))
+                     ~ '/certificate.pem') }}
       ovn_central_ssl_ca_cert: >-
         {{ ovn_multihost_ssl_ca_cert
-           | default('/run/ovn-test-pki/ca-cert.pem') }}
+           | default((ovn_multihost_pki_dir | default('/run/ovn-test-pki'))
+                     ~ '/ca-cert.pem') }}
 
 - name: Resolve central for OVN chassis
   hosts: compute:gateway
@@ -33,7 +36,7 @@
       ansible.builtin.wait_for:
         host: "{{ ovn_central_address }}"
         port: "{{ ovn_multihost_sb_port | default(6642) }}"
-        timeout: 2700
+        timeout: "{{ ovn_multihost_sb_wait_timeout | default(2700) }}"
 
 - name: Set up OVN chassis on compute nodes
   hosts: compute
@@ -45,13 +48,16 @@
         {{ ovn_multihost_ssl_enabled | default(false) | bool }}
       ovs_setup_ssl_private_key: >-
         {{ ovn_multihost_ssl_private_key
-           | default('/run/ovn-test-pki/private-key.pem') }}
+           | default((ovn_multihost_pki_dir | default('/run/ovn-test-pki'))
+                     ~ '/private-key.pem') }}
       ovs_setup_ssl_certificate: >-
         {{ ovn_multihost_ssl_certificate
-           | default('/run/ovn-test-pki/certificate.pem') }}
+           | default((ovn_multihost_pki_dir | default('/run/ovn-test-pki'))
+                     ~ '/certificate.pem') }}
       ovs_setup_ssl_ca_cert: >-
         {{ ovn_multihost_ssl_ca_cert
-           | default('/run/ovn-test-pki/ca-cert.pem') }}
+           | default((ovn_multihost_pki_dir | default('/run/ovn-test-pki'))
+                     ~ '/ca-cert.pem') }}
     - ovn_chassis
   vars:
     ovn_chassis_sb_port: "{{ ovn_multihost_sb_port | default(6642) }}"
@@ -70,13 +76,16 @@
         {{ ovn_multihost_ssl_enabled | default(false) | bool }}
       ovs_setup_ssl_private_key: >-
         {{ ovn_multihost_ssl_private_key
-           | default('/run/ovn-test-pki/private-key.pem') }}
+           | default((ovn_multihost_pki_dir | default('/run/ovn-test-pki'))
+                     ~ '/private-key.pem') }}
       ovs_setup_ssl_certificate: >-
         {{ ovn_multihost_ssl_certificate
-           | default('/run/ovn-test-pki/certificate.pem') }}
+           | default((ovn_multihost_pki_dir | default('/run/ovn-test-pki'))
+                     ~ '/certificate.pem') }}
       ovs_setup_ssl_ca_cert: >-
         {{ ovn_multihost_ssl_ca_cert
-           | default('/run/ovn-test-pki/ca-cert.pem') }}
+           | default((ovn_multihost_pki_dir | default('/run/ovn-test-pki'))
+                     ~ '/ca-cert.pem') }}
     - ovn_chassis
   vars:
     ovn_chassis_sb_port: "{{ ovn_multihost_sb_port | default(6642) }}"
@@ -85,10 +94,14 @@
          if ovn_multihost_ssl_enabled | default(false) | bool
          else 'tcp' }}:{{ ovn_central_address }}:{{ ovn_multihost_sb_port | default(6642) }}
     ovn_chassis_name: >-
-      {{ ovn_gateway_chassis_name | default(inventory_hostname) }}
+      {{ ovn_gateway_chassis_name | default(inventory_hostname, true) }}
     ovn_chassis_bridges: >-
-      {{ ovn_gateway_bridges | default(['br-int', 'br-ex']) }}
+      {{ ((ovn_gateway_bridges | from_yaml) or [])
+         if ovn_gateway_bridges is defined and ovn_gateway_bridges is string
+         else ovn_gateway_bridges | default(['br-int', 'br-ex']) }}
     ovn_chassis_bridge_mappings: >-
       {{ ovn_gateway_bridge_mappings | default('public:br-ex') }}
     ovn_chassis_cms_options: >-
-      {{ ovn_gateway_cms_options | default(['enable-chassis-as-gw']) }}
+      {{ ((ovn_gateway_cms_options | from_yaml) or [])
+         if ovn_gateway_cms_options is defined and ovn_gateway_cms_options is string
+         else ovn_gateway_cms_options | default(['enable-chassis-as-gw']) }}

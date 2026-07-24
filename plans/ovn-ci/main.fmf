@@ -5,11 +5,22 @@ environment:
   OTT_CC: gcc
   OTT_CONFIGURE_FLAGS: ""
   OTT_DPDK: "false"
+  OTT_DPDK_CHECKSUM: sha256:bcae7d42c449fc456dfb279feabcbe0599a29bebb2fe2905761e187339d96b8e
   OTT_DPDK_DIR: /usr/local/dpdk
+  OTT_DPDK_DRIVERS: net/null,net/tap,net/virtio
+  OTT_DPDK_HUGEPAGES: "2048"
+  OTT_DPDK_SOURCE_DIR: /usr/src/dpdk
+  OTT_DPDK_VERSION: 24.11.1
+  OTT_DISTRO_VERSION: latest
   OTT_GIT_REPO: https://github.com/ovn-org/ovn.git
   OTT_GIT_VERSION: main
   OTT_INSTALL_METHOD: git
   OTT_MAKE_FLAGS: ""
+  OTT_PACKAGE_DIR: ""
+  OTT_PACKAGE_FILES: "[]"
+  OTT_ARTIFACT_CACHE_DIR: ""
+  OTT_ARTIFACT_EXPECTED_REVISION: ""
+  OTT_ARTIFACT_NAME: ovn
   OTT_SOURCE_DIR: /usr/src/ovn
   OTT_WERROR: "true"
 
@@ -23,6 +34,16 @@ prepare:
       -e ovn_install_git_repo=$OTT_GIT_REPO -e ovn_install_git_version=$OTT_GIT_VERSION
       -e 'ovn_install_source_dir=$OTT_SOURCE_DIR' -e 'ovn_install_make_flags=$OTT_MAKE_FLAGS'
       -e 'ovn_install_dpdk_dir=$OTT_DPDK_DIR'
+      -e ovn_install_dpdk_version=$OTT_DPDK_VERSION
+      -e ovn_install_dpdk_checksum=$OTT_DPDK_CHECKSUM
+      -e ovn_install_dpdk_drivers=$OTT_DPDK_DRIVERS
+      -e 'ovn_install_dpdk_source_dir=$OTT_DPDK_SOURCE_DIR'
+      -e ovn_install_distro_version=$OTT_DISTRO_VERSION
+      -e 'ovn_install_package_dir=$OTT_PACKAGE_DIR'
+      -e 'ovn_install_package_files=$OTT_PACKAGE_FILES'
+      -e ovn_artifact_name=$OTT_ARTIFACT_NAME
+      -e 'ovn_artifact_cache_dir=$OTT_ARTIFACT_CACHE_DIR'
+      -e ovn_artifact_expected_revision=$OTT_ARTIFACT_EXPECTED_REVISION
 
 execute:
   how: tmt

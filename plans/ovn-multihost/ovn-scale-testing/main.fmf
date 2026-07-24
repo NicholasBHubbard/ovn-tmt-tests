@@ -1,6 +1,7 @@
 summary: Base configuration for OVN scale workloads
 
 environment+:
+  OTT_SCALE_DURATION: 10m
   OTT_SCALE_TIMEOUT: "60"
   OTT_SCALE_IPV4: "true"
   OTT_SCALE_IPV6: "true"

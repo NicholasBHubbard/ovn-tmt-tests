@@ -12,7 +12,12 @@ provision:
 prepare+<:
   - how: ansible
     playbook: playbooks/dpdk-build.yml
-    extra-args: "-e 'dpdk_build_install_dir=$OTT_DPDK_DIR'"
+    extra-args: >-
+      -e 'dpdk_build_install_dir=$OTT_DPDK_DIR'
+      -e dpdk_build_version=$OTT_DPDK_VERSION
+      -e dpdk_build_checksum=$OTT_DPDK_CHECKSUM
+      -e dpdk_build_drivers=$OTT_DPDK_DRIVERS
+      -e 'dpdk_build_source_dir=$OTT_DPDK_SOURCE_DIR'
 
 prepare+:
   - how: ansible
@@ -21,6 +26,7 @@ prepare+:
     playbook: playbooks/ovn-system-test-deps.yml
   - how: ansible
     playbook: playbooks/dpdk-hugepages.yml
+    extra-args: '-e dpdk_hugepages_count=$OTT_DPDK_HUGEPAGES'
 
 discover:
   how: fmf

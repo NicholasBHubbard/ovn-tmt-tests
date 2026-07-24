@@ -1,3 +1,8 @@
+- name: Normalize package file list
+  when: ovn_install_package_files is string
+  ansible.builtin.set_fact:
+    ovn_install_package_files: "{{ (ovn_install_package_files | from_yaml) or [] }}"
+
 - name: Verify supported package manager
   ansible.builtin.assert:
     that:

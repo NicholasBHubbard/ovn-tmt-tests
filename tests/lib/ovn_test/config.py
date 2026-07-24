@@ -1,3 +1,17 @@
+from pathlib import Path
+
+
+DEFAULT_DRIVER_RUNTIME_DIR = "/run/ovn-tmt-tests/multihost-driver"
+
+
+def driver_connection(environment):
+    runtime_dir = environment.get("OTT_DRIVER_RUNTIME_DIR", DEFAULT_DRIVER_RUNTIME_DIR)
+    return (
+        environment.get("OTT_DRIVER_USER", "root"),
+        environment.get("OTT_DRIVER_KEY_PATH") or str(Path(runtime_dir) / "id_ed25519"),
+    )
+
+
 def read_int(environment, name, default):
     try:
         return int(environment.get(name, default))

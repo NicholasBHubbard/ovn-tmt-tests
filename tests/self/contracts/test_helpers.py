@@ -540,7 +540,12 @@ def test_ansible_writes_inventory_and_keeps_per_guest_logs(tmp_path):
         tree=tmp_path,
         data=data,
         execute=execute,
-        environment={"OTT_TEST_DEBUG": "true"},
+        environment={
+            "OTT_DRIVER_KEY_PATH": "/custom/key",
+            "OTT_DRIVER_RUNTIME_DIR": "/custom/driver",
+            "OTT_DRIVER_USER": "tester",
+            "OTT_TEST_DEBUG": "true",
+        },
     )
 
     with pytest.raises(subprocess.CalledProcessError) as error:
@@ -549,7 +554,8 @@ def test_ansible_writes_inventory_and_keeps_per_guest_logs(tmp_path):
     assert error.value.returncode == 7
     inventory = (data / "ansible-inventory.ini").read_text()
     assert "[all]" in inventory
-    assert "compute-1 ansible_host=192.0.2.2" in inventory
+    assert "compute-1 ansible_host=192.0.2.2 ansible_user=tester" in inventory
+    assert "ansible_ssh_private_key_file=/custom/key" in inventory
     assert "[compute]\ncompute-1\ncompute-2\n" in inventory
     assert len(calls) == 3
     assert all("-vvv" in command for command, kwargs in calls)

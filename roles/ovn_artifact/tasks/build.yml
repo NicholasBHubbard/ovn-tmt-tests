@@ -55,6 +55,7 @@
     dpdk_build_checksum: "{{ ovn_install_dpdk_checksum }}"
     dpdk_build_drivers: "{{ ovn_install_dpdk_drivers }}"
     dpdk_build_install_dir: "{{ ovn_install_dpdk_dir | default('/usr/local/dpdk') }}"
+    dpdk_build_source_dir: "{{ ovn_install_dpdk_source_dir | default('/usr/src/dpdk') }}"
 
 - name: Build OVN into artifact staging directory
   when: ovn_artifact_build | bool

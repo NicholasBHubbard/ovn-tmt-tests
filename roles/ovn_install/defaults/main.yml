@@ -11,6 +11,7 @@ ovn_install_dpdk_dir: /usr/local/dpdk
 ovn_install_dpdk_version: ""
 ovn_install_dpdk_checksum: ""
 ovn_install_dpdk_drivers: ""
+ovn_install_dpdk_source_dir: /usr/src/dpdk
 ovn_install_dpdk_runtime_package_names:
   dnf:
     - libpcap

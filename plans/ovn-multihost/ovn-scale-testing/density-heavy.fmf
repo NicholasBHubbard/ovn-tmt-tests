@@ -10,5 +10,7 @@ environment+:
 discover:
   how: fmf
   where: [central]
+  adjust-tests:
+    - duration: $OTT_SCALE_DURATION
   test:
     - /tests/scale/density-heavy

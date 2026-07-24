@@ -51,13 +51,21 @@ class TestResult:
             "OTT_SOURCE_DIR: /usr/src/ovn",
             'OTT_MAKE_FLAGS: ""',
             "OTT_DPDK_DIR: /usr/local/dpdk",
+            "OTT_DPDK_SOURCE_DIR: /usr/src/dpdk",
             "-e 'ovn_install_source_dir=$OTT_SOURCE_DIR'",
             "-e 'ovn_install_make_flags=$OTT_MAKE_FLAGS'",
             "-e 'ovn_install_dpdk_dir=$OTT_DPDK_DIR'",
+            "-e 'ovn_install_dpdk_source_dir=$OTT_DPDK_SOURCE_DIR'",
         ):
             assert expected in main
-        assert (
-            "-e 'dpdk_build_install_dir=$OTT_DPDK_DIR'"
-            in (plans / "system-dpdk-gcc.fmf").read_text()
-        )
+        dpdk = (plans / "system-dpdk-gcc.fmf").read_text()
+        for expected in (
+            "-e 'dpdk_build_install_dir=$OTT_DPDK_DIR'",
+            "-e dpdk_build_version=$OTT_DPDK_VERSION",
+            "-e dpdk_build_checksum=$OTT_DPDK_CHECKSUM",
+            "-e dpdk_build_drivers=$OTT_DPDK_DRIVERS",
+            "-e 'dpdk_build_source_dir=$OTT_DPDK_SOURCE_DIR'",
+            "-e dpdk_hugepages_count=$OTT_DPDK_HUGEPAGES",
+        ):
+            assert expected in dpdk
         assert all_plans.count('OTT_MAKE_CHECK_TESTSUITEFLAGS: ""') == 1

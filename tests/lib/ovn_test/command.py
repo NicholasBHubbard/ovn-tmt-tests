@@ -1,8 +1,11 @@
 import json
+import os
 import shlex
 import subprocess
 import sys
 import time
+
+from ovn_test.config import driver_connection
 
 
 RUN_MANY = """\
@@ -22,15 +25,18 @@ class Runner:
         self,
         topology=None,
         execute=subprocess.run,
-        key="/run/ovn-tmt-tests/multihost-driver/id_ed25519",
+        key=None,
         sleep=time.sleep,
-        user="root",
+        user=None,
+        environment=None,
     ):
+        environment = os.environ if environment is None else environment
+        configured_user, configured_key = driver_connection(environment)
         self.topology = topology
         self.execute = execute
-        self.key = key
+        self.key = configured_key if key is None else key
         self.sleep = sleep
-        self.user = user
+        self.user = configured_user if user is None else user
 
     def run(
         self,

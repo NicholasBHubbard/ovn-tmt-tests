@@ -1,3 +1,2 @@
 summary: Measure logical port and service convergence
 test: python3 -m pytest ./test.py
-duration: 10m
