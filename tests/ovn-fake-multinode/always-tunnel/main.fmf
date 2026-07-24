@@ -1,7 +1,6 @@
 summary: Verify provider traffic honors always_tunnel
 test: >-
-  PYTHONPATH="$TMT_TREE/tests/lib"
-  python3 -m pytest -p ovn_test.pytest_multihost -q -s ./test.py
+  python3 -m pytest -p ovn_test.pytest_multihost ./test.py
 duration: 5m
 require+:
   - iputils

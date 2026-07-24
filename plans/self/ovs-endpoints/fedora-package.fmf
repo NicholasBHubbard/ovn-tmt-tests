@@ -13,7 +13,7 @@ prepare:
     how: shell
     order: 78
     script: >-
-      python3 -m pytest -q -s
+      python3 -m pytest
       ./tests/self/ovs-endpoints/test.py::TestPreconditions
   - name: Verify invalid OVS endpoint configuration
     how: ansible
@@ -27,7 +27,7 @@ prepare:
     how: shell
     order: 81
     script: >-
-      python3 -m pytest -q -s
+      python3 -m pytest
       ./tests/self/ovs-endpoints/test.py::TestInitial
   - name: Reconfigure OVS endpoints
     how: ansible
@@ -37,7 +37,7 @@ prepare:
     how: shell
     order: 83
     script: >-
-      python3 -m pytest -q -s
+      python3 -m pytest
       ./tests/self/ovs-endpoints/test.py::TestReconfigured
   - name: Reapply OVS endpoints
     how: ansible

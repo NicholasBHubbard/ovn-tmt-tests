@@ -7,7 +7,7 @@ provision:
 prepare:
   - how: shell
     order: 80
-    script: python3 -m pytest -q -s ./tests/self/ovn-central-ssl/test.py::TestPreconditions
+    script: python3 -m pytest ./tests/self/ovn-central-ssl/test.py::TestPreconditions
   - name: Create OVN test PKI
     how: ansible
     order: 90
@@ -20,7 +20,7 @@ prepare:
     extra-args: '-e ovn_test_pki_enabled=true'
   - how: shell
     order: 100
-    script: python3 -m pytest -q -s ./tests/self/ovn-central-ssl/test.py::TestCredentials
+    script: python3 -m pytest ./tests/self/ovn-central-ssl/test.py::TestCredentials
   - how: ansible
     order: 110
     playbook: playbooks/ovn-central.yml

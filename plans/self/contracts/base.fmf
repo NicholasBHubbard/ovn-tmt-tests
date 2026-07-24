@@ -4,7 +4,7 @@ prepare:
   - how: shell
     order: 80
     script: >-
-      python3 -m pytest -q -s
+      python3 -m pytest
       ./tests/self/contracts/test_repository.py::TestPreconditions
 
 provision:

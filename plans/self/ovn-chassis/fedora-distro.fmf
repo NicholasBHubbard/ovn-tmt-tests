@@ -18,7 +18,7 @@ prepare:
     how: shell
     order: 78
     script: >-
-      python3 -m pytest -q -s
+      python3 -m pytest
       ./tests/self/ovn-chassis/test.py::TestPreconditions
   - name: Set up OVN chassis
     how: ansible
@@ -28,7 +28,7 @@ prepare:
     how: shell
     order: 81
     script: >-
-      python3 -m pytest -q -s
+      python3 -m pytest
       ./tests/self/ovn-chassis/test.py::TestInitial
   - name: Reconfigure OVN gateway
     how: ansible
@@ -38,7 +38,7 @@ prepare:
     how: shell
     order: 83
     script: >-
-      python3 -m pytest -q -s
+      python3 -m pytest
       ./tests/self/ovn-chassis/test.py::TestReconfigured
   - name: Clear OVN gateway configuration
     how: ansible
@@ -52,7 +52,7 @@ prepare:
     how: shell
     order: 86
     script: >-
-      python3 -m pytest -q -s
+      python3 -m pytest
       ./tests/self/ovn-chassis/test.py::TestInvalid
   - name: Build synthetic chassis image
     how: ansible
@@ -70,7 +70,7 @@ prepare:
     how: shell
     order: 90
     script: >-
-      python3 -m pytest -q -s
+      python3 -m pytest
       ./tests/self/ovn-chassis/test.py::TestMulti
   - name: Reconfigure synthetic chassis
     how: ansible
@@ -80,13 +80,13 @@ prepare:
     how: shell
     order: 92
     script: >-
-      python3 -m pytest -q -s
+      python3 -m pytest
       ./tests/self/ovn-chassis/test.py::TestMultiReconfigured
   - name: Record retained chassis start time
     how: shell
     order: 93
     script: >-
-      python3 -m pytest -q -s
+      python3 -m pytest
       ./tests/self/ovn-chassis/test.py::TestRecordContainer
   - name: Reapply synthetic chassis configuration
     how: ansible
@@ -96,7 +96,7 @@ prepare:
     how: shell
     order: 95
     script: >-
-      python3 -m pytest -q -s
+      python3 -m pytest
       ./tests/self/ovn-chassis/test.py::TestMultiReconfigured
   - name: Replace the synthetic chassis image
     how: ansible
@@ -110,5 +110,5 @@ prepare:
     how: shell
     order: 98
     script: >-
-      python3 -m pytest -q -s
+      python3 -m pytest
       ./tests/self/ovn-chassis/test.py::TestImageRefresh

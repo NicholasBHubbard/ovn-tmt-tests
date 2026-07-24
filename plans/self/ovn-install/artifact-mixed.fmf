@@ -22,7 +22,7 @@ prepare:
   - name: Check clean guests
     how: shell
     order: 80
-    script: python3 -m pytest -q -s ./tests/self/ovn-install/test.py::TestPreconditions
+    script: python3 -m pytest ./tests/self/ovn-install/test.py::TestPreconditions
 
   - name: Build Fedora artifact
     how: ansible

@@ -1,5 +1,5 @@
 summary: Verify OVN endpoint lifecycle
-test: python3 -m pytest -q -s ./test.py::TestResult
+test: python3 -m pytest ./test.py::TestResult
 duration: 5m
 require+:
   - dhcp-client

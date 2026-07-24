@@ -12,7 +12,7 @@ prepare:
   - name: Check OVN topology preconditions
     how: shell
     order: 80
-    script: python3 -m pytest -q -s ./tests/self/ovn-topology/test.py::TestPreconditions
+    script: python3 -m pytest ./tests/self/ovn-topology/test.py::TestPreconditions
   - name: Apply initial OVN topology
     how: ansible
     order: 90
@@ -20,7 +20,7 @@ prepare:
   - name: Verify initial OVN topology
     how: shell
     order: 100
-    script: python3 -m pytest -q -s ./tests/self/ovn-topology/test.py::TestInitial
+    script: python3 -m pytest ./tests/self/ovn-topology/test.py::TestInitial
   - name: Reconfigure OVN topology
     how: ansible
     order: 110
@@ -28,7 +28,7 @@ prepare:
   - name: Record reconfigured OVN topology
     how: shell
     order: 120
-    script: python3 -m pytest -q -s ./tests/self/ovn-topology/test.py::TestReconfigured
+    script: python3 -m pytest ./tests/self/ovn-topology/test.py::TestReconfigured
   - name: Reapply OVN topology
     how: ansible
     order: 130

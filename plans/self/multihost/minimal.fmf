@@ -43,7 +43,7 @@ prepare+:
     where: [central]
     order: 80
     script: >-
-      python3 -m pytest -q -s
+      python3 -m pytest
       ./tests/self/multihost/test.py::TestPreconditions
 
   - name: Check compute preconditions
@@ -51,7 +51,7 @@ prepare+:
     where: [compute]
     order: 81
     script: >-
-      python3 -m pytest -q -s
+      python3 -m pytest
       ./tests/self/multihost/test.py::TestPreconditions
 
   - name: Set up OVN topology
@@ -70,7 +70,7 @@ prepare+:
     where: [central]
     order: 110
     script: >-
-      python3 -m pytest -q -s
+      python3 -m pytest
       ./tests/self/multihost/test.py::TestTLS
 
   - name: Return OVN topology to TCP
@@ -90,7 +90,7 @@ prepare+:
     where: [central]
     order: 140
     script: >-
-      python3 -m pytest -q -s
+      python3 -m pytest
       ./tests/self/multihost/test.py::TestTCP
 
 discover:

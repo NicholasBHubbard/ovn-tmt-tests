@@ -1,0 +1,6 @@
+[tool.pytest.ini_options]
+addopts = "-q -s --import-mode=importlib"
+pythonpath = ["tests/lib"]
+
+[tool.ruff]
+show-fixes = true

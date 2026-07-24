@@ -1,3 +1,3 @@
 summary: Verify OVS and OVN binaries are installed and runnable
-test: python3 -m pytest -q -s ./test.py::TestResult
+test: python3 -m pytest ./test.py::TestResult
 duration: 5m

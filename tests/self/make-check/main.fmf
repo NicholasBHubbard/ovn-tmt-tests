@@ -1,5 +1,5 @@
 summary: Verify make_check role
-test: python3 -m pytest -q -s ./test.py::TestResult
+test: python3 -m pytest ./test.py::TestResult
 duration: 5m
 require+:
   - ansible-core

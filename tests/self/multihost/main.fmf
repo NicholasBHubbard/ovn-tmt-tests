@@ -1,5 +1,5 @@
 summary: Verify multi-host OVN topology is correctly configured
-test: python3 -m pytest -q -s ./test.py::TestResult
+test: python3 -m pytest ./test.py::TestResult
 duration: 10m
 require+:
   - ansible-core

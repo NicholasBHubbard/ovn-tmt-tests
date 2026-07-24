@@ -10,7 +10,7 @@ provision:
 prepare:
   - how: shell
     order: 80
-    script: python3 -m pytest -q -s ./tests/self/ovn-install/test.py::TestPreconditions
+    script: python3 -m pytest ./tests/self/ovn-install/test.py::TestPreconditions
   - how: ansible
     order: 90
     playbook: playbooks/ovn-install.yml

@@ -29,9 +29,9 @@ jobs:
 
       - name: Run Python checks
         run: |
-          ruff check --show-fixes tests/lib/ovn_test tests/ovn-ci tests/ovn-fake-multinode tests/ovn-scale tests/self
+          ruff check tests/lib/ovn_test tests/ovn-ci tests/ovn-fake-multinode tests/ovn-scale tests/self
           ruff format --check tests/lib/ovn_test tests/ovn-ci tests/ovn-fake-multinode tests/ovn-scale tests/self
-          PYTHONPATH=tests/lib pytest -q tests/self/contracts
+          python3 -m pytest tests/self/contracts
 
   actionlint:
     name: GitHub Actions lint
@@ -162,7 +162,7 @@ jobs:
 
       - name: Run pre-check
         run: >-
-          python3 -m pytest -q -s
+          python3 -m pytest
           ./tests/self/brew-packages/test.py::TestPreconditions
         env:
           TMT_TREE: ${{ github.workspace }}
@@ -172,7 +172,7 @@ jobs:
 
       - name: Run post-check
         run: >-
-          python3 -m pytest -q -s
+          python3 -m pytest
           ./tests/self/brew-packages/test.py::TestResult
         env:
           TMT_TREE: ${{ github.workspace }}

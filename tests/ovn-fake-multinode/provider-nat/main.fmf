@@ -1,7 +1,6 @@
 summary: Verify NAT when a provider switch loses its localnet port
 test: >-
-  PYTHONPATH="$TMT_TREE/tests/lib"
-  python3 -m pytest -p ovn_test.pytest_multihost -q -s ./test.py
+  python3 -m pytest -p ovn_test.pytest_multihost ./test.py
 duration: 10m
 require+:
   - iputils

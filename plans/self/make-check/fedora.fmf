@@ -9,7 +9,7 @@ prepare:
     playbook: tests/self/make-check/fixture.yml
   - how: shell
     order: 80
-    script: python3 -m pytest -q -s ./tests/self/make-check/test.py::TestFixture
+    script: python3 -m pytest ./tests/self/make-check/test.py::TestFixture
   - how: ansible
     order: 90
     playbook: playbooks/make-check.yml
