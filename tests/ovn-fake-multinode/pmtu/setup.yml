@@ -38,6 +38,19 @@
           10.70.0.1:8080: 10.70.0.4:8080
         switches:
           - pmtu-sw0
+    ovn_acls:
+      - id: pmtu-sw0-allow-related
+        target: pmtu-sw0
+        direction: from-lport
+        priority: 1002
+        match: ip4 || ip6
+        action: allow-related
+      - id: pmtu-sw1-allow-related
+        target: pmtu-sw1
+        direction: from-lport
+        priority: 1002
+        match: ip4 || ip6
+        action: allow-related
 
 - name: Apply PMTU endpoints
   ansible.builtin.import_playbook: ../../../playbooks/ovn-endpoints.yml
@@ -76,23 +89,3 @@
         routes:
           - to: default
             via: 20.70.0.1
-
-- name: Configure PMTU stateful ACLs
-  hosts: central
-  become: true
-  tasks:
-    - name: Add allow-related ACLs
-      ansible.builtin.command:
-        argv:
-          - ovn-nbctl
-          - --may-exist
-          - acl-add
-          - "{{ item }}"
-          - from-lport
-          - "1002"
-          - ip4 || ip6
-          - allow-related
-      loop:
-        - pmtu-sw0
-        - pmtu-sw1
-      changed_when: true

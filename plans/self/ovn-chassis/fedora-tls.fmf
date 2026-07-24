@@ -22,12 +22,24 @@ prepare:
   - name: Create chassis TLS credentials
     how: ansible
     order: 90
-    playbook: tests/self/ovn-central-ssl/prepare.yml
+    playbook: playbooks/ovn-test-pki-create.yml
+    extra-args: '-e ovn_test_pki_enabled=true -e ovn_test_pki_builder_hosts=all'
+  - name: Install chassis TLS credentials
+    how: ansible
+    order: 95
+    playbook: playbooks/ovn-test-pki-install.yml
+    extra-args: '-e ovn_test_pki_enabled=true'
   - name: Set up TLS OVN central
     how: ansible
     order: 100
     playbook: playbooks/ovn-central.yml
-    extra-args: '-e ovn_install_method=distro -e ovs_setup_install_method=distro -e ovn_central_ssl_enabled=true'
+    extra-args: >-
+      -e ovn_install_method=distro
+      -e ovs_setup_install_method=distro
+      -e ovn_central_ssl_enabled=true
+      -e ovn_central_ssl_private_key=/run/ovn-test-pki/private-key.pem
+      -e ovn_central_ssl_certificate=/run/ovn-test-pki/certificate.pem
+      -e ovn_central_ssl_ca_cert=/run/ovn-test-pki/ca-cert.pem
   - name: Build synthetic chassis image
     how: ansible
     order: 110

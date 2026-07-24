@@ -1,11 +1,10 @@
 - name: Create the destination OVS bridge
   hosts: all
   become: true
-  tasks:
-    - name: Create self-test OVS bridge
-      ansible.builtin.command:
-        cmd: ovs-vsctl --may-exist add-br self-br
-      changed_when: true
+  roles:
+    - role: ovs_bridges
+      ovs_bridges:
+        - self-br
 
 - name: Apply changed endpoint configuration
   ansible.builtin.import_playbook: ../../../playbooks/ovn-endpoints.yml

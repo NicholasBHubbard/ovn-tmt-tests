@@ -276,6 +276,41 @@ class TestInitial:
         snapshots.save("load-balancer", load_balancer["_uuid"])
         snapshots.save("route", route["_uuid"])
 
+    def test_acls(self, nb, snapshots):
+        acl = managed(
+            nb,
+            "ACL",
+            "self-acl",
+            "_uuid",
+            "direction",
+            "priority",
+            "match",
+            "action",
+            "name",
+            "log",
+            "severity",
+            "meter",
+            "label",
+            "tier",
+            "options",
+        )
+
+        assert acl["direction"] == "from-lport"
+        assert acl["priority"] == 1002
+        assert acl["match"] == "ip4 || ip6"
+        assert acl["action"] == "allow-related"
+        assert acl["name"] == "self-acl-log"
+        assert acl["log"] is True
+        assert acl["severity"] == "info"
+        assert acl["meter"] == "self-meter"
+        assert acl["label"] == 42
+        assert acl["tier"] == 1
+        assert acl["options"] == {"apply-after-lb": "true"}
+        assert attached_to(nb, "Port_Group", "acls", acl["_uuid"]) == ["self-pg"]
+        assert attached_to(nb, "Logical_Switch", "acls", acl["_uuid"]) == []
+        assert nb.exists("ACL", f"{MANAGED}self-acl-delete")
+        snapshots.save("acl", acl["_uuid"])
+
 
 class TestReconfigured:
     @pytest.mark.parametrize(
@@ -303,6 +338,7 @@ class TestReconfigured:
             ),
             ("NAT", "self-nat", "nat-moved"),
             ("DHCP_Options", "self-dhcp", "dhcp-moved"),
+            ("ACL", "self-acl", "acl-moved"),
         ],
     )
     def test_managed_identity_is_recorded(
@@ -461,6 +497,51 @@ class TestResult:
         assert dhcp_v6["options"]["dns_server"] == "2001:db8::53"
         assert not nb.exists("DHCP_Options", f"{MANAGED}self-dhcp-delete")
         assert nb.exists("DHCP_Options", "cidr=10.10.0.0/24")
+
+    def test_acl_reconfiguration(self, nb, snapshots):
+        acl = managed(
+            nb,
+            "ACL",
+            "self-acl",
+            "_uuid",
+            "direction",
+            "priority",
+            "match",
+            "action",
+            "name",
+            "log",
+            "severity",
+            "meter",
+            "label",
+            "tier",
+            "options",
+        )
+
+        assert acl["_uuid"] == snapshots.load("acl")
+        assert acl["_uuid"] == snapshots.load("acl-moved")
+        assert acl["direction"] == "to-lport"
+        assert acl["priority"] == 1100
+        assert acl["match"] == "ip4"
+        assert acl["action"] == "reject"
+        assert acl["name"] == []
+        assert acl["log"] is False
+        assert acl["severity"] == []
+        assert acl["meter"] == []
+        assert acl["label"] == 0
+        assert acl["tier"] == 2
+        assert acl["options"] == {}
+        assert attached_to(nb, "Logical_Switch", "acls", acl["_uuid"]) == ["self-moved"]
+        assert attached_to(nb, "Port_Group", "acls", acl["_uuid"]) == []
+        assert not nb.exists("ACL", f"{MANAGED}self-acl-delete")
+        unmanaged = nb.one(
+            "ACL",
+            "priority=800",
+            "match=ip4.src == 192.0.2.0/24",
+            columns=("_uuid",),
+        )
+        assert attached_to(nb, "Logical_Switch", "acls", unmanaged["_uuid"]) == [
+            "self-sw"
+        ]
 
     def test_nat_load_balancer_and_route(self, nb, snapshots):
         nat = managed(

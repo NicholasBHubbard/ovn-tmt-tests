@@ -1,0 +1,3 @@
+# Each ACL needs a stable id and one switch or port_group target.
+# Optional fields and options are cleared when omitted. Unlisted ACLs are untouched.
+ovn_acls: []

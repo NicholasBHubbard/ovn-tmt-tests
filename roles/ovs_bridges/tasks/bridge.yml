@@ -1,0 +1,33 @@
+- name: Select OVS bridge configuration
+  ansible.builtin.set_fact:
+    ovs_bridge_name: "{{ ovs_bridge.name if ovs_bridge is mapping else ovs_bridge }}"
+    ovs_bridge_state: >-
+      {{ ovs_bridge.state | default('present')
+         if ovs_bridge is mapping else 'present' }}
+
+- name: Verify OVS bridge {{ ovs_bridge_name }}
+  ansible.builtin.assert:
+    that:
+      - ovs_bridge_name | length > 0
+      - ovs_bridge_state in ['present', 'absent']
+    fail_msg: "OVS bridges need a name and a present or absent state."
+
+- name: Create OVS bridge {{ ovs_bridge_name }}
+  when: ovs_bridge_state == 'present'
+  ansible.builtin.command:
+    argv:
+      - ovs-vsctl
+      - --may-exist
+      - add-br
+      - "{{ ovs_bridge_name }}"
+  changed_when: true
+
+- name: Delete OVS bridge {{ ovs_bridge_name }}
+  when: ovs_bridge_state == 'absent'
+  ansible.builtin.command:
+    argv:
+      - ovs-vsctl
+      - --if-exists
+      - del-br
+      - "{{ ovs_bridge_name }}"
+  changed_when: true

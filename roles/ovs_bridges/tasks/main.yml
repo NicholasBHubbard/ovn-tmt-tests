@@ -1,0 +1,6 @@
+- name: Configure OVS bridges
+  ansible.builtin.include_tasks: bridge.yml
+  loop: "{{ ovs_bridges }}"
+  loop_control:
+    loop_var: ovs_bridge
+    label: "{{ ovs_bridge.name if ovs_bridge is mapping else ovs_bridge }}"

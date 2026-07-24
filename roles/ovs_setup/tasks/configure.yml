@@ -46,10 +46,10 @@
 
 - name: Create OVS bridges
   when: ovs_setup_bridges | length > 0
-  ansible.builtin.command:
-    cmd: "ovs-vsctl --may-exist add-br {{ item }}"
-  loop: "{{ ovs_setup_bridges }}"
-  changed_when: true
+  ansible.builtin.include_role:
+    name: ovs_bridges
+  vars:
+    ovs_bridges: "{{ ovs_setup_bridges }}"
 
 - name: Configure SSL private key
   when: ovs_setup_ssl_enabled | bool

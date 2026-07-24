@@ -15,9 +15,9 @@ class TestPreconditions:
 
 class TestCredentials:
     def test_credentials_exist(self):
-        root = Path("/etc/openvswitch")
+        root = Path("/run/ovn-test-pki")
 
-        for name in ("ovn-privkey.pem", "ovn-cert.pem", "cacert.pem"):
+        for name in ("private-key.pem", "certificate.pem", "ca-cert.pem"):
             assert (root / name).is_file()
 
 

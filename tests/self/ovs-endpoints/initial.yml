@@ -1,14 +1,11 @@
 - name: Create test OVS bridges
   hosts: all
   become: true
-  tasks:
-    - name: Create test OVS bridge
-      ansible.builtin.command:
-        cmd: "ovs-vsctl --may-exist add-br {{ item }}"
-      loop:
+  roles:
+    - role: ovs_bridges
+      ovs_bridges:
         - self-br-a
         - self-br-b
-      changed_when: true
 
 - name: Apply initial direct OVS endpoints
   ansible.builtin.import_playbook: ../../../playbooks/ovs-endpoints.yml

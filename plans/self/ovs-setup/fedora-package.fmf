@@ -4,7 +4,7 @@ provision:
   - how: virtual
     image: fedora
 
-prepare:
+prepare+:
   - how: shell
     order: 80
     script: python3 -m pytest -q -s ./tests/self/ovs-setup/test.py::TestPreconditions

@@ -15,13 +15,7 @@
 - name: Configure shared provider bridge mappings
   hosts: compute-1:compute-2:gateway-1
   become: true
-  tasks:
-    - name: Configure public bridge mapping
-      ansible.builtin.command:
-        argv:
-          - ovs-vsctl
-          - set
-          - open
-          - .
-          - external-ids:ovn-bridge-mappings=public:br-ex
-      changed_when: true
+  roles:
+    - role: ovs_external_ids
+      ovs_external_ids:
+        ovn-bridge-mappings: public:br-ex

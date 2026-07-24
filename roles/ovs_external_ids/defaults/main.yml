@@ -1,0 +1,2 @@
+# Listed keys are set to their value; null removes a key. Unlisted keys are untouched.
+ovs_external_ids: {}

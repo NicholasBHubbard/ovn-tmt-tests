@@ -1,0 +1,255 @@
+- name: Verify ACL {{ ovn_acl.id }}
+  ansible.builtin.assert:
+    that:
+      - >-
+        ovn_acl.state | default('present') == 'absent'
+        or ovn_acl.target_type | default('switch') in ['switch', 'port_group']
+      - >-
+        ovn_acl.state | default('present') == 'absent'
+        or ovn_acl.target is defined
+      - >-
+        ovn_acl.state | default('present') == 'absent'
+        or ovn_acl.direction in ['from-lport', 'to-lport']
+      - >-
+        ovn_acl.state | default('present') == 'absent'
+        or ovn_acl.priority is defined
+      - >-
+        ovn_acl.state | default('present') == 'absent'
+        or ovn_acl.match is defined
+      - >-
+        ovn_acl.state | default('present') == 'absent'
+        or ovn_acl.action in
+           ['allow', 'allow-related', 'allow-stateless', 'drop', 'reject', 'pass']
+    fail_msg: >-
+      Present ACLs need a switch or port_group target, direction, priority,
+      match and supported action.
+
+- name: Find ACL {{ ovn_acl.id }}
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - --bare
+      - --columns=_uuid
+      - find
+      - ACL
+      - "external_ids:ovn-tmt-tests-id={{ ovn_acl.id }}"
+  register: ovn_acl_rows
+  changed_when: false
+
+- name: Verify ACL ID is unambiguous {{ ovn_acl.id }}
+  ansible.builtin.assert:
+    that:
+      - ovn_acl_rows.stdout_lines | length <= 1
+    fail_msg: "ACL ID {{ ovn_acl.id }} matches multiple rows."
+
+- name: Find switch attachments for deleted ACL {{ ovn_acl.id }}
+  when:
+    - ovn_acl.state | default('present') == 'absent'
+    - ovn_acl_rows.stdout_lines | length == 1
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - --bare
+      - --columns=name
+      - find
+      - Logical_Switch
+      - "acls{>=}{{ ovn_acl_rows.stdout }}"
+  register: ovn_acl_deleted_switches
+  changed_when: false
+
+- name: Find port group attachments for deleted ACL {{ ovn_acl.id }}
+  when:
+    - ovn_acl.state | default('present') == 'absent'
+    - ovn_acl_rows.stdout_lines | length == 1
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - --bare
+      - --columns=name
+      - find
+      - Port_Group
+      - "acls{>=}{{ ovn_acl_rows.stdout }}"
+  register: ovn_acl_deleted_port_groups
+  changed_when: false
+
+- name: Remove deleted ACL from switches {{ ovn_acl.id }}
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - remove
+      - Logical_Switch
+      - "{{ item }}"
+      - acls
+      - "{{ ovn_acl_rows.stdout }}"
+  loop: >-
+    {{ ovn_acl_deleted_switches.stdout_lines
+       | default([]) | reject('equalto', '') }}
+  changed_when: true
+
+- name: Remove deleted ACL from port groups {{ ovn_acl.id }}
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - remove
+      - Port_Group
+      - "{{ item }}"
+      - acls
+      - "{{ ovn_acl_rows.stdout }}"
+  loop: >-
+    {{ ovn_acl_deleted_port_groups.stdout_lines
+       | default([]) | reject('equalto', '') }}
+  changed_when: true
+
+- name: Create ACL {{ ovn_acl.id }}
+  when:
+    - ovn_acl.state | default('present') == 'present'
+    - ovn_acl_rows.stdout_lines | length == 0
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - --id=@acl
+      - create
+      - ACL
+      - "direction={{ ovn_acl.direction }}"
+      - "priority={{ ovn_acl.priority }}"
+      - "match={{ ovn_acl.match | to_json }}"
+      - "action={{ ovn_acl.action }}"
+      - "external_ids:ovn-tmt-tests-id={{ ovn_acl.id | to_json }}"
+      - --
+      - add
+      - "{{ 'Port_Group' if ovn_acl.target_type | default('switch') == 'port_group' else 'Logical_Switch' }}"
+      - "{{ ovn_acl.target }}"
+      - acls
+      - "@acl"
+  register: ovn_acl_created
+  changed_when: true
+
+- name: Select ACL {{ ovn_acl.id }}
+  when: ovn_acl.state | default('present') == 'present'
+  ansible.builtin.set_fact:
+    ovn_acl_uuid: >-
+      {{ ovn_acl_rows.stdout
+         if ovn_acl_rows.stdout_lines | length == 1
+         else ovn_acl_created.stdout }}
+
+- name: Configure ACL {{ ovn_acl.id }}
+  when: ovn_acl.state | default('present') == 'present'
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - set
+      - ACL
+      - "{{ ovn_acl_uuid }}"
+      - "direction={{ ovn_acl.direction }}"
+      - "priority={{ ovn_acl.priority }}"
+      - "match={{ ovn_acl.match | to_json }}"
+      - "action={{ ovn_acl.action }}"
+      - "name={{ ovn_acl.name | default([]) | to_json }}"
+      - "log={{ ovn_acl.log | default(false) | string | lower }}"
+      - "severity={{ ovn_acl.severity | default([]) | to_json }}"
+      - "meter={{ ovn_acl.meter | default([]) | to_json }}"
+      - "label={{ ovn_acl.label | default(0) }}"
+      - "tier={{ ovn_acl.tier | default(0) }}"
+      - "options={}"
+      - "external_ids:ovn-tmt-tests-id={{ ovn_acl.id | to_json }}"
+  changed_when: true
+
+- name: Configure options for ACL {{ ovn_acl.id }}
+  when: ovn_acl.state | default('present') == 'present'
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - set
+      - ACL
+      - "{{ ovn_acl_uuid }}"
+      - "options:{{ ovn_acl_option.key }}={{ ovn_acl_option_value }}"
+  loop: "{{ ovn_acl.options | default({}) | dict2items }}"
+  loop_control:
+    loop_var: ovn_acl_option
+    label: "{{ ovn_acl_option.key }}"
+  vars:
+    ovn_acl_option_value: >-
+      {{ (ovn_acl_option.value | string | lower)
+         if ovn_acl_option.value is boolean
+         else (ovn_acl_option.value | string) }}
+  changed_when: true
+
+- name: Find switch attachments for ACL {{ ovn_acl.id }}
+  when: ovn_acl.state | default('present') == 'present'
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - --bare
+      - --columns=name
+      - find
+      - Logical_Switch
+      - "acls{>=}{{ ovn_acl_uuid }}"
+  register: ovn_acl_switches
+  changed_when: false
+
+- name: Find port group attachments for ACL {{ ovn_acl.id }}
+  when: ovn_acl.state | default('present') == 'present'
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - --bare
+      - --columns=name
+      - find
+      - Port_Group
+      - "acls{>=}{{ ovn_acl_uuid }}"
+  register: ovn_acl_port_groups
+  changed_when: false
+
+- name: Attach ACL {{ ovn_acl.id }}
+  when:
+    - ovn_acl.state | default('present') == 'present'
+    - >-
+      ovn_acl.target not in (
+        ovn_acl_port_groups.stdout_lines
+        if ovn_acl.target_type | default('switch') == 'port_group'
+        else ovn_acl_switches.stdout_lines
+      )
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - add
+      - "{{ 'Port_Group' if ovn_acl.target_type | default('switch') == 'port_group' else 'Logical_Switch' }}"
+      - "{{ ovn_acl.target }}"
+      - acls
+      - "{{ ovn_acl_uuid }}"
+  changed_when: true
+
+- name: Remove old switch attachments for ACL {{ ovn_acl.id }}
+  when:
+    - ovn_acl.state | default('present') == 'present'
+    - >-
+      ovn_acl.target_type | default('switch') != 'switch'
+      or item != ovn_acl.target
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - remove
+      - Logical_Switch
+      - "{{ item }}"
+      - acls
+      - "{{ ovn_acl_uuid }}"
+  loop: "{{ ovn_acl_switches.stdout_lines | default([]) | reject('equalto', '') }}"
+  changed_when: true
+
+- name: Remove old port group attachments for ACL {{ ovn_acl.id }}
+  when:
+    - ovn_acl.state | default('present') == 'present'
+    - >-
+      ovn_acl.target_type | default('switch') != 'port_group'
+      or item != ovn_acl.target
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - remove
+      - Port_Group
+      - "{{ item }}"
+      - acls
+      - "{{ ovn_acl_uuid }}"
+  loop: >-
+    {{ ovn_acl_port_groups.stdout_lines | default([]) | reject('equalto', '') }}
+  changed_when: true

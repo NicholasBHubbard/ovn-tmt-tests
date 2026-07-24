@@ -1,3 +1,16 @@
+- name: Create an ACL target outside the managed topology
+  hosts: all
+  become: true
+  tasks:
+    - name: Create self-test port group
+      ansible.builtin.command:
+        argv:
+          - ovn-nbctl
+          - --may-exist
+          - pg-add
+          - self-pg
+      changed_when: true
+
 - name: Apply the top-down topology configuration
   ansible.builtin.import_playbook: ../../../playbooks/ovn-topology.yml
   vars:
@@ -145,6 +158,28 @@
         router: self-r3
         prefix: 203.0.113.0/24
         nexthop: 192.0.2.2
+    ovn_acls:
+      - id: self-acl
+        target_type: port_group
+        target: self-pg
+        direction: from-lport
+        priority: 1002
+        match: ip4 || ip6
+        action: allow-related
+        name: self-acl-log
+        log: true
+        severity: info
+        meter: self-meter
+        label: 42
+        tier: 1
+        options:
+          apply-after-lb: true
+      - id: self-acl-delete
+        target: self-sw
+        direction: to-lport
+        priority: 900
+        match: ip4
+        action: drop
 
 - name: Create unmanaged logical topology
   hosts: all
@@ -181,4 +216,17 @@
     - name: Add unmanaged DHCP options for preservation test
       ansible.builtin.command:
         cmd: ovn-nbctl dhcp-options-create 10.10.0.0/24
+      changed_when: true
+
+    - name: Add unmanaged ACL for preservation test
+      ansible.builtin.command:
+        argv:
+          - ovn-nbctl
+          - --may-exist
+          - acl-add
+          - self-sw
+          - from-lport
+          - "800"
+          - ip4.src == 192.0.2.0/24
+          - drop
       changed_when: true

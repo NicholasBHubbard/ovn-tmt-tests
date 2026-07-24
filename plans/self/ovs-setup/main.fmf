@@ -1,5 +1,27 @@
 summary: Base configuration for ovs-setup self-tests
 
+prepare:
+  - name: Apply initial reusable OVS state
+    how: ansible
+    order: 100
+    playbook: tests/self/ovs-setup/initial.yml
+  - name: Verify initial reusable OVS state
+    how: shell
+    order: 110
+    script: python3 -m pytest -q -s ./tests/self/ovs-setup/test.py::TestInitial
+  - name: Reconfigure reusable OVS state
+    how: ansible
+    order: 120
+    playbook: tests/self/ovs-setup/reconfigure.yml
+  - name: Record reconfigured reusable OVS state
+    how: shell
+    order: 130
+    script: python3 -m pytest -q -s ./tests/self/ovs-setup/test.py::TestReconfigured
+  - name: Reapply reusable OVS state
+    how: ansible
+    order: 140
+    playbook: tests/self/ovs-setup/reconfigure.yml
+
 discover:
   how: fmf
   test:

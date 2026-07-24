@@ -1,0 +1,22 @@
+- name: Apply initial reusable OVS configuration
+  hosts: all
+  become: true
+  pre_tasks:
+    - name: Add unmanaged OVS external ID
+      ansible.builtin.command:
+        argv:
+          - ovs-vsctl
+          - set
+          - Open_vSwitch
+          - .
+          - external_ids:self-unmanaged=preserve
+      changed_when: true
+  roles:
+    - role: ovs_bridges
+      ovs_bridges:
+        - self-bridge-keep
+        - name: self-bridge-delete
+    - role: ovs_external_ids
+      ovs_external_ids:
+        self-managed: initial
+        self-delete: remove-me

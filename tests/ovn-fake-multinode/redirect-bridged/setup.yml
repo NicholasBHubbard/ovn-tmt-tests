@@ -65,15 +65,8 @@
     rr_chassis_macs:
       compute-1: "aa:bb:cc:dd:01:01"
       gateway-1: "aa:bb:cc:dd:02:01"
-  tasks:
-    - name: Configure provider-network chassis MAC
-      ansible.builtin.command:
-        argv:
-          - ovs-vsctl
-          - set
-          - open
-          - .
-          - >-
-            external-ids:ovn-chassis-mac-mappings=public:{{
-            rr_chassis_macs[inventory_hostname] }}
-      changed_when: true
+  roles:
+    - role: ovs_external_ids
+      ovs_external_ids:
+        ovn-chassis-mac-mappings: >-
+          public:{{ rr_chassis_macs[inventory_hostname] }}

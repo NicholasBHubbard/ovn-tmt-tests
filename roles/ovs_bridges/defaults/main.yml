@@ -1,0 +1,3 @@
+# Strings create bridges. Mappings may set name and state (present or absent).
+# Unlisted bridges are untouched.
+ovs_bridges: []

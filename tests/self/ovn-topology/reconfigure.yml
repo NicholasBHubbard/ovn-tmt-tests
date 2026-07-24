@@ -90,3 +90,13 @@
         nexthop: 2001:db8:2::1
       - id: self-route-delete
         state: absent
+    ovn_acls:
+      - id: self-acl
+        target: self-moved
+        direction: to-lport
+        priority: 1100
+        match: ip4
+        action: reject
+        tier: 2
+      - id: self-acl-delete
+        state: absent

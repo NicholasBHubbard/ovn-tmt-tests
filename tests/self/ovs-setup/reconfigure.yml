@@ -1,0 +1,15 @@
+- name: Reconfigure reusable OVS state
+  hosts: all
+  become: true
+  roles:
+    - role: ovs_bridges
+      ovs_bridges:
+        - self-bridge-keep
+        - name: self-bridge-delete
+          state: absent
+        - name: self-bridge-new
+          state: present
+    - role: ovs_external_ids
+      ovs_external_ids:
+        self-managed: updated
+        self-delete: null
