@@ -1,4 +1,5 @@
 summary: Verify packet-level gateway and NAT connectivity
+enabled: true
 
 provision:
   - name: central
@@ -21,16 +22,16 @@ prepare+:
   - name: Set up gateway NAT test scenario
     how: ansible
     order: 80
-    playbook: tests/ovn-fake-multinode/gateway-nat/setup.yml
+    playbook: tests/multihost/gateway-nat/setup.yml
 
 discover:
   - name: compute
     how: fmf
     where: compute
     test:
-      - /tests/ovn-fake-multinode/gateway-nat
+      - /tests/multihost/gateway-nat
   - name: gateway
     how: fmf
     where: gateway
     test:
-      - /tests/ovn-fake-multinode/gateway-nat
+      - /tests/multihost/gateway-nat

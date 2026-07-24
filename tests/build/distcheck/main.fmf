@@ -1,0 +1,4 @@
+summary: Run OVN distcheck
+test: >-
+  python3 -m pytest -p ovn_test.pytest_build ./test.py
+duration: 5h

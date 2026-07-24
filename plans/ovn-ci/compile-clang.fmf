@@ -11,4 +11,4 @@ provision:
 discover:
   how: fmf
   test:
-    - /tests/ovn-ci/compile
+    - /tests/build/compile

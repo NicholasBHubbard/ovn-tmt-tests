@@ -1,4 +1,5 @@
 summary: Measure incremental OVN pod and service convergence
+enabled: true
 
 environment+:
   OTT_SCALE_INITIAL_PODS: "4"
@@ -40,4 +41,4 @@ discover:
   how: fmf
   where: [central]
   test:
-    - /tests/ovn-scale/density-heavy
+    - /tests/scale/density-heavy

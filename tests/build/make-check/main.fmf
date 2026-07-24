@@ -1,0 +1,4 @@
+summary: Run OVN make check
+test: >-
+  python3 -m pytest -p ovn_test.pytest_build ./test.py
+duration: 5h

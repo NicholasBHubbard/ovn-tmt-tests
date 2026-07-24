@@ -165,6 +165,7 @@ def test_multihost_parent_propagates_configuration(tree):
     )
     for value in expected:
         assert_contains(tree, path, value)
+    assert_contains(tree, path, "enabled: false")
 
 
 def test_multihost_tls_contract(tree):
@@ -190,18 +191,19 @@ def test_multihost_tls_contract(tree):
     )
 
 
-def test_multihost_children_do_not_repeat_topology_setup(tree):
+def test_multihost_children_inherit_base(tree):
     parent = tree / "plans/ovn-multihost/main.fmf"
-    for plan in parent.parent.glob("*.fmf"):
+    for plan in parent.parent.rglob("*.fmf"):
         if plan != parent:
             assert "playbook: playbooks/multihost.yml" not in plan.read_text()
+            assert "enabled: true" in plan.read_text()
 
 
-def test_fake_multinode_setup_is_test_scoped(tree):
+def test_multihost_setup_is_test_scoped(tree):
     plans = "\n".join(
-        path.read_text() for path in (tree / "plans/ovn-multihost").glob("*.fmf")
+        path.read_text() for path in (tree / "plans/ovn-multihost").rglob("*.fmf")
     )
-    for setup in (tree / "tests/ovn-fake-multinode").glob("*/setup.yml"):
+    for setup in (tree / "tests/multihost").glob("*/setup.yml"):
         if setup.parent.name in {"gateway-nat", "provider-network"}:
             continue
         test = setup.with_name("test.py")
@@ -237,7 +239,7 @@ def test_artifact_role_contract(tree):
     ("plan", "test", "settings"),
     [
         (
-            "scale-density-light.fmf",
+            "density-light.fmf",
             "density-light",
             (
                 "OTT_SCALE_INITIAL_PORTS:",
@@ -249,7 +251,7 @@ def test_artifact_role_contract(tree):
             ),
         ),
         (
-            "scale-density-heavy.fmf",
+            "density-heavy.fmf",
             "density-heavy",
             (
                 "OTT_SCALE_INITIAL_PODS:",
@@ -261,20 +263,20 @@ def test_artifact_role_contract(tree):
     ],
 )
 def test_scale_workload_contract(tree, plan, test, settings):
-    plan_path = tree / "plans/ovn-multihost" / plan
-    test_dir = tree / "tests/ovn-scale" / test
+    plan_path = tree / "plans/ovn-multihost/ovn-scale-testing" / plan
+    test_dir = tree / "tests/scale" / test
     assert plan_path.is_file()
     assert (test_dir / "main.fmf").is_file()
     assert (test_dir / "test.py").is_file()
     for setting in settings:
         assert setting in plan_path.read_text()
-    assert f"/tests/ovn-scale/{test}" in plan_path.read_text()
+    assert f"/tests/scale/{test}" in plan_path.read_text()
     assert "python3 -m pytest" in (test_dir / "main.fmf").read_text()
 
 
 def test_scale_workload_uses_shared_library(tree):
     library = content(tree, "tests/lib/ovn_test/workload.py")
-    light = content(tree, "tests/ovn-scale/density-light/test.py")
+    light = content(tree, "tests/scale/density-light/test.py")
     assert "class Workload:" in library
     assert '"--wait=hv"' in library
     assert "metrics.csv" in light

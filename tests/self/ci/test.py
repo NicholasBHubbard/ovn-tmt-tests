@@ -34,7 +34,7 @@ class TestResult:
         ("expected", "paths"),
         [
             ("true", ("plans/ovn-ci/main.fmf",)),
-            ("true", ("tests/ovn-ci/make-check/test.py",)),
+            ("true", ("tests/build/make-check/test.py",)),
             ("true", ("components/new/config.yml",)),
             ("true", ("README.md", "roles/ovn_install/tasks/main.yml")),
             (
@@ -99,10 +99,8 @@ class TestResult:
             "pip install ansible-lint",
             "ansible-lint --strict playbooks roles",
             "pip install ansible-core pytest pyyaml ruff==0.15.22",
-            "ruff check tests/lib/ovn_test tests/ovn-ci "
-            "tests/ovn-fake-multinode tests/ovn-scale tests/self",
-            "ruff format --check tests/lib/ovn_test tests/ovn-ci "
-            "tests/ovn-fake-multinode tests/ovn-scale tests/self",
+            "ruff check tests",
+            "ruff format --check tests",
         ):
             assert expected in text
 

@@ -1,4 +1,5 @@
 summary: Base configuration for OVN multihost tests
+enabled: false
 
 environment:
   OTT_ARTIFACT_BUILD: "true"
@@ -86,7 +87,7 @@ discover:
   where:
     - compute
   test:
-    - /tests/ovn-fake-multinode/connectivity
+    - /tests/multihost/connectivity
 
 execute:
   how: tmt

@@ -29,8 +29,8 @@ jobs:
 
       - name: Run Python checks
         run: |
-          ruff check tests/lib/ovn_test tests/ovn-ci tests/ovn-fake-multinode tests/ovn-scale tests/self
-          ruff format --check tests/lib/ovn_test tests/ovn-ci tests/ovn-fake-multinode tests/ovn-scale tests/self
+          ruff check tests
+          ruff format --check tests
           python3 -m pytest tests/self/contracts
 
   actionlint:
