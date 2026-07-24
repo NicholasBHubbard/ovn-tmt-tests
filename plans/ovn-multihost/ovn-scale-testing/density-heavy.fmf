@@ -6,36 +6,6 @@ environment+:
   OTT_SCALE_ITERATIONS: "2"
   OTT_SCALE_PODS_PER_SERVICE: "2"
   OTT_SCALE_LB_PROTOCOLS: tcp,udp,sctp
-  OTT_SCALE_TIMEOUT: "60"
-  OTT_SCALE_IPV4: "true"
-  OTT_SCALE_IPV6: "true"
-  OTT_SCALE_MTU: "1342"
-
-provision:
-  - name: central
-    role: central
-    how: virtual
-    image: fedora
-    connection: system
-  - name: compute-1
-    role: compute
-    how: virtual
-    image: fedora
-    connection: system
-  - name: compute-2
-    role: compute
-    how: virtual
-    image: fedora
-    connection: system
-
-prepare+:
-  - name: Install scale workload dependencies
-    how: install
-    order: 20
-    where: [compute]
-    package:
-      - iproute
-      - iputils
 
 discover:
   how: fmf

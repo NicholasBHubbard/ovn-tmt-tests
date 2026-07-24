@@ -1,5 +1,5 @@
 - name: Create shared provider mesh
-  ansible.builtin.import_playbook: ../../../playbooks/ovs-tunnel-mesh.yml
+  ansible.builtin.import_playbook: ../../../../playbooks/ovs-tunnel-mesh.yml
   vars:
     ovs_tunnel_mesh_hosts: compute-1:compute-2:gateway-1
     ovs_tunnel_mesh_definitions:

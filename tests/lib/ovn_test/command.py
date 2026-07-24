@@ -1,7 +1,20 @@
+import json
 import shlex
 import subprocess
 import sys
 import time
+
+
+RUN_MANY = """\
+import json
+import shlex
+import subprocess
+import sys
+
+for command, check in json.load(sys.stdin):
+    print(f"+ {shlex.join(command)}", flush=True)
+    subprocess.run(command, check=check)
+"""
 
 
 class Runner:
@@ -27,9 +40,10 @@ class Runner:
         check=True,
         cwd=None,
         env=None,
+        display=None,
     ):
         command = [str(part) for part in command]
-        shown = command
+        shown = command if display is None else [str(part) for part in display]
         if guest is not None and self.topology is None:
             raise ValueError("guest execution requires a tmt topology")
         if guest is not None and not self.topology.is_local(guest):
@@ -76,6 +90,19 @@ class Runner:
 
     def namespace(self, namespace, *command, **options):
         return self.run("ip", "netns", "exec", namespace, *command, **options)
+
+    def run_many(self, commands, guest=None):
+        payload = [
+            ([str(part) for part in command], check) for command, check in commands
+        ]
+        return self.run(
+            "python3",
+            "-c",
+            RUN_MANY,
+            guest=guest,
+            input=json.dumps(payload),
+            display=["python3", "<command-batch>"],
+        )
 
     def succeeds(self, *command, **options):
         try:

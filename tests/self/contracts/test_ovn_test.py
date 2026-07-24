@@ -16,7 +16,9 @@ from ovn_test.workload import (
 class FakeRunner:
     def __init__(self):
         self.calls = []
+        self.batches = []
         self.fail = set()
+        self.returncodes = {}
         self.waits = []
 
     def run(self, *command, guest=None, input=None, check=True):
@@ -30,10 +32,19 @@ class FakeRunner:
             stdout = "logical-port-uuid\n"
         if "Port_Binding" in command:
             stdout = "chassis-uuid\n"
-        return subprocess.CompletedProcess(command, 0, stdout, "")
+        return subprocess.CompletedProcess(
+            command,
+            self.returncodes.get(command, 0),
+            stdout,
+            "",
+        )
 
     def output(self, *command, **options):
         return self.run(*command, **options).stdout.strip()
+
+    def run_many(self, commands, guest=None):
+        self.batches.append((guest, commands))
+        return subprocess.CompletedProcess([], 0, "", "")
 
     def wait(self, *command, **options):
         self.waits.append((command, options))
@@ -166,7 +177,7 @@ def test_workload_creates_namespace_objects(tmp_path):
     assert len([command for command in commands if "Address_Set" in command]) == 4
 
 
-def test_workload_uses_supported_port_group_commands(tmp_path):
+def test_workload_creates_ocp_port_state(tmp_path):
     runner = FakeRunner()
     workload = Workload(
         runner,
@@ -181,14 +192,11 @@ def test_workload_uses_supported_port_group_commands(tmp_path):
     workload.cleanup()
 
     commands = [call[1] for call in runner.calls]
-    assert (
-        "ovn-nbctl",
-        "add",
-        "Port_Group",
-        "pg_density_light",
-        "ports",
-        "logical-port-uuid",
-    ) in commands
+    create = next(command for command in commands if "lsp-set-addresses" in command)
+    assert "lsp-set-port-security" in create
+    assert not [
+        command for command in commands if "Port_Group" in command and "add" in command
+    ]
     assert (
         "ovn-nbctl",
         "add",
@@ -197,6 +205,10 @@ def test_workload_uses_supported_port_group_commands(tmp_path):
         "addresses",
         '"fd00:240::1"',
     ) in commands
+    assert runner.batches[0][0] == "compute-1"
+    assert ("ip", "netns", "add", "dl00000") in [
+        command for command, _ in runner.batches[0][1]
+    ]
     assert not [
         command
         for command in commands
@@ -322,6 +334,33 @@ def test_cleanup_attempts_every_object_after_a_failure(tmp_path):
     completed_calls = len(runner.calls)
     workload.cleanup()
     assert len(runner.calls) == completed_calls
+
+
+def test_cleanup_verification_checks_remote_endpoint_state(tmp_path):
+    runner = FakeRunner()
+    workload = Workload(
+        runner,
+        ["compute-1", "compute-2"],
+        "density-light",
+        "dl",
+        tmp_path / "metrics.csv",
+    )
+    endpoint = workload.endpoint(0)
+    workload.endpoints = [endpoint]
+    namespace = ("ip", "netns", "exec", endpoint["namespace"], "true")
+    interface = ("ovs-vsctl", "port-to-br", endpoint["interface"])
+    runner.returncodes = {namespace: 1, interface: 1}
+
+    workload.verify_cleanup()
+
+    runner.returncodes[namespace] = 0
+    with pytest.raises(AssertionError, match="network namespace remains"):
+        workload.verify_cleanup()
+
+    runner.returncodes[namespace] = 1
+    runner.returncodes[interface] = 0
+    with pytest.raises(AssertionError, match="OVS port remains"):
+        workload.verify_cleanup()
 
 
 @pytest.mark.parametrize(

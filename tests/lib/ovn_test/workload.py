@@ -3,56 +3,8 @@ import time
 from pathlib import Path
 
 
-CREATE_ENDPOINT = """\
-set -euxo pipefail
-namespace=$1
-host_interface=$2
-port=$3
-mac=$4
-ipv4=$5
-ipv6=$6
-enable_ipv4=$7
-enable_ipv6=$8
-mtu=$9
-
-ovs-vsctl --if-exists del-port br-int "$host_interface"
-ip link delete "$host_interface" 2>/dev/null || true
-ip netns delete "$namespace" 2>/dev/null || true
-ip netns add "$namespace"
-ip link add "$host_interface" type veth peer name "${namespace}-n"
-ip link set "${namespace}-n" netns "$namespace"
-ip -n "$namespace" link set "${namespace}-n" name eth0
-ip link set "$host_interface" mtu "$mtu" up
-ip -n "$namespace" link set lo up
-ip -n "$namespace" link set eth0 address "$mac" mtu "$mtu" up
-
-if [ "$enable_ipv4" = true ]; then
-    ip -n "$namespace" address replace "$ipv4/16" dev eth0
-fi
-if [ "$enable_ipv6" = true ]; then
-    ip -n "$namespace" -6 address replace "$ipv6/64" dev eth0 nodad
-fi
-
-ovs-vsctl --may-exist add-port br-int "$host_interface" \
-    -- set Interface "$host_interface" external_ids:iface-id="$port"
-"""
-
-
-REMOVE_ENDPOINT = """\
-set -euxo pipefail
-namespace=$1
-host_interface=$2
-ovs-vsctl --if-exists del-port br-int "$host_interface"
-ip link delete "$host_interface" 2>/dev/null || true
-ip netns delete "$namespace" 2>/dev/null || true
-"""
-
-
-VERIFY_ENDPOINT_REMOVED = """\
-set -euxo pipefail
-test ! -e "/var/run/netns/$1"
-! ovs-vsctl port-to-br "$2" >/dev/null 2>&1
-"""
+def _command(*parts, check=True):
+    return parts, check
 
 
 def _positive(name, value):
@@ -255,26 +207,10 @@ class Workload:
             "lsp-set-addresses",
             endpoint["port"],
             " ".join(addresses),
-        )
-        port_uuid = self.runner.output(
-            "ovn-nbctl",
-            "--bare",
-            "--columns=_uuid",
-            "find",
-            "Logical_Switch_Port",
-            f"name={endpoint['port']}",
-        )
-        if not port_uuid:
-            raise RuntimeError(
-                f"logical switch port was not created: {endpoint['port']}"
-            )
-        self.runner.run(
-            "ovn-nbctl",
-            "add",
-            "Port_Group",
-            self.port_groups[0],
-            "ports",
-            port_uuid,
+            "--",
+            "lsp-set-port-security",
+            endpoint["port"],
+            " ".join(addresses),
         )
         for family, enabled in enumerate((self.ipv4_enabled, self.ipv6_enabled)):
             if enabled:
@@ -290,22 +226,81 @@ class Workload:
         self.record_metric(index, f"{phase}_nb", start)
 
         start = time.time_ns()
-        self.runner.run(
-            "bash",
-            "-s",
-            "--",
-            endpoint["namespace"],
-            endpoint["interface"],
-            endpoint["port"],
-            endpoint["mac"],
-            endpoint["ipv4"],
-            endpoint["ipv6"],
-            str(self.ipv4_enabled).lower(),
-            str(self.ipv6_enabled).lower(),
-            str(self.mtu),
-            guest=endpoint["guest"],
-            input=CREATE_ENDPOINT,
+        namespace = endpoint["namespace"]
+        interface = endpoint["interface"]
+        peer = f"{namespace}-n"
+        ip = ("ip", "-n", namespace)
+        commands = [
+            _command("ovs-vsctl", "--if-exists", "del-port", "br-int", interface),
+            _command("ip", "link", "delete", interface, check=False),
+            _command("ip", "netns", "delete", namespace, check=False),
+            _command("ip", "netns", "add", namespace),
+            _command(
+                "ip",
+                "link",
+                "add",
+                interface,
+                "type",
+                "veth",
+                "peer",
+                "name",
+                peer,
+            ),
+            _command("ip", "link", "set", peer, "netns", namespace),
+            _command(*ip, "link", "set", peer, "name", "eth0"),
+            _command("ip", "link", "set", interface, "mtu", self.mtu, "up"),
+            _command(*ip, "link", "set", "lo", "up"),
+            _command(
+                *ip,
+                "link",
+                "set",
+                "eth0",
+                "address",
+                endpoint["mac"],
+                "mtu",
+                self.mtu,
+                "up",
+            ),
+        ]
+        if self.ipv4_enabled:
+            commands.append(
+                _command(
+                    *ip,
+                    "address",
+                    "replace",
+                    f"{endpoint['ipv4']}/16",
+                    "dev",
+                    "eth0",
+                )
+            )
+        if self.ipv6_enabled:
+            commands.append(
+                _command(
+                    *ip,
+                    "-6",
+                    "address",
+                    "replace",
+                    f"{endpoint['ipv6']}/64",
+                    "dev",
+                    "eth0",
+                    "nodad",
+                )
+            )
+        commands.append(
+            _command(
+                "ovs-vsctl",
+                "--may-exist",
+                "add-port",
+                "br-int",
+                interface,
+                "--",
+                "set",
+                "Interface",
+                interface,
+                f"external_ids:iface-id={endpoint['port']}",
+            )
         )
+        self.runner.run_many(commands, guest=endpoint["guest"])
         self.record_metric(index, f"{phase}_attach", start)
 
         start = time.time_ns()
@@ -397,14 +392,19 @@ class Workload:
         self.record_metric(index, "connectivity", start)
 
     def _remove_endpoint(self, endpoint):
-        self.runner.run(
-            "bash",
-            "-s",
-            "--",
-            endpoint["namespace"],
-            endpoint["interface"],
+        self.runner.run_many(
+            [
+                _command(
+                    "ovs-vsctl",
+                    "--if-exists",
+                    "del-port",
+                    "br-int",
+                    endpoint["interface"],
+                ),
+                _command("ip", "link", "delete", endpoint["interface"], check=False),
+                _command("ip", "netns", "delete", endpoint["namespace"], check=False),
+            ],
             guest=endpoint["guest"],
-            input=REMOVE_ENDPOINT,
         )
 
     def cleanup(self):
@@ -462,12 +462,27 @@ class Workload:
             if output:
                 raise AssertionError(f"{table} remains after cleanup: {name}")
         for endpoint in self.endpoints:
-            self.runner.run(
-                "bash",
-                "-s",
-                "--",
+            namespace = self.runner.run(
+                "ip",
+                "netns",
+                "exec",
                 endpoint["namespace"],
+                "true",
+                guest=endpoint["guest"],
+                check=False,
+            )
+            if namespace.returncode == 0:
+                raise AssertionError(
+                    f"network namespace remains after cleanup: {endpoint['namespace']}"
+                )
+            interface = self.runner.run(
+                "ovs-vsctl",
+                "port-to-br",
                 endpoint["interface"],
                 guest=endpoint["guest"],
-                input=VERIFY_ENDPOINT_REMOVED,
+                check=False,
             )
+            if interface.returncode == 0:
+                raise AssertionError(
+                    f"OVS port remains after cleanup: {endpoint['interface']}"
+                )

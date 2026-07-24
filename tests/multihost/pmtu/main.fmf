@@ -1,6 +1,5 @@
 summary: Verify logical-switch PMTU across OVN encapsulations
-test: >-
-  python3 -m pytest -p ovn_test.pytest_multihost ./test.py
+test: python3 -m pytest ./test.py
 duration: 10m
 environment:
   OTT_TEST_ENCAP: geneve

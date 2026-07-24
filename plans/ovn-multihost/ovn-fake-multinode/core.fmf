@@ -32,7 +32,7 @@ prepare+:
   - name: Set up shared provider network
     how: ansible
     order: 70
-    playbook: tests/multihost/provider-network/setup.yml
+    playbook: plans/ovn-multihost/ovn-fake-multinode/core/setup.yml
 
 discover:
   how: fmf

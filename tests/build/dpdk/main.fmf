@@ -1,4 +1,3 @@
 summary: Verify source-tree ovs-vswitchd has DPDK support
-test: >-
-  python3 -m pytest -p ovn_test.pytest_build ./test.py
+test: python3 -m pytest ./test.py
 duration: 1m

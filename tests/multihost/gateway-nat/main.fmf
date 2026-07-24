@@ -1,6 +1,5 @@
 summary: Verify traffic through an OVN gateway and NAT
-test: >-
-  python3 -m pytest -p ovn_test.pytest_multihost ./test.py
+test: python3 -m pytest ./test.py
 duration: 5m
 require+:
   - iproute

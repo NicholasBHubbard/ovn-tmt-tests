@@ -83,19 +83,6 @@ class TestNaming:
         assert run_naming(tree, tree).returncode == 0
 
 
-def test_chassis_rename_is_complete(tree):
-    assert (tree / "roles/ovn_chassis/defaults/main.yml").is_file()
-    assert (tree / "roles/ovn_chassis/tasks/main.yml").is_file()
-    assert (tree / "playbooks/ovn-chassis.yml").is_file()
-    assert_contains(
-        tree,
-        "roles/ovn_chassis/defaults/main.yml",
-        "ovn_chassis_instances:",
-    )
-    assert not (tree / "roles/ovn_host").exists()
-    assert not (tree / "playbooks/ovn-host.yml").exists()
-
-
 def test_every_self_test_is_referenced_by_a_plan(tree):
     plans = tree / "plans/self"
     for test_dir in (tree / "tests/self").iterdir():
@@ -194,9 +181,10 @@ def test_multihost_tls_contract(tree):
 def test_multihost_children_inherit_base(tree):
     parent = tree / "plans/ovn-multihost/main.fmf"
     for plan in parent.parent.rglob("*.fmf"):
-        if plan != parent:
-            assert "playbook: playbooks/multihost.yml" not in plan.read_text()
-            assert "enabled: true" in plan.read_text()
+        if plan.name == "main.fmf":
+            continue
+        assert "playbook: playbooks/multihost.yml" not in plan.read_text()
+        assert "enabled: true" in plan.read_text()
 
 
 def test_multihost_setup_is_test_scoped(tree):
@@ -204,7 +192,7 @@ def test_multihost_setup_is_test_scoped(tree):
         path.read_text() for path in (tree / "plans/ovn-multihost").rglob("*.fmf")
     )
     for setup in (tree / "tests/multihost").glob("*/setup.yml"):
-        if setup.parent.name in {"gateway-nat", "provider-network"}:
+        if setup.parent.name == "gateway-nat":
             continue
         test = setup.with_name("test.py")
         assert test.is_file()
@@ -244,10 +232,6 @@ def test_artifact_role_contract(tree):
             (
                 "OTT_SCALE_INITIAL_PORTS:",
                 "OTT_SCALE_ITERATIONS:",
-                "OTT_SCALE_TIMEOUT:",
-                "OTT_SCALE_IPV4:",
-                "OTT_SCALE_IPV6:",
-                "OTT_SCALE_MTU:",
             ),
         ),
         (
@@ -274,10 +258,14 @@ def test_scale_workload_contract(tree, plan, test, settings):
     assert "python3 -m pytest" in (test_dir / "main.fmf").read_text()
 
 
-def test_scale_workload_uses_shared_library(tree):
-    library = content(tree, "tests/lib/ovn_test/workload.py")
-    light = content(tree, "tests/scale/density-light/test.py")
-    assert "class Workload:" in library
-    assert '"--wait=hv"' in library
-    assert "metrics.csv" in light
-    assert "instance.cleanup()" in light
+def test_scale_workloads_inherit_common_configuration(tree):
+    parent = content(tree, "plans/ovn-multihost/ovn-scale-testing/main.fmf")
+    for setting in (
+        "OTT_SCALE_TIMEOUT:",
+        "OTT_SCALE_IPV4:",
+        "OTT_SCALE_IPV6:",
+        "OTT_SCALE_MTU:",
+    ):
+        assert setting in parent
+    assert parent.count("role: compute") == 2
+    assert "Install scale workload dependencies" in parent

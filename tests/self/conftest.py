@@ -1,12 +1,10 @@
 import os
-import sys
 from pathlib import Path
 
 import pytest
 
 
 TREE = Path(os.environ.get("TMT_TREE", Path(__file__).parents[2]))
-sys.path.insert(0, str(TREE / "tests" / "lib"))
 
 
 @pytest.fixture

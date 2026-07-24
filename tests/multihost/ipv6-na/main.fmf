@@ -1,6 +1,5 @@
 summary: Verify IPv6 neighbor advertisements on a non-resident chassis
-test: >-
-  python3 -m pytest -p ovn_test.pytest_multihost ./test.py
+test: python3 -m pytest ./test.py
 duration: 10m
 require+:
   - iputils

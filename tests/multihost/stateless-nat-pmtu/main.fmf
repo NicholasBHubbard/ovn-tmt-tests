@@ -1,6 +1,5 @@
 summary: Verify stateless NAT rewrites inner ICMP PMTU addresses
-test: >-
-  python3 -m pytest -p ovn_test.pytest_multihost ./test.py
+test: python3 -m pytest ./test.py
 duration: 10m
 require+:
   - iputils

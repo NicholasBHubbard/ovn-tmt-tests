@@ -1,5 +1,6 @@
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -101,6 +102,43 @@ def test_runner_normalizes_arguments_and_wait_options():
     assert calls[0][0] == ["/usr/bin/true", "1"]
     assert calls[1][1]["cwd"] == "/work"
     assert calls[1][1]["env"] == {"EXAMPLE": "value"}
+
+
+def test_runner_serializes_remote_command_batches(capsys):
+    calls = []
+
+    def execute(command, **kwargs):
+        calls.append((command, kwargs))
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    Runner(Topology(topology_data()), execute=execute).run_many(
+        [
+            (["true", 1], True),
+            (["false"], False),
+        ],
+        guest="compute-1",
+    )
+
+    assert calls[0][0][-1].startswith("python3 -c ")
+    assert json.loads(calls[0][1]["input"]) == [
+        [["true", "1"], True],
+        [["false"], False],
+    ]
+    assert "+ ssh compute-1 -- python3 '<command-batch>'" in capsys.readouterr().out
+
+
+def test_runner_command_batches_honor_error_handling():
+    python = sys.executable
+    result = Runner().run_many(
+        [
+            ([python, "-c", "raise SystemExit(1)"], False),
+            ([python, "-c", "print('continued')"], True),
+        ]
+    )
+
+    assert "continued" in result.stdout
+    with pytest.raises(subprocess.CalledProcessError):
+        Runner().run_many([([python, "-c", "raise SystemExit(1)"], True)])
 
 
 def test_runner_waits_for_a_result():
