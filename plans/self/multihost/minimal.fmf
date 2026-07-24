@@ -63,7 +63,7 @@ prepare+:
   - name: Create TLS packet endpoints
     how: ansible
     order: 100
-    playbook: tests/self/multihost/tls.yml
+    playbook: tests/self/multihost/tls-endpoints.yml
 
   - name: Verify TLS topology
     how: shell

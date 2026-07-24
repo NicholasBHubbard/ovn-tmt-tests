@@ -6,7 +6,7 @@ provision:
 
 prepare:
   - how: ansible
-    playbook: tests/self/make-check/prepare.yml
+    playbook: tests/self/make-check/fixture.yml
   - how: shell
     order: 80
     script: python3 -m pytest -q -s ./tests/self/make-check/test.py::TestFixture

@@ -18,7 +18,7 @@ prepare:
   - name: Verify invalid OVS endpoint configuration
     how: ansible
     order: 79
-    playbook: tests/self/ovs-endpoints/negative.yml
+    playbook: tests/self/ovs-endpoints/invalid-configuration.yml
   - name: Apply initial OVS endpoints
     how: ansible
     order: 80

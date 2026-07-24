@@ -1,8 +1,8 @@
-- name: Verify test-scoped setup execution
+- name: Verify test-scoped Ansible execution
   hosts: all
   gather_facts: false
   tasks:
-    - name: Confirm test-scoped setup reaches each guest
+    - name: Confirm test-scoped Ansible execution reaches each guest
       ansible.builtin.assert:
         that:
           - inventory_hostname in groups['all']

@@ -112,7 +112,7 @@ class TestInvalid:
             "localhost,",
             "-c",
             "local",
-            tree / "tests/self/ovn-chassis/invalid-config.yml",
+            tree / "tests/self/ovn-chassis/invalid-configuration.yml",
             "-e",
             f"ovn_chassis_invalid_case={case}",
             cwd=tree,

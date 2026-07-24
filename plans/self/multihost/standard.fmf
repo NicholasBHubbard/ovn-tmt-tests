@@ -57,31 +57,31 @@ prepare+:
   - name: Create endpoint on compute-1
     how: ansible
     order: 100
-    playbook: tests/self/multihost/endpoint.yml
+    playbook: tests/self/multihost/endpoint-placement.yml
     extra-args: '-e ovn_test_endpoint_host=compute-1'
 
   - name: Verify endpoint on compute-1
     how: ansible
     order: 110
-    playbook: tests/self/multihost/verify-endpoint.yml
+    playbook: tests/self/multihost/verify-endpoint-placement.yml
     extra-args: '-e ovn_test_endpoint_host=compute-1'
 
   - name: Move endpoint to compute-2
     how: ansible
     order: 120
-    playbook: tests/self/multihost/endpoint.yml
+    playbook: tests/self/multihost/endpoint-placement.yml
     extra-args: '-e ovn_test_endpoint_host=compute-2'
 
   - name: Verify endpoint moved to compute-2
     how: ansible
     order: 130
-    playbook: tests/self/multihost/verify-endpoint.yml
+    playbook: tests/self/multihost/verify-endpoint-placement.yml
     extra-args: '-e ovn_test_endpoint_host=compute-2'
 
   - name: Set up provider mesh
     how: ansible
     order: 140
-    playbook: tests/self/multihost/provider.yml
+    playbook: tests/self/multihost/provider-mesh.yml
 
 discover:
   - how: fmf

@@ -133,10 +133,10 @@ class TestTCP:
 
 
 class TestResult:
-    def test_test_scoped_ansible_setup(self, topology, test_data):
+    def test_test_scoped_ansible_execution(self, topology, test_data):
         ansible = Ansible.from_environment(topology=topology)
-        ansible.run("tests/self/multihost/test-setup.yml")
-        marker = "TASK [Confirm test-scoped setup reaches each guest]"
+        ansible.run("tests/self/multihost/ansible-execution.yml")
+        marker = "TASK [Confirm test-scoped Ansible execution reaches each guest]"
         assert marker in (test_data / "setup.log").read_text()
         for guest in topology.guests():
             log = (test_data / f"setup-{guest}.log").read_text()

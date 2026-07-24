@@ -47,11 +47,11 @@ prepare:
   - name: Create synthetic chassis with TLS
     how: ansible
     order: 120
-    playbook: tests/self/ovn-chassis/multi-tls.yml
+    playbook: tests/self/ovn-chassis/containers-tls.yml
   - name: Create TLS synthetic chassis packet topology
     how: ansible
     order: 130
-    playbook: tests/self/ovn-chassis/traffic.yml
+    playbook: tests/self/ovn-chassis/containers-traffic.yml
   - name: Verify TLS synthetic chassis traffic
     how: shell
     order: 140

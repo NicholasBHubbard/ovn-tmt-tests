@@ -11,7 +11,7 @@ prepare:
     script: python3 -m pytest -q -s ./tests/self/ovn-install/test.py::TestPreconditions
   - how: ansible
     order: 90
-    playbook: tests/self/ovn-install/prepare-source.yml
+    playbook: tests/self/ovn-install/source-fixture.yml
   - how: ansible
     order: 100
     playbook: playbooks/ovn-install.yml

@@ -43,11 +43,11 @@ prepare:
   - name: Clear OVN gateway configuration
     how: ansible
     order: 84
-    playbook: tests/self/ovn-chassis/clear.yml
+    playbook: tests/self/ovn-chassis/clear-gateway.yml
   - name: Reapply cleared OVN gateway configuration
     how: ansible
     order: 85
-    playbook: tests/self/ovn-chassis/clear.yml
+    playbook: tests/self/ovn-chassis/clear-gateway.yml
   - name: Verify invalid chassis configurations are rejected
     how: shell
     order: 86
@@ -61,11 +61,11 @@ prepare:
   - name: Create synthetic chassis
     how: ansible
     order: 88
-    playbook: tests/self/ovn-chassis/multi.yml
+    playbook: tests/self/ovn-chassis/containers.yml
   - name: Create synthetic chassis packet topology
     how: ansible
     order: 89
-    playbook: tests/self/ovn-chassis/traffic.yml
+    playbook: tests/self/ovn-chassis/containers-traffic.yml
   - name: Verify synthetic chassis traffic
     how: shell
     order: 90
@@ -75,7 +75,7 @@ prepare:
   - name: Reconfigure synthetic chassis
     how: ansible
     order: 91
-    playbook: tests/self/ovn-chassis/multi-reconfigure.yml
+    playbook: tests/self/ovn-chassis/containers-reconfigure.yml
   - name: Verify synthetic chassis reconfiguration
     how: shell
     order: 92
@@ -91,7 +91,7 @@ prepare:
   - name: Reapply synthetic chassis configuration
     how: ansible
     order: 94
-    playbook: tests/self/ovn-chassis/multi-reconfigure.yml
+    playbook: tests/self/ovn-chassis/containers-reconfigure.yml
   - name: Verify idempotent synthetic chassis reapplication
     how: shell
     order: 95
@@ -105,7 +105,7 @@ prepare:
   - name: Apply the replacement chassis image
     how: ansible
     order: 97
-    playbook: tests/self/ovn-chassis/multi-reconfigure.yml
+    playbook: tests/self/ovn-chassis/containers-reconfigure.yml
   - name: Verify chassis image replacement
     how: shell
     order: 98
