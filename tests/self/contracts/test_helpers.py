@@ -168,6 +168,30 @@ def test_runner_command_batches_honor_error_handling(capsys):
     assert "local: command batch failed (exit status 1)" in capsys.readouterr().out
 
 
+def test_runner_command_batches_keep_errors_with_commands(capsys):
+    python = sys.executable
+    Runner().run_many(
+        [
+            (
+                [
+                    python,
+                    "-c",
+                    "import sys; sys.stderr.write('batch-' + 'error\\n'); "
+                    "raise SystemExit(1)",
+                ],
+                False,
+            ),
+            ([python, "-c", "pass"], True),
+        ]
+    )
+
+    output = capsys.readouterr().out
+    marker = output.index("[nonfatal 1]")
+    error = output.index("batch-error")
+    next_command = output.index(f"local: + {python} -c pass")
+    assert marker < error < next_command
+
+
 def test_runner_waits_for_a_result():
     results = iter(
         [

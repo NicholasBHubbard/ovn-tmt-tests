@@ -19,17 +19,20 @@ for command, check in json.load(sys.stdin):
     shown = f"{label}: + {shlex.join(command)}"
     if check:
         print(shown, flush=True)
-        subprocess.run(command, check=True)
+        subprocess.run(command, check=True, stderr=subprocess.STDOUT)
         continue
 
-    result = subprocess.run(command, capture_output=True, text=True)
+    result = subprocess.run(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
     if result.returncode:
         shown += f"  [nonfatal {result.returncode}]"
     print(shown, flush=True)
     if result.stdout:
         print(result.stdout, end="", flush=True)
-    if result.stderr:
-        print(result.stderr, end="", file=sys.stderr, flush=True)
 """
 
 
