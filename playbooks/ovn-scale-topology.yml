@@ -1,0 +1,8 @@
+- name: Configure OVN scale topology
+  hosts: "{{ ovn_scale_topology_central_hosts | default('central') }}"
+  become: true
+  roles:
+    - role: ovn_scale_topology
+      ovn_scale_topology_chassis: >-
+        {{ ovn_scale_topology_chassis_names
+           | default(groups['compute'] | default([])) }}

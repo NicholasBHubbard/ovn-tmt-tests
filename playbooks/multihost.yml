@@ -1,11 +1,38 @@
 - name: Set up OVN central
-  hosts: central
+  hosts: central:central-follower
   become: true
+  pre_tasks:
+    - name: Skip unused central followers
+      when:
+        - inventory_hostname in (groups['central-follower'] | default([]))
+        - not (ovn_multihost_clustered | default(false) | bool)
+      ansible.builtin.meta: end_host
+
+    - name: Initialize OVN central cluster members
+      ansible.builtin.set_fact:
+        ovn_central_cluster_members: []
+      tags: topology-resolution
+
+    - name: Build OVN central cluster members
+      when: ovn_multihost_clustered | default(false) | bool
+      ansible.builtin.set_fact:
+        ovn_central_cluster_members: >-
+          {{ ovn_central_cluster_members
+             + [hostvars[item]['ansible_host'] | default(item)] }}
+      loop: >-
+        {{ groups['central'] | default([])
+           + (groups['central-follower'] | default([])
+              if ovn_multihost_clustered | default(false) | bool
+              else []) }}
+      tags: topology-resolution
   roles:
     - ovn_install
     - ovs_setup
     - role: ovn_central
+      ovn_central_nb_port: "{{ ovn_multihost_nb_port | default(6641) }}"
       ovn_central_sb_port: "{{ ovn_multihost_sb_port | default(6642) }}"
+      ovn_central_cluster_join_timeout: >-
+        {{ ovn_multihost_sb_wait_timeout | default(2700) }}
       ovn_central_ssl_enabled: >-
         {{ ovn_multihost_ssl_enabled | default(false) | bool }}
       ovn_central_ssl_private_key: >-
@@ -25,18 +52,49 @@
   hosts: compute:gateway
   gather_facts: false
   tasks:
-    - name: Resolve central address
+    - name: Initialize central endpoint lists
       ansible.builtin.set_fact:
-        ovn_central_address: >-
-          {{ hostvars[groups['central'][0]]['ansible_host']
-             | default(groups['central'][0]) }}
+        ovn_central_addresses: []
+        ovn_central_sb_remotes: []
       tags: topology-resolution
 
-    - name: Wait for SB database to be reachable on central
+    - name: Build central address list
+      ansible.builtin.set_fact:
+        ovn_central_addresses: >-
+          {{ ovn_central_addresses
+             + [hostvars[item]['ansible_host'] | default(item)] }}
+      loop: >-
+        {{ groups['central'] | default([])
+           + (groups['central-follower'] | default([])
+              if ovn_multihost_clustered | default(false) | bool
+              else []) }}
+      tags: topology-resolution
+
+    - name: Resolve central address
+      ansible.builtin.set_fact:
+        ovn_central_address: "{{ ovn_central_addresses[0] }}"
+      tags: topology-resolution
+
+    - name: Build central Southbound remote list
+      ansible.builtin.set_fact:
+        ovn_central_sb_remotes: >-
+          {{ ovn_central_sb_remotes
+             + [ovn_central_protocol ~ ':' ~ item ~ ':'
+                ~ (ovn_multihost_sb_port | default(6642) | string)] }}
+      vars:
+        ovn_central_protocol: >-
+          {{ 'ssl'
+             if ovn_multihost_ssl_enabled | default(false) | bool
+             else 'tcp' }}
+      loop: "{{ ovn_central_addresses }}"
+      tags: topology-resolution
+
+    - name: Wait for every SB database endpoint
       ansible.builtin.wait_for:
-        host: "{{ ovn_central_address }}"
+        host: "{{ item }}"
         port: "{{ ovn_multihost_sb_port | default(6642) }}"
         timeout: "{{ ovn_multihost_sb_wait_timeout | default(2700) }}"
+      loop: "{{ ovn_central_addresses }}"
 
 - name: Set up OVN chassis on compute nodes
   hosts: compute
@@ -61,10 +119,20 @@
     - ovn_chassis
   vars:
     ovn_chassis_sb_port: "{{ ovn_multihost_sb_port | default(6642) }}"
-    ovn_chassis_remote: >-
-      {{ 'ssl'
-         if ovn_multihost_ssl_enabled | default(false) | bool
-         else 'tcp' }}:{{ ovn_central_address }}:{{ ovn_multihost_sb_port | default(6642) }}
+    ovn_chassis_name: "{{ inventory_hostname }}"
+    ovn_chassis_monitor_all: >-
+      {{ ovn_multihost_monitor_all | default(false) | bool }}
+    ovn_chassis_bridges: >-
+      {{ ['br-int']
+         + ([ovn_compute_physical_bridge]
+            if ovn_compute_physical_bridge | default('') | length > 0
+            else []) }}
+    ovn_chassis_bridge_mappings: >-
+      {{ (ovn_compute_physical_network ~ ':' ~ ovn_compute_physical_bridge)
+         if ovn_compute_physical_network | default('') | length > 0
+         and ovn_compute_physical_bridge | default('') | length > 0
+         else '' }}
+    ovn_chassis_remote: "{{ ovn_central_sb_remotes | join(',') }}"
 
 - name: Set up OVN chassis on gateway nodes
   hosts: gateway
@@ -89,10 +157,9 @@
     - ovn_chassis
   vars:
     ovn_chassis_sb_port: "{{ ovn_multihost_sb_port | default(6642) }}"
-    ovn_chassis_remote: >-
-      {{ 'ssl'
-         if ovn_multihost_ssl_enabled | default(false) | bool
-         else 'tcp' }}:{{ ovn_central_address }}:{{ ovn_multihost_sb_port | default(6642) }}
+    ovn_chassis_remote: "{{ ovn_central_sb_remotes | join(',') }}"
+    ovn_chassis_monitor_all: >-
+      {{ ovn_multihost_monitor_all | default(false) | bool }}
     ovn_chassis_name: >-
       {{ ovn_gateway_chassis_name | default(inventory_hostname, true) }}
     ovn_chassis_bridges: >-

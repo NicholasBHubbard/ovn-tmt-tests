@@ -1,0 +1,12 @@
+# Expected and absent names are authoritative within this convergence check.
+# A state file may provide the same fields under a "southbound" key.
+ovn_sb_convergence_datapaths: []
+ovn_sb_convergence_ports: []
+ovn_sb_convergence_absent_datapaths: []
+ovn_sb_convergence_absent_ports: []
+ovn_sb_convergence_state_path: ""
+ovn_sb_convergence_timeout: 120
+ovn_sb_convergence_nbctl:
+  - ovn-nbctl
+ovn_sb_convergence_sbctl:
+  - ovn-sbctl

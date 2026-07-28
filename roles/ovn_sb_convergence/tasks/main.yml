@@ -1,0 +1,44 @@
+- name: Verify Southbound convergence configuration
+  ansible.builtin.assert:
+    that:
+      - ovn_sb_convergence_timeout | int > 0
+      - ovn_sb_convergence_nbctl is sequence
+      - ovn_sb_convergence_nbctl is not string
+      - ovn_sb_convergence_nbctl | length > 0
+      - ovn_sb_convergence_sbctl is sequence
+      - ovn_sb_convergence_sbctl is not string
+      - ovn_sb_convergence_sbctl | length > 0
+      - >-
+        ovn_sb_convergence_state_path | length > 0
+        or ovn_sb_convergence_datapaths | length > 0
+        or ovn_sb_convergence_ports | length > 0
+        or ovn_sb_convergence_absent_datapaths | length > 0
+        or ovn_sb_convergence_absent_ports | length > 0
+    fail_msg: "Southbound convergence needs expected objects and a positive timeout."
+
+- name: Wait for Southbound convergence
+  ansible.builtin.script:
+    cmd: check.py
+    executable: python3
+  environment:
+    OVN_SB_CONVERGENCE_CONFIG: >-
+      {{ {
+        'datapaths': ovn_sb_convergence_datapaths,
+        'ports': ovn_sb_convergence_ports,
+        'absent_datapaths': ovn_sb_convergence_absent_datapaths,
+        'absent_ports': ovn_sb_convergence_absent_ports,
+        'timeout': ovn_sb_convergence_timeout | int,
+        'nbctl': ovn_sb_convergence_nbctl,
+        'sbctl': ovn_sb_convergence_sbctl
+      } | to_json | b64encode }}
+    OVN_SB_CONVERGENCE_STATE_PATH: "{{ ovn_sb_convergence_state_path }}"
+  register: ovn_sb_convergence_result
+  changed_when: false
+
+- name: Report Southbound convergence
+  ansible.builtin.debug:
+    msg: >-
+      Southbound converged in
+      {{ (ovn_sb_convergence_result.stdout | from_json).duration_seconds }}s:
+      {{ (ovn_sb_convergence_result.stdout | from_json).datapaths }} datapaths,
+      {{ (ovn_sb_convergence_result.stdout | from_json).ports }} ports.

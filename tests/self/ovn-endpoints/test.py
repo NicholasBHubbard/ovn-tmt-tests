@@ -31,18 +31,6 @@ def ovs(runner):
     return Ovsdb(runner, "ovs-vsctl")
 
 
-def named(nb, table, name, *columns):
-    return nb.one(table, f"name={name}", columns=columns)
-
-
-def managed(nb, table, identifier, *columns):
-    return nb.one(
-        table,
-        f"external_ids:ovn-tmt-tests-id={identifier}",
-        columns=columns,
-    )
-
-
 def namespace_identity(runner, name):
     return runner.output("stat", "-Lc", "%i", f"/var/run/netns/{name}")
 
@@ -56,13 +44,8 @@ def process_arguments(runner, pid):
 
 
 def assert_logical_port(nb, name, switch, mac, addresses):
-    port = named(nb, "Logical_Switch_Port", name, "_uuid", "addresses")
-    switches = nb.find(
-        "Logical_Switch",
-        f"ports{{>=}}{port['_uuid']}",
-        columns=("name",),
-    )
-    assert [row["name"] for row in switches] == [switch]
+    port = nb.by_name("Logical_Switch_Port", name, "_uuid", "addresses")
+    assert nb.referring_names("Logical_Switch", "ports", port["_uuid"]) == [switch]
     assert port["addresses"] == " ".join((mac, *addresses))
 
 
@@ -90,14 +73,12 @@ class TestHostState:
 
 class TestInitial:
     def test_port_state_is_recorded(self, nb, snapshots):
-        port = named(
-            nb,
+        port = nb.by_name(
             "Logical_Switch_Port",
             "self-port3",
             "_uuid",
         )
-        dynamic = named(
-            nb,
+        dynamic = nb.by_name(
             "Logical_Switch_Port",
             "self-port2",
             "dynamic_addresses",
@@ -125,23 +106,22 @@ class TestInitial:
 
     def test_port_configuration(self, nb):
         assert (
-            named(nb, "Logical_Switch_Port", "self-port3", "addresses")["addresses"]
+            nb.by_name("Logical_Switch_Port", "self-port3", "addresses")["addresses"]
             == "02:00:00:00:03:01 dynamic"
         )
-        options = named(nb, "Logical_Switch_Port", "self-port1", "options")["options"]
+        options = nb.by_name("Logical_Switch_Port", "self-port1", "options")["options"]
         assert options["requested-chassis"] == "default-0"
         assert options["mcast_flood"] == "false"
 
     def test_dhcp_options(self, nb):
-        port = named(
-            nb,
+        port = nb.by_name(
             "Logical_Switch_Port",
             "self-port3",
             "dhcpv4_options",
             "dhcpv6_options",
         )
-        dhcp4 = managed(nb, "DHCP_Options", "self-dhcp", "_uuid")
-        dhcp6 = managed(nb, "DHCP_Options", "self-dhcp-v6", "_uuid")
+        dhcp4 = nb.managed("DHCP_Options", "self-dhcp", "_uuid")
+        dhcp6 = nb.managed("DHCP_Options", "self-dhcp-v6", "_uuid")
         assert port["dhcpv4_options"] == dhcp4["_uuid"]
         assert port["dhcpv6_options"] == dhcp6["_uuid"]
 
@@ -214,7 +194,7 @@ class TestResult:
         ]
 
     def test_vm1_options(self, nb):
-        options = named(nb, "Logical_Switch_Port", "self-port1", "options")["options"]
+        options = nb.by_name("Logical_Switch_Port", "self-port1", "options")["options"]
         assert options == {"requested-chassis": "another-host"}
 
     def test_other_ports(self, nb):
@@ -260,8 +240,7 @@ class TestResult:
 
     def test_deleted_port_and_dhcp_links(self, nb):
         assert not nb.exists("Logical_Switch_Port", "name=self-port4")
-        port = named(
-            nb,
+        port = nb.by_name(
             "Logical_Switch_Port",
             "self-port3",
             "dhcpv4_options",
@@ -271,8 +250,7 @@ class TestResult:
         assert port["dhcpv6_options"] == []
 
     def test_port_identity_was_preserved(self, nb, snapshots):
-        assert named(
-            nb,
+        assert nb.by_name(
             "Logical_Switch_Port",
             "self-port3",
             "_uuid",

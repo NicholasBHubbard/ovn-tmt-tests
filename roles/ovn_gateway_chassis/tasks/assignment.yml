@@ -1,8 +1,12 @@
 - name: Find gateway chassis assignment {{ ovn_gateway_assignment.id }}
   ansible.builtin.command:
-    cmd: >-
-      ovn-nbctl --bare --columns=_uuid find Gateway_Chassis
-      name={{ ovn_gateway_assignment.id | quote }}
+    argv:
+      - ovn-nbctl
+      - --bare
+      - --columns=_uuid
+      - find
+      - Gateway_Chassis
+      - "name={{ ovn_gateway_assignment.id | to_json }}"
   register: ovn_gateway_chassis_row
   changed_when: false
 

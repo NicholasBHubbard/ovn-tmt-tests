@@ -1,0 +1,5 @@
+enabled: false
+
+adjust:
+  when: intentional-failures == true
+  enabled: true

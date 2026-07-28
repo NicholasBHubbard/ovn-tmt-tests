@@ -1,3 +1,8 @@
 summary: Verify declarative OVN topology lifecycle
-test: python3 -m pytest ./test.py::TestResult
+test: >-
+  python3 -m pytest
+  ./test.py::TestResult
+  ./test.py::TestScaleResult
+  ./test.py::TestScaleChassisResult
+  ./test.py::TestScalePortsResult
 duration: 5m

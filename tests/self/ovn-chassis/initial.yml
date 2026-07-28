@@ -10,3 +10,4 @@
     ovn_chassis_cms_options:
       - enable-chassis-as-gw
       - prefer-chassis-as-gw
+    ovn_chassis_monitor_all: true

@@ -1,4 +1,4 @@
-summary: Test Podman OVN chassis with TLS on Fedora
+summary: Test an OVN chassis with TLS on Fedora
 
 environment:
   OTT_CHASSIS_TEST_MODE: tls
@@ -8,11 +8,6 @@ provision:
     image: fedora
 
 prepare:
-  - name: Install Podman
-    how: install
-    package:
-      - podman
-    order: 10
   - name: Check OVN chassis preconditions
     how: shell
     order: 80
@@ -40,21 +35,13 @@ prepare:
       -e ovn_central_ssl_private_key=/run/ovn-test-pki/private-key.pem
       -e ovn_central_ssl_certificate=/run/ovn-test-pki/certificate.pem
       -e ovn_central_ssl_ca_cert=/run/ovn-test-pki/ca-cert.pem
-  - name: Build synthetic chassis image
-    how: ansible
-    order: 110
-    playbook: tests/self/ovn-chassis/build-container.yml
-  - name: Create synthetic chassis with TLS
+  - name: Configure chassis with TLS
     how: ansible
     order: 120
-    playbook: tests/self/ovn-chassis/containers-tls.yml
-  - name: Create TLS synthetic chassis packet topology
-    how: ansible
-    order: 130
-    playbook: tests/self/ovn-chassis/containers-traffic.yml
-  - name: Verify TLS synthetic chassis traffic
+    playbook: tests/self/ovn-chassis/tls.yml
+  - name: Verify TLS chassis connection
     how: shell
     order: 140
     script: >-
       python3 -m pytest
-      ./tests/self/ovn-chassis/test.py::TestMulti
+      ./tests/self/ovn-chassis/test.py::TestResult

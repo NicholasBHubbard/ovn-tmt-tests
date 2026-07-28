@@ -33,3 +33,59 @@ prepare:
     how: ansible
     order: 130
     playbook: tests/self/ovn-topology/reconfigure.yml
+  - name: Apply three-worker scale topology
+    how: ansible
+    order: 140
+    playbook: tests/self/ovn-topology/scale.yml
+    extra-args: -e ovn_scale_topology_worker_count=3
+  - name: Configure the scale chassis guest
+    how: ansible
+    order: 145
+    playbook: tests/self/ovn-topology/chassis.yml
+  - name: Create three passive scale ports on the chassis guest
+    how: ansible
+    order: 147
+    playbook: tests/self/ovn-topology/ports.yml
+    extra-args: -e ovn_scale_ports_count=3
+  - name: Verify three-worker scale topology
+    how: shell
+    order: 150
+    script: >-
+      python3 -m pytest
+      ./tests/self/ovn-topology/test.py::TestScaleInitial
+      ./tests/self/ovn-topology/test.py::TestScaleChassisInitial
+      ./tests/self/ovn-topology/test.py::TestScalePortsInitial
+  - name: Expand scale topology to 500 workers
+    how: ansible
+    order: 160
+    playbook: tests/self/ovn-topology/scale.yml
+    extra-args: -e ovn_scale_topology_worker_count=500
+  - name: Reapply three passive scale ports
+    how: ansible
+    order: 165
+    playbook: tests/self/ovn-topology/ports.yml
+    extra-args: -e ovn_scale_ports_count=3
+  - name: Verify expanded scale topology
+    how: shell
+    order: 170
+    script: >-
+      python3 -m pytest
+      ./tests/self/ovn-topology/test.py::TestScaleExpanded
+      ./tests/self/ovn-topology/test.py::TestScaleChassisExpanded
+      ./tests/self/ovn-topology/test.py::TestScalePortsExpanded
+  - name: Contract passive scale ports to two
+    how: ansible
+    order: 173
+    playbook: tests/self/ovn-topology/ports.yml
+    extra-args: -e ovn_scale_ports_count=2
+  - name: Verify contracted passive scale ports
+    how: shell
+    order: 174
+    script: >-
+      python3 -m pytest
+      ./tests/self/ovn-topology/test.py::TestScalePortsContracted
+  - name: Contract scale topology to two workers
+    how: ansible
+    order: 180
+    playbook: tests/self/ovn-topology/scale.yml
+    extra-args: -e ovn_scale_topology_worker_count=2

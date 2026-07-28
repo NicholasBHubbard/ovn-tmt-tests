@@ -1,6 +1,17 @@
+import ipaddress
+import json
 import math
 import time
 from pathlib import Path
+
+
+LOAD_BALANCER_OPTIONS = {
+    "event": "false",
+    "hairpin_snat_ip": "169.254.169.5 fd69::5",
+    "neighbor_responder": "none",
+    "reject": "true",
+    "skip_snat": "false",
+}
 
 
 def _command(*parts, check=True):
@@ -79,6 +90,22 @@ def validate_heavy(
     )
 
 
+def load_scale_topology(path, computes):
+    topology = json.loads(Path(path).read_text())
+    workers = topology.get("workers", [])
+    if not workers:
+        raise ValueError("scale topology does not contain workers")
+    required = {"name", "chassis", "switch", "internal"}
+    if any(required - worker.keys() for worker in workers):
+        raise ValueError("scale topology worker is incomplete")
+    unknown = {worker["chassis"] for worker in workers} - set(computes)
+    if unknown:
+        raise ValueError(f"scale topology uses unknown chassis: {sorted(unknown)}")
+    if not topology.get("load_balancer_group"):
+        raise ValueError("scale topology does not contain a load balancer group")
+    return topology
+
+
 class Workload:
     def __init__(
         self,
@@ -91,6 +118,9 @@ class Workload:
         ipv6=True,
         mtu=1342,
         timeout=60,
+        sync_timeout=None,
+        scale_topology=None,
+        base_ports_per_worker=0,
     ):
         self.runner = runner
         self.computes = computes
@@ -100,6 +130,19 @@ class Workload:
         self.ipv6_enabled = ipv6
         self.mtu = mtu
         self.timeout = timeout
+        self.sync_timeout = timeout if sync_timeout is None else sync_timeout
+        if (
+            isinstance(base_ports_per_worker, bool)
+            or not isinstance(base_ports_per_worker, int)
+            or base_ports_per_worker < 0
+        ):
+            raise ValueError("base ports per worker must be a non-negative integer")
+        self.workers = scale_topology["workers"] if scale_topology else []
+        self.load_balancer_group = (
+            scale_topology["load_balancer_group"] if scale_topology else None
+        )
+        self.load_balancer_group_uuid = None
+        self.base_ports_per_worker = base_ports_per_worker
         self.endpoints = []
         self.load_balancers = []
         self.cleaned = False
@@ -118,7 +161,7 @@ class Workload:
 
     def endpoint(self, index):
         value = index + 1
-        return {
+        endpoint = {
             "guest": self.computes[index % len(self.computes)],
             "namespace": f"{self.prefix}{index:05d}",
             "interface": f"{self.prefix}{index:05d}-p",
@@ -132,9 +175,45 @@ class Workload:
             "ipv4": f"10.240.{value >> 8 & 255}.{value & 255}",
             "ipv6": f"fd00:240::{value:x}",
         }
+        if not self.workers:
+            return endpoint
+
+        worker = self.workers[index % len(self.workers)]
+        value += self.base_ports_per_worker * len(self.workers)
+        endpoint["mac"] = "02:00:{:02x}:{:02x}:{:02x}:{:02x}".format(
+            value >> 24 & 255,
+            value >> 16 & 255,
+            value >> 8 & 255,
+            value & 255,
+        )
+        local_index = self.base_ports_per_worker + index // len(self.workers) + 1
+        endpoint.update(
+            {
+                "guest": worker["chassis"],
+                "switch": worker["switch"],
+                "worker": worker["name"],
+            }
+        )
+        for version, enabled in (
+            (4, self.ipv4_enabled),
+            (6, self.ipv6_enabled),
+        ):
+            if not enabled:
+                continue
+            network = ipaddress.ip_network(worker["internal"][f"ipv{version}"])
+            if local_index >= network.num_addresses - 2:
+                raise ValueError(f"worker {worker['name']} address space is exhausted")
+            endpoint[f"ipv{version}"] = str(network[local_index])
+            endpoint[f"gateway{version}"] = str(network[-2])
+            endpoint[f"prefix{version}"] = network.prefixlen
+        return endpoint
 
     def service_name(self, service, protocol, family):
         return f"{self.name}-{service:05d}-{protocol}-v{family}"
+
+    @staticmethod
+    def _socket(address, port, family):
+        return f"[{address}]:{port}" if family == 6 else f"{address}:{port}"
 
     @staticmethod
     def vip(service, family):
@@ -167,9 +246,12 @@ class Workload:
         for uuid in output.split():
             self.runner.run("ovn-nbctl", "destroy", table, uuid)
 
-    def create_topology(self):
-        self._destroy_named("Logical_Switch", self.name)
-        self.runner.run("ovn-nbctl", "ls-add", self.name)
+    def create_namespace(self):
+        if self.load_balancer_group:
+            self.load_balancer_group_uuid = self._named_uuid(
+                "Load_Balancer_Group",
+                self.load_balancer_group,
+            )
         for port_group in self.port_groups:
             self._destroy_named("Port_Group", port_group)
             self.runner.run("ovn-nbctl", "pg-add", port_group)
@@ -187,7 +269,14 @@ class Workload:
             )
             self.address_set_ids[family] = address_set_id
 
-    def add_endpoint(self, index, phase):
+    def create_topology(self):
+        if self.workers:
+            raise RuntimeError("prepared scale topology is owned by provisioning")
+        self._destroy_named("Logical_Switch", self.name)
+        self.runner.run("ovn-nbctl", "ls-add", self.name)
+        self.create_namespace()
+
+    def add_endpoint(self, index, phase, passive=False, converge=True):
         endpoint = self.endpoint(index)
         self.endpoints.append(endpoint)
         addresses = [endpoint["mac"]]
@@ -201,7 +290,7 @@ class Workload:
             "ovn-nbctl",
             "--may-exist",
             "lsp-add",
-            self.name,
+            endpoint.get("switch", self.name),
             endpoint["port"],
             "--",
             "lsp-set-addresses",
@@ -213,7 +302,7 @@ class Workload:
             " ".join(addresses),
         )
         for family, enabled in enumerate((self.ipv4_enabled, self.ipv6_enabled)):
-            if enabled:
+            if enabled and self.address_set_ids[family] is not None:
                 address = endpoint[f"ipv{family * 2 + 4}"]
                 self.runner.run(
                     "ovn-nbctl",
@@ -234,58 +323,86 @@ class Workload:
             _command("ovs-vsctl", "--if-exists", "del-port", "br-int", interface),
             _command("ip", "link", "delete", interface, check=False),
             _command("ip", "netns", "delete", namespace, check=False),
-            _command("ip", "netns", "add", namespace),
-            _command(
-                "ip",
-                "link",
-                "add",
-                interface,
-                "type",
-                "veth",
-                "peer",
-                "name",
-                peer,
-            ),
-            _command("ip", "link", "set", peer, "netns", namespace),
-            _command(*ip, "link", "set", peer, "name", "eth0"),
-            _command("ip", "link", "set", interface, "mtu", self.mtu, "up"),
-            _command(*ip, "link", "set", "lo", "up"),
-            _command(
-                *ip,
-                "link",
-                "set",
-                "eth0",
-                "address",
-                endpoint["mac"],
-                "mtu",
-                self.mtu,
-                "up",
-            ),
         ]
-        if self.ipv4_enabled:
-            commands.append(
-                _command(
-                    *ip,
-                    "address",
-                    "replace",
-                    f"{endpoint['ipv4']}/16",
-                    "dev",
-                    "eth0",
-                )
+        if not passive:
+            commands.extend(
+                [
+                    _command("ip", "netns", "add", namespace),
+                    _command(
+                        "ip",
+                        "link",
+                        "add",
+                        interface,
+                        "type",
+                        "veth",
+                        "peer",
+                        "name",
+                        peer,
+                    ),
+                    _command("ip", "link", "set", peer, "netns", namespace),
+                    _command(*ip, "link", "set", peer, "name", "eth0"),
+                    _command("ip", "link", "set", interface, "mtu", self.mtu, "up"),
+                    _command(*ip, "link", "set", "lo", "up"),
+                    _command(
+                        *ip,
+                        "link",
+                        "set",
+                        "eth0",
+                        "address",
+                        endpoint["mac"],
+                        "mtu",
+                        self.mtu,
+                        "up",
+                    ),
+                ]
             )
-        if self.ipv6_enabled:
-            commands.append(
-                _command(
-                    *ip,
-                    "-6",
-                    "address",
-                    "replace",
-                    f"{endpoint['ipv6']}/64",
-                    "dev",
-                    "eth0",
-                    "nodad",
+            if self.ipv4_enabled:
+                commands.append(
+                    _command(
+                        *ip,
+                        "address",
+                        "replace",
+                        f"{endpoint['ipv4']}/{endpoint.get('prefix4', 16)}",
+                        "dev",
+                        "eth0",
+                    )
                 )
-            )
+                if "gateway4" in endpoint:
+                    commands.append(
+                        _command(
+                            *ip,
+                            "route",
+                            "replace",
+                            "default",
+                            "via",
+                            endpoint["gateway4"],
+                        )
+                    )
+            if self.ipv6_enabled:
+                commands.append(
+                    _command(
+                        *ip,
+                        "-6",
+                        "address",
+                        "replace",
+                        f"{endpoint['ipv6']}/{endpoint.get('prefix6', 64)}",
+                        "dev",
+                        "eth0",
+                        "nodad",
+                    )
+                )
+                if "gateway6" in endpoint:
+                    commands.append(
+                        _command(
+                            *ip,
+                            "-6",
+                            "route",
+                            "replace",
+                            "default",
+                            "via",
+                            endpoint["gateway6"],
+                        )
+                    )
         commands.append(
             _command(
                 "ovs-vsctl",
@@ -297,16 +414,18 @@ class Workload:
                 "set",
                 "Interface",
                 interface,
+                *(["type=internal"] if passive else []),
                 f"external_ids:iface-id={endpoint['port']}",
             )
         )
         self.runner.run_many(commands, guest=endpoint["guest"])
         self.record_metric(index, f"{phase}_attach", start)
 
-        start = time.time_ns()
-        self.sync()
-        self.wait_for_binding(endpoint["port"])
-        self.record_metric(index, f"{phase}_convergence", start)
+        if converge:
+            start = time.time_ns()
+            self.sync()
+            self.wait_for_binding(endpoint["port"])
+            self.record_metric(index, f"{phase}_convergence", start)
         return endpoint
 
     def wait_for_binding(self, port):
@@ -323,10 +442,116 @@ class Workload:
         )
 
     def sync(self):
-        self.runner.run("ovn-nbctl", "--wait=hv", f"--timeout={self.timeout}", "sync")
+        self.runner.run(
+            "ovn-nbctl",
+            "--wait=hv",
+            f"--timeout={self.sync_timeout}",
+            "sync",
+        )
+
+    def _replace_load_balancer(
+        self,
+        name,
+        protocol,
+        vips=None,
+        switches=(),
+        routers=(),
+        group=None,
+    ):
+        self.load_balancers.append(name)
+        command = [
+            "ovn-nbctl",
+            "--if-exists",
+            "lb-del",
+            name,
+            "--",
+            "--id=@lb",
+            "create",
+            "Load_Balancer",
+            f"name={json.dumps(name)}",
+            f"protocol={protocol}",
+            f"external_ids:ovn-tmt-tests-owner={json.dumps(self.name)}",
+        ]
+        command.extend(
+            f"options:{key}={json.dumps(value)}"
+            for key, value in LOAD_BALANCER_OPTIONS.items()
+        )
+        command.extend(
+            f"vips:{json.dumps(vip)}={json.dumps(','.join(backends))}"
+            for vip, backends in (vips or {}).items()
+        )
+        for table, objects in (
+            ("Logical_Switch", switches),
+            ("Logical_Router", routers),
+        ):
+            for item in objects:
+                command.extend(["--", "add", table, item, "load_balancer", "@lb"])
+        if group:
+            command.extend(
+                [
+                    "--",
+                    "add",
+                    "Load_Balancer_Group",
+                    group,
+                    "load_balancer",
+                    "@lb",
+                ]
+            )
+        self.runner.run(*command)
+
+    def add_background_load_balancers(self, protocols):
+        if not self.workers:
+            raise RuntimeError("background load balancers need a scale topology")
+
+        for family, enabled in (
+            (4, self.ipv4_enabled),
+            (6, self.ipv6_enabled),
+        ):
+            if not enabled:
+                continue
+            vip_network = ipaddress.ip_network("4.0.0.0/8" if family == 4 else "4::/32")
+            backend_network = ipaddress.ip_network(
+                "6.0.0.0/8" if family == 4 else "6::/32"
+            )
+            static_backends = [
+                self._socket(str(backend_network[index]), 8080, family)
+                for index in range(1, 3)
+            ]
+            vips = {
+                self._socket(str(vip_network[index]), 80, family): list(static_backends)
+                for index in range(1, 66)
+            }
+            first_vip = next(iter(vips))
+            vips[first_vip].extend(
+                self._socket(endpoint[f"ipv{family}"], 8080, family)
+                for endpoint in self.endpoints
+            )
+            suffix = "" if family == 4 else "6"
+            for protocol in protocols:
+                self._replace_load_balancer(
+                    f"lb-cluster1{suffix}-{protocol}",
+                    protocol,
+                    vips,
+                    switches=(worker["switch"] for worker in self.workers),
+                    routers=(worker["gateway_router"] for worker in self.workers),
+                )
+                for worker in self.workers:
+                    self._replace_load_balancer(
+                        f"lb-{worker['gateway_router']}{suffix}-{protocol}",
+                        protocol,
+                        routers=[worker["gateway_router"]],
+                    )
 
     def add_service(self, service, backend, protocols):
         endpoint = self.endpoint(backend)
+        group = None
+        if self.load_balancer_group:
+            if self.load_balancer_group_uuid is None:
+                self.load_balancer_group_uuid = self._named_uuid(
+                    "Load_Balancer_Group",
+                    self.load_balancer_group,
+                )
+            group = self.load_balancer_group_uuid
         for protocol in protocols:
             for family, enabled in (
                 (4, self.ipv4_enabled),
@@ -335,35 +560,26 @@ class Workload:
                 if not enabled:
                     continue
                 name = self.service_name(service, protocol, family)
-                self.load_balancers.append(name)
-                vip = self.vip(service, family)
-                backend_ip = endpoint[f"ipv{family}"]
-                if family == 4:
-                    vip = f"{vip}:80"
-                    backend_ip = f"{backend_ip}:8080"
-                else:
-                    vip = f"[{vip}]:80"
-                    backend_ip = f"[{backend_ip}]:8080"
-                self.runner.run(
-                    "ovn-nbctl",
-                    "--may-exist",
-                    "lb-add",
+                self._replace_load_balancer(
                     name,
-                    vip,
-                    backend_ip,
                     protocol,
-                )
-                self.runner.run(
-                    "ovn-nbctl",
-                    "--may-exist",
-                    "ls-lb-add",
-                    self.name,
-                    name,
+                    {
+                        self._socket(self.vip(service, family), 80, family): [
+                            self._socket(
+                                endpoint[f"ipv{family}"],
+                                8080,
+                                family,
+                            )
+                        ]
+                    },
+                    switches=[] if group else [self.name],
+                    group=group,
                 )
 
-    def verify_connectivity(self, index):
+    def verify_connectivity(self, index, target_index=None):
         source = self.endpoint(index)
-        target_index = (index % len(self.computes) + 1) % len(self.computes)
+        if target_index is None:
+            target_index = (index % len(self.computes) + 1) % len(self.computes)
         target = self.endpoint(target_index)
         start = time.time_ns()
         for family, enabled in (
@@ -407,6 +623,20 @@ class Workload:
             guest=endpoint["guest"],
         )
 
+    def _named_uuid(self, table, name):
+        output = self.runner.output(
+            "ovn-nbctl",
+            "--bare",
+            "--columns=_uuid",
+            "find",
+            table,
+            f"name={json.dumps(name)}",
+        )
+        matches = output.split()
+        if len(matches) != 1:
+            raise RuntimeError(f"expected one {table} named {name!r}")
+        return matches[0]
+
     def cleanup(self):
         if self.cleaned:
             return
@@ -428,7 +658,8 @@ class Workload:
             attempt(action=lambda endpoint=endpoint: self._remove_endpoint(endpoint))
         for load_balancer in self.load_balancers:
             attempt("ovn-nbctl", "--if-exists", "lb-del", load_balancer)
-        attempt("ovn-nbctl", "--if-exists", "ls-del", self.name)
+        if not self.workers:
+            attempt("ovn-nbctl", "--if-exists", "ls-del", self.name)
         for port_group in self.port_groups:
             attempt(
                 action=lambda name=port_group: self._destroy_named("Port_Group", name)
@@ -445,11 +676,15 @@ class Workload:
 
     def verify_cleanup(self):
         objects = [
-            ("Logical_Switch", self.name),
             *(("Load_Balancer", name) for name in self.load_balancers),
             *(("Port_Group", name) for name in self.port_groups),
             *(("Address_Set", name) for name in self.address_sets),
         ]
+        if not self.workers:
+            objects.insert(0, ("Logical_Switch", self.name))
+        else:
+            for switch in {worker["switch"] for worker in self.workers}:
+                self._named_uuid("Logical_Switch", switch)
         for table, name in objects:
             output = self.runner.output(
                 "ovn-nbctl",
@@ -461,28 +696,32 @@ class Workload:
             )
             if output:
                 raise AssertionError(f"{table} remains after cleanup: {name}")
-        for endpoint in self.endpoints:
-            namespace = self.runner.run(
-                "ip",
-                "netns",
-                "exec",
-                endpoint["namespace"],
-                "true",
-                guest=endpoint["guest"],
-                check=False,
+
+        guest_state = {}
+        for guest in dict.fromkeys(endpoint["guest"] for endpoint in self.endpoints):
+            namespaces = self.runner.output("ip", "netns", "list", guest=guest)
+            ports = self.runner.output(
+                "ovs-vsctl",
+                "list-ports",
+                "br-int",
+                guest=guest,
             )
-            if namespace.returncode == 0:
+            guest_state[guest] = (
+                {
+                    line.split(maxsplit=1)[0]
+                    for line in namespaces.splitlines()
+                    if line.strip()
+                },
+                set(ports.splitlines()),
+            )
+
+        for endpoint in self.endpoints:
+            namespaces, ports = guest_state[endpoint["guest"]]
+            if endpoint["namespace"] in namespaces:
                 raise AssertionError(
                     f"network namespace remains after cleanup: {endpoint['namespace']}"
                 )
-            interface = self.runner.run(
-                "ovs-vsctl",
-                "port-to-br",
-                endpoint["interface"],
-                guest=endpoint["guest"],
-                check=False,
-            )
-            if interface.returncode == 0:
+            if endpoint["interface"] in ports:
                 raise AssertionError(
                     f"OVS port remains after cleanup: {endpoint['interface']}"
                 )

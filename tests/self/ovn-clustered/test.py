@@ -1,5 +1,5 @@
 from ovn_test.command import Runner
-from ovn_test.system import processes, tcp_listeners
+from ovn_test.system import ovsdb_control_socket, processes, tcp_listeners
 
 
 class TestPreconditions:
@@ -25,15 +25,15 @@ class TestResult:
     def test_databases_are_clustered(self):
         runner = Runner()
         databases = (
-            ("/var/run/ovn/ovnnb_db.ctl", "OVN_Northbound"),
-            ("/var/run/ovn/ovnsb_db.ctl", "OVN_Southbound"),
+            ("ovnnb_db", "OVN_Northbound"),
+            ("ovnsb_db", "OVN_Southbound"),
         )
 
-        for control, database in databases:
+        for daemon, database in databases:
             output = runner.output(
                 "ovn-appctl",
                 "-t",
-                control,
+                ovsdb_control_socket(runner, daemon),
                 "cluster/status",
                 database,
             )

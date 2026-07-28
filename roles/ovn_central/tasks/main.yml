@@ -3,6 +3,11 @@
     cmd: which ovn-northd
   changed_when: false
 
+- name: Resolve OVN central address
+  ansible.builtin.set_fact:
+    ovn_central_address: "{{ ansible_host | default(inventory_hostname) }}"
+  changed_when: false
+
 - name: Verify OVS is running
   ansible.builtin.command:
     cmd: ovs-vsctl show
@@ -91,33 +96,45 @@
 - name: Start OVN NB cluster (leader)
   when:
     - ovn_central_cluster_members | length > 0
-    - ansible_host == ovn_central_cluster_members[0]
+    - ovn_central_address == ovn_central_cluster_members[0]
   ansible.builtin.command:
     cmd: >-
       {{ ovn_ctl_path }}
-      --db-nb-cluster-local-addr={{ ansible_host }}
+      --db-nb-cluster-local-addr={{ ovn_central_address }}
       start_nb_ovsdb
   changed_when: true
 
 - name: Start OVN SB cluster (leader)
   when:
     - ovn_central_cluster_members | length > 0
-    - ansible_host == ovn_central_cluster_members[0]
+    - ovn_central_address == ovn_central_cluster_members[0]
   ansible.builtin.command:
     cmd: >-
       {{ ovn_ctl_path }}
-      --db-sb-cluster-local-addr={{ ansible_host }}
+      --db-sb-cluster-local-addr={{ ovn_central_address }}
       start_sb_ovsdb
   changed_when: true
+
+- name: Wait for OVN cluster leader
+  when:
+    - ovn_central_cluster_members | length > 0
+    - ovn_central_address != ovn_central_cluster_members[0]
+  ansible.builtin.wait_for:
+    host: "{{ ovn_central_cluster_members[0] }}"
+    port: "{{ item }}"
+    timeout: "{{ ovn_central_cluster_join_timeout }}"
+  loop:
+    - 6643
+    - 6644
 
 - name: Start OVN NB cluster (follower)
   when:
     - ovn_central_cluster_members | length > 0
-    - ansible_host != ovn_central_cluster_members[0]
+    - ovn_central_address != ovn_central_cluster_members[0]
   ansible.builtin.command:
     cmd: >-
       {{ ovn_ctl_path }}
-      --db-nb-cluster-local-addr={{ ansible_host }}
+      --db-nb-cluster-local-addr={{ ovn_central_address }}
       --db-nb-cluster-remote-addr={{ ovn_central_cluster_members[0] }}
       start_nb_ovsdb
   changed_when: true
@@ -125,11 +142,11 @@
 - name: Start OVN SB cluster (follower)
   when:
     - ovn_central_cluster_members | length > 0
-    - ansible_host != ovn_central_cluster_members[0]
+    - ovn_central_address != ovn_central_cluster_members[0]
   ansible.builtin.command:
     cmd: >-
       {{ ovn_ctl_path }}
-      --db-sb-cluster-local-addr={{ ansible_host }}
+      --db-sb-cluster-local-addr={{ ovn_central_address }}
       --db-sb-cluster-remote-addr={{ ovn_central_cluster_members[0] }}
       start_sb_ovsdb
   changed_when: true

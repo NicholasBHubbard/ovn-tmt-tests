@@ -241,6 +241,9 @@ def test_multihost_parent_propagates_configuration(tree):
         "-e 'ovn_test_pki_remote_dir=$OTT_PKI_REMOTE_DIR'",
         "-e ovn_multihost_ssl_enabled=$OTT_SSL_ENABLED",
         "-e 'ovn_multihost_pki_dir=$OTT_PKI_REMOTE_DIR'",
+        "-e ovn_multihost_clustered=$OTT_CLUSTERED",
+        "-e ovn_multihost_monitor_all=$OTT_MONITOR_ALL",
+        "-e ovn_multihost_nb_port=$OTT_NB_PORT",
     )
     for value in expected:
         assert_contains(tree, path, value)
@@ -291,6 +294,11 @@ def test_multihost_runtime_configuration_is_complete(tree):
         >= {
             "ovn_multihost_sb_port": "$OTT_SB_PORT",
             "ovn_multihost_sb_wait_timeout": "$OTT_SB_WAIT_TIMEOUT",
+            "ovn_multihost_clustered": "$OTT_CLUSTERED",
+            "ovn_multihost_monitor_all": "$OTT_MONITOR_ALL",
+            "ovn_multihost_nb_port": "$OTT_NB_PORT",
+            "ovn_compute_physical_bridge": "$OTT_COMPUTE_PHYSICAL_BRIDGE",
+            "ovn_compute_physical_network": "$OTT_COMPUTE_PHYSICAL_NETWORK",
             "ovn_gateway_chassis_name": "$OTT_GATEWAY_CHASSIS_NAME",
             "ovn_gateway_bridges": "$OTT_GATEWAY_BRIDGES",
             "ovn_gateway_bridge_mappings": "$OTT_GATEWAY_BRIDGE_MAPPINGS",
@@ -301,6 +309,9 @@ def test_multihost_runtime_configuration_is_complete(tree):
     playbook = content(tree, "playbooks/multihost.yml")
     assert "ovn_multihost_sb_wait_timeout | default(2700)" in playbook
     assert "ovn_gateway_chassis_name | default(inventory_hostname, true)" in playbook
+    assert (
+        "ovn_compute_physical_network ~ ':' ~ ovn_compute_physical_bridge" in playbook
+    )
     assert "ovn_gateway_bridges | from_yaml" in playbook
     assert "ovn_gateway_cms_options | from_yaml" in playbook
 
@@ -399,10 +410,16 @@ def test_artifact_role_contract(tree):
             "density-heavy.fmf",
             "density-heavy",
             (
+                "OTT_SCALE_BASE_PODS_PER_WORKER:",
+                "OTT_CLUSTERED:",
+                "OTT_COMPUTE_PHYSICAL_BRIDGE:",
+                "OTT_COMPUTE_PHYSICAL_NETWORK:",
+                "OTT_MONITOR_ALL:",
                 "OTT_SCALE_INITIAL_PODS:",
-                "OTT_SCALE_ITERATIONS:",
                 "OTT_SCALE_PODS_PER_SERVICE:",
                 "OTT_SCALE_LB_PROTOCOLS:",
+                "OTT_SCALE_TOTAL_PODS:",
+                "OTT_SCALE_WORKERS:",
             ),
         ),
     ],
@@ -419,6 +436,13 @@ def test_scale_workload_contract(tree, plan, test, settings):
     assert "duration: $OTT_SCALE_DURATION" in plan_path.read_text()
     assert "python3 -m pytest" in (test_dir / "main.fmf").read_text()
     assert "duration:" not in (test_dir / "main.fmf").read_text()
+    if test == "density-heavy":
+        metadata = yaml.safe_load(plan_path.read_text())
+        assert metadata["environment+"]["OTT_SCALE_IPV6"] == "false"
+        assert [guest["role"] for guest in metadata["provision+"]] == [
+            "central-follower",
+            "central-follower",
+        ]
 
 
 def test_scale_workloads_inherit_common_configuration(tree):
@@ -429,6 +453,7 @@ def test_scale_workloads_inherit_common_configuration(tree):
         "OTT_SCALE_IPV4:",
         "OTT_SCALE_IPV6:",
         "OTT_SCALE_MTU:",
+        "OTT_SCALE_SYNC_TIMEOUT:",
     ):
         assert setting in parent
     assert parent.count("role: compute") == 2

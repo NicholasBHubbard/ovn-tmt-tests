@@ -6,7 +6,6 @@
       ansible.builtin.command:
         argv:
           - ovn-nbctl
-          - --may-exist
           - pg-add
           - self-pg
       changed_when: true

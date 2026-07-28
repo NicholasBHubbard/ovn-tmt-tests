@@ -1,8 +1,12 @@
 - name: Find logical static route {{ ovn_static_route.id }}
   ansible.builtin.command:
-    cmd: >-
-      ovn-nbctl --bare --columns=_uuid find Logical_Router_Static_Route
-      external_ids:ovn-tmt-tests-id={{ ovn_static_route.id | quote }}
+    argv:
+      - ovn-nbctl
+      - --bare
+      - --columns=_uuid
+      - find
+      - Logical_Router_Static_Route
+      - "external_ids:ovn-tmt-tests-id={{ ovn_static_route.id | to_json }}"
   register: ovn_static_route_row
   changed_when: false
 

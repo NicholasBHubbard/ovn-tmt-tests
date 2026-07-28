@@ -10,3 +10,4 @@
     ovn_chassis_bridge_mappings: provider:br-ex
     ovn_chassis_cms_options:
       - enable-chassis-as-gw
+    ovn_chassis_monitor_all: false

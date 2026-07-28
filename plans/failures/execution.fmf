@@ -1,0 +1,12 @@
+summary: Intentionally fail during test execution
+
+provision:
+  how: local
+
+discover:
+  how: fmf
+  test:
+    - /tests/failures/execution
+
+execute:
+  how: tmt

@@ -18,9 +18,13 @@
 
 - name: Find NAT rule {{ ovn_nat_rule.id }}
   ansible.builtin.command:
-    cmd: >-
-      ovn-nbctl --bare --columns=_uuid find NAT
-      external_ids:ovn-tmt-tests-id={{ ovn_nat_rule.id | quote }}
+    argv:
+      - ovn-nbctl
+      - --bare
+      - --columns=_uuid
+      - find
+      - NAT
+      - "external_ids:ovn-tmt-tests-id={{ ovn_nat_rule.id | to_json }}"
   register: ovn_nat_row
   changed_when: false
 
@@ -132,9 +136,13 @@
 - name: Find configured NAT rule {{ ovn_nat_rule.id }}
   when: ovn_nat_rule.state | default('present') == 'present'
   ansible.builtin.command:
-    cmd: >-
-      ovn-nbctl --bare --columns=_uuid find NAT
-      external_ids:ovn-tmt-tests-id={{ ovn_nat_rule.id | quote }}
+    argv:
+      - ovn-nbctl
+      - --bare
+      - --columns=_uuid
+      - find
+      - NAT
+      - "external_ids:ovn-tmt-tests-id={{ ovn_nat_rule.id | to_json }}"
   register: ovn_nat_configured_row
   changed_when: false
 

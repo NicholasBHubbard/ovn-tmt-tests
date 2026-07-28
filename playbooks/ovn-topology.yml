@@ -11,4 +11,5 @@
     - ovn_nat
     - ovn_static_routes
     - ovn_load_balancers
+    - ovn_load_balancer_groups
     - ovn_acls

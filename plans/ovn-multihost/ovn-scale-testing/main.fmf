@@ -6,6 +6,8 @@ environment+:
   OTT_SCALE_IPV4: "true"
   OTT_SCALE_IPV6: "true"
   OTT_SCALE_MTU: "1342"
+  OTT_SCALE_SNAT_CT_ZONE: ""
+  OTT_SCALE_SYNC_TIMEOUT: "1800"
 
 provision:
   - name: central

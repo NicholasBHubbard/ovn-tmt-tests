@@ -11,7 +11,7 @@ from ovn_test.files import find_text
 from ovn_test.network import Network
 from ovn_test.ovsdb import Ovsdb
 from ovn_test.state import Snapshots
-from ovn_test.system import processes, tcp_listeners
+from ovn_test.system import ovsdb_control_socket, processes, tcp_listeners
 from ovn_test.topology import Topology
 
 from .test_ovn_test import topology_data
@@ -70,6 +70,22 @@ def test_runner_reports_missing_commands_as_unsuccessful():
     assert not Runner(execute=execute).succeeds("missing")
 
 
+def test_ovsdb_control_socket_uses_process_configuration():
+    output = (
+        "10 ovsdb-server --unixctl=/custom/run/ovn/ovnnb_db.ctl nb.db\n"
+        "11 ovsdb-server --unixctl=/custom/run/ovn/ovnsb_db.ctl sb.db\n"
+    )
+    runner = Runner(
+        execute=lambda command, **kwargs: subprocess.CompletedProcess(
+            command, 0, output, ""
+        )
+    )
+
+    assert ovsdb_control_socket(runner, "ovnnb_db") == "/custom/run/ovn/ovnnb_db.ctl"
+    with pytest.raises(LookupError, match="missing"):
+        ovsdb_control_socket(runner, "missing")
+
+
 def test_runner_does_not_require_topology_for_local_commands():
     runner = Runner(
         execute=lambda command, **kwargs: subprocess.CompletedProcess(
@@ -124,10 +140,14 @@ def test_runner_serializes_remote_command_batches(capsys):
         [["true", "1"], True],
         [["false"], False],
     ]
-    assert "+ ssh compute-1 -- python3 '<command-batch>'" in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert output.splitlines() == [
+        "compute-1: command batch started",
+        "compute-1: command batch completed successfully",
+    ]
 
 
-def test_runner_command_batches_honor_error_handling():
+def test_runner_command_batches_honor_error_handling(capsys):
     python = sys.executable
     result = Runner().run_many(
         [
@@ -137,8 +157,15 @@ def test_runner_command_batches_honor_error_handling():
     )
 
     assert "continued" in result.stdout
+    output = capsys.readouterr().out
+    assert "local: command batch started" in output
+    assert f"local: + {python} -c 'raise SystemExit(1)'  [nonfatal 1]" in output
+    assert "[nonfatal 0]" not in output
+    assert "local: command batch completed successfully" in output
+
     with pytest.raises(subprocess.CalledProcessError):
         Runner().run_many([([python, "-c", "raise SystemExit(1)"], True)])
+    assert "local: command batch failed (exit status 1)" in capsys.readouterr().out
 
 
 def test_runner_waits_for_a_result():
@@ -291,6 +318,10 @@ def test_ovsdb_decodes_json_rows():
         == "sw0"
     )
     assert database.value("Logical_Switch", "name", "name=sw0") == "sw0"
+    assert database.values("Logical_Switch", "name") == ["sw0"]
+    assert database.by_name("Logical_Switch", 'sw"0', "name")["name"] == "sw0"
+    assert database.managed("Logical_Switch", "managed:0", "name")["name"] == "sw0"
+    assert database.referring_names("Logical_Switch", "ports", "port-1") == ["sw0"]
     assert database.exists("Logical_Switch", "name=sw0")
     assert calls[0][0] == (
         "ovn-nbctl",
@@ -301,6 +332,9 @@ def test_ovsdb_decodes_json_rows():
         "Logical_Switch",
         "name=sw0",
     )
+    assert calls[4][0][-1] == 'name="sw\\"0"'
+    assert calls[5][0][-1] == 'external_ids:ovn-tmt-tests-id="managed:0"'
+    assert calls[6][0][-1] == "ports{>=}port-1"
 
 
 def test_ovsdb_one_requires_exactly_one_row():

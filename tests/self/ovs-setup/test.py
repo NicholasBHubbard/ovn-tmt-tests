@@ -37,10 +37,10 @@ class TestInitial:
         assert external_id(runner, "self-unmanaged") == "preserve"
         snapshots.save(
             "ovs-bridge",
-            ovs.one(
+            ovs.by_name(
                 "Bridge",
-                "name=self-bridge-keep",
-                columns=("_uuid",),
+                "self-bridge-keep",
+                "_uuid",
             )["_uuid"],
         )
 
@@ -51,10 +51,10 @@ class TestReconfigured:
 
         snapshots.save(
             "ovs-bridge-reconfigured",
-            ovs.one(
+            ovs.by_name(
                 "Bridge",
-                "name=self-bridge-keep",
-                columns=("_uuid",),
+                "self-bridge-keep",
+                "_uuid",
             )["_uuid"],
         )
 
@@ -80,10 +80,10 @@ class TestResult:
     def test_reusable_ovs_state(self, snapshots):
         runner = Runner()
         ovs = Ovsdb(runner, "ovs-vsctl")
-        bridge_uuid = ovs.one(
+        bridge_uuid = ovs.by_name(
             "Bridge",
-            "name=self-bridge-keep",
-            columns=("_uuid",),
+            "self-bridge-keep",
+            "_uuid",
         )["_uuid"]
 
         assert bridge_uuid == snapshots.load("ovs-bridge")

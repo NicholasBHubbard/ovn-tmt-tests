@@ -1,0 +1,5 @@
+summary: Intentionally fail during test execution
+test: python3 -m pytest ./test.py
+duration: 1m
+require: []
+recommend: []

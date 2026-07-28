@@ -1,0 +1,11 @@
+- name: Configure TLS-connected OVN chassis
+  ansible.builtin.import_playbook: ../../../playbooks/ovn-chassis.yml
+  vars:
+    ovn_install_method: distro
+    ovs_setup_install_method: distro
+    ovn_chassis_name: tls-chassis
+    ovn_chassis_remote: ssl:127.0.0.1:6642
+    ovs_setup_ssl_enabled: true
+    ovs_setup_ssl_private_key: /run/ovn-test-pki/private-key.pem
+    ovs_setup_ssl_certificate: /run/ovn-test-pki/certificate.pem
+    ovs_setup_ssl_ca_cert: /run/ovn-test-pki/ca-cert.pem

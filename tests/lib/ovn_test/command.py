@@ -14,9 +14,22 @@ import shlex
 import subprocess
 import sys
 
+label = sys.argv[1]
 for command, check in json.load(sys.stdin):
-    print(f"+ {shlex.join(command)}", flush=True)
-    subprocess.run(command, check=check)
+    shown = f"{label}: + {shlex.join(command)}"
+    if check:
+        print(shown, flush=True)
+        subprocess.run(command, check=True)
+        continue
+
+    result = subprocess.run(command, capture_output=True, text=True)
+    if result.returncode:
+        shown += f"  [nonfatal {result.returncode}]"
+    print(shown, flush=True)
+    if result.stdout:
+        print(result.stdout, end="", flush=True)
+    if result.stderr:
+        print(result.stderr, end="", file=sys.stderr, flush=True)
 """
 
 
@@ -46,10 +59,10 @@ class Runner:
         check=True,
         cwd=None,
         env=None,
-        display=None,
+        announce=True,
     ):
         command = [str(part) for part in command]
-        shown = command if display is None else [str(part) for part in display]
+        shown = command
         if guest is not None and self.topology is None:
             raise ValueError("guest execution requires a tmt topology")
         if guest is not None and not self.topology.is_local(guest):
@@ -73,7 +86,8 @@ class Runner:
             ]
             shown = ["ssh", guest, "--", *shown]
 
-        print(f"+ {shlex.join(shown)}", flush=True)
+        if announce:
+            print(f"+ {shlex.join(shown)}", flush=True)
         try:
             result = self.execute(
                 command,
@@ -98,17 +112,29 @@ class Runner:
         return self.run("ip", "netns", "exec", namespace, *command, **options)
 
     def run_many(self, commands, guest=None):
+        label = guest or "local"
         payload = [
             ([str(part) for part in command], check) for command, check in commands
         ]
-        return self.run(
-            "python3",
-            "-c",
-            RUN_MANY,
-            guest=guest,
-            input=json.dumps(payload),
-            display=["python3", "<command-batch>"],
-        )
+        print(f"{label}: command batch started", flush=True)
+        try:
+            result = self.run(
+                "python3",
+                "-c",
+                RUN_MANY,
+                label,
+                guest=guest,
+                input=json.dumps(payload),
+                announce=False,
+            )
+        except subprocess.CalledProcessError as error:
+            print(
+                f"{label}: command batch failed (exit status {error.returncode})",
+                flush=True,
+            )
+            raise
+        print(f"{label}: command batch completed successfully", flush=True)
+        return result
 
     def succeeds(self, *command, **options):
         try:

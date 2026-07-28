@@ -1,5 +1,5 @@
 - name: Set up OVN chassis
-  hosts: all
+  hosts: "{{ ovn_chassis_hosts | default('all') }}"
   become: true
   roles:
     - ovn_install

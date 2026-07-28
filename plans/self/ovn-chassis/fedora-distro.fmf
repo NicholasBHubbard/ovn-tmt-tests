@@ -5,11 +5,6 @@ provision:
     image: fedora
 
 prepare:
-  - name: Install Podman
-    how: install
-    package:
-      - podman
-    order: 10
   - name: Set up OVN central
     how: ansible
     playbook: playbooks/ovn-central.yml
@@ -54,61 +49,3 @@ prepare:
     script: >-
       python3 -m pytest
       ./tests/self/ovn-chassis/test.py::TestInvalid
-  - name: Build synthetic chassis image
-    how: ansible
-    order: 87
-    playbook: tests/self/ovn-chassis/build-container.yml
-  - name: Create synthetic chassis
-    how: ansible
-    order: 88
-    playbook: tests/self/ovn-chassis/containers.yml
-  - name: Create synthetic chassis packet topology
-    how: ansible
-    order: 89
-    playbook: tests/self/ovn-chassis/containers-traffic.yml
-  - name: Verify synthetic chassis traffic
-    how: shell
-    order: 90
-    script: >-
-      python3 -m pytest
-      ./tests/self/ovn-chassis/test.py::TestMulti
-  - name: Reconfigure synthetic chassis
-    how: ansible
-    order: 91
-    playbook: tests/self/ovn-chassis/containers-reconfigure.yml
-  - name: Verify synthetic chassis reconfiguration
-    how: shell
-    order: 92
-    script: >-
-      python3 -m pytest
-      ./tests/self/ovn-chassis/test.py::TestMultiReconfigured
-  - name: Record retained chassis start time
-    how: shell
-    order: 93
-    script: >-
-      python3 -m pytest
-      ./tests/self/ovn-chassis/test.py::TestRecordContainer
-  - name: Reapply synthetic chassis configuration
-    how: ansible
-    order: 94
-    playbook: tests/self/ovn-chassis/containers-reconfigure.yml
-  - name: Verify idempotent synthetic chassis reapplication
-    how: shell
-    order: 95
-    script: >-
-      python3 -m pytest
-      ./tests/self/ovn-chassis/test.py::TestMultiReconfigured
-  - name: Replace the synthetic chassis image
-    how: ansible
-    order: 96
-    playbook: tests/self/ovn-chassis/update-container-image.yml
-  - name: Apply the replacement chassis image
-    how: ansible
-    order: 97
-    playbook: tests/self/ovn-chassis/containers-reconfigure.yml
-  - name: Verify chassis image replacement
-    how: shell
-    order: 98
-    script: >-
-      python3 -m pytest
-      ./tests/self/ovn-chassis/test.py::TestImageRefresh

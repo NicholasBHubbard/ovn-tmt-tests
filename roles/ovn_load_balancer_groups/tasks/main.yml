@@ -1,0 +1,29 @@
+- name: Verify load balancer group states
+  ansible.builtin.assert:
+    that:
+      - >-
+        ovn_load_balancer_groups
+        | map(attribute='state', default='present')
+        | difference(['present', 'absent'])
+        | length == 0
+    fail_msg: "Load balancer group states must be present or absent."
+
+- name: Verify load balancer group IDs are unique
+  ansible.builtin.assert:
+    that:
+      - >-
+        ovn_load_balancer_groups | map(attribute='id') | unique | length
+        == ovn_load_balancer_groups | length
+    fail_msg: "Load balancer group IDs must be unique."
+
+- name: Configure load balancer groups
+  ansible.builtin.script:
+    cmd: apply.py
+    executable: python3
+  environment:
+    OVN_LOAD_BALANCER_GROUPS: >-
+      {{ ovn_load_balancer_groups | to_json | b64encode
+         if ovn_load_balancer_groups_path | length == 0
+         else '' }}
+    OVN_LOAD_BALANCER_GROUPS_PATH: "{{ ovn_load_balancer_groups_path }}"
+  changed_when: true

@@ -48,8 +48,24 @@ class Ovsdb:
             raise LookupError(f"expected one {table} row, found {len(rows)}")
         return rows[0]
 
+    def by_name(self, table, name, *columns):
+        return self.one(table, f"name={json.dumps(name)}", columns=columns)
+
+    def managed(self, table, identifier, *columns):
+        return self.one(
+            table,
+            f"external_ids:ovn-tmt-tests-id={json.dumps(identifier)}",
+            columns=columns,
+        )
+
     def value(self, table, column, *conditions):
         return self.one(table, *conditions, columns=(column,))[column]
+
+    def values(self, table, column, *conditions):
+        return [row[column] for row in self.find(table, *conditions, columns=(column,))]
+
+    def referring_names(self, table, column, uuid):
+        return self.values(table, "name", f"{column}{{>=}}{uuid}")
 
     def exists(self, table, *conditions):
         return bool(self.find(table, *conditions, columns=("_uuid",)))

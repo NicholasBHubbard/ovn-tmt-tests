@@ -1,0 +1,5 @@
+# Each group needs a unique id, used as its OVN name unless name is set.
+# Switch and router attachments are authoritative. Load balancer membership is
+# preserved for workloads to manage independently.
+ovn_load_balancer_groups: []
+ovn_load_balancer_groups_path: ""

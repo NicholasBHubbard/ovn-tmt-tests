@@ -1,0 +1,6 @@
+- name: Apply the scale port configuration
+  ansible.builtin.import_playbook: ../../../playbooks/ovn-scale-ports.yml
+  vars:
+    ovn_scale_ports_hosts: all
+    ovn_scale_ports_id: self-scale-ports
+    ovn_scale_ports_chassis: ovn-scale-0
