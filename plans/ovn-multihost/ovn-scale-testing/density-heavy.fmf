@@ -1,3 +1,6 @@
+# Build a Kubernetes-like OVN topology across the available compute chassis,
+# populate its workers with pods and load-balanced services, then measure
+# incremental convergence while verifying pod and external gateway traffic.
 summary: Measure incremental OVN pod and service convergence
 enabled: true
 

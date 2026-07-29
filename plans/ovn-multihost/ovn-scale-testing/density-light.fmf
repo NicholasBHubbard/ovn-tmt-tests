@@ -1,3 +1,5 @@
+# Create a small OVN network across the available compute chassis, verify
+# endpoint connectivity, and measure convergence as logical ports are added.
 summary: Measure incremental OVN logical port convergence
 enabled: true
 
