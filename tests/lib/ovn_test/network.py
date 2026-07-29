@@ -124,7 +124,16 @@ class ExternalPeers:
                 "guest": worker["chassis"],
                 "namespace": f"{prefix}{index:05d}",
                 "interface": f"{prefix}{index:05d}-p",
+                "vlan": worker.get("external_vlan"),
             }
+            if peer["vlan"] is not None and (
+                isinstance(peer["vlan"], bool)
+                or not isinstance(peer["vlan"], int)
+                or not 1 <= peer["vlan"] <= 4094
+            ):
+                raise ValueError(
+                    f"worker {worker['name']} external VLAN must be 1 through 4094"
+                )
             for family, enabled in ((4, ipv4), (6, ipv6)):
                 if not enabled:
                     continue
@@ -234,6 +243,11 @@ class ExternalPeers:
                     "add-port",
                     self.bridge,
                     interface,
+                    "--",
+                    "set",
+                    "Port",
+                    interface,
+                    f"tag={peer['vlan'] if peer['vlan'] is not None else '[]'}",
                 )
             )
             self.runner.run_many(commands, guest=peer["guest"])

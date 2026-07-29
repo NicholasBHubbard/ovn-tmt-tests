@@ -1,6 +1,7 @@
 import ipaddress
 import json
 import os
+from collections import Counter
 from pathlib import Path
 
 
@@ -38,6 +39,16 @@ def generate(config):
         raise ValueError("worker_count must be positive")
     if not config["ipv4"] and not config["ipv6"]:
         raise ValueError("at least one IP family must be enabled")
+
+    worker_chassis = [
+        chassis[index % len(chassis)] if chassis else name
+        for index, name in enumerate(names)
+    ]
+    workers_per_chassis = Counter(worker_chassis)
+    for chassis_name, worker_count in workers_per_chassis.items():
+        if worker_count > 4094:
+            raise ValueError(f"chassis {chassis_name} exceeds its external VLAN space")
+    next_vlan = Counter()
 
     families = []
     for version in (4, 6):
@@ -91,17 +102,20 @@ def generate(config):
         "workers": [],
     }
 
-    for index, name in enumerate(names):
-        worker_chassis = chassis[index % len(chassis)] if chassis else name
+    for index, (name, chassis_name) in enumerate(zip(names, worker_chassis)):
         worker_switch = f"lswitch-{name}"
         gateway_router = f"gwrouter-{name}"
         external_switch = f"ext-{name}"
         cluster_worker_port = f"rtr-to-node-{name}"
         gateway_join_port = f"gw-to-join-{name}"
         gateway_external_port = f"gw-to-ext-{name}"
+        external_vlan = None
+        if workers_per_chassis[chassis_name] > 1:
+            next_vlan[chassis_name] += 1
+            external_vlan = next_vlan[chassis_name]
         worker = {
             "name": name,
-            "chassis": worker_chassis,
+            "chassis": chassis_name,
             "switch": worker_switch,
             "gateway_router": gateway_router,
             "external_switch": external_switch,
@@ -109,12 +123,14 @@ def generate(config):
             "external": {},
             "join": {},
         }
+        if external_vlan is not None:
+            worker["external_vlan"] = external_vlan
 
         result["switches"].extend([{"name": worker_switch}, {"name": external_switch}])
         gateway_options = {
             "always_learn_from_arp_request": "false",
             "dynamic_neigh_routers": "true",
-            "chassis": worker_chassis,
+            "chassis": chassis_name,
             "lb_force_snat_ip": "router_ip",
         }
         if snat_ct_zone != "":
@@ -212,17 +228,18 @@ def generate(config):
             {
                 "id": f"{owner}:{cluster_worker_port}:{name}",
                 "router_port": cluster_worker_port,
-                "chassis": worker_chassis,
+                "chassis": chassis_name,
                 "priority": 10,
             }
         )
-        result["localnet_ports"].append(
-            {
-                "name": f"provnet-{name}",
-                "switch": external_switch,
-                "network": config["physical_network"],
-            }
-        )
+        localnet = {
+            "name": f"provnet-{name}",
+            "switch": external_switch,
+            "network": config["physical_network"],
+        }
+        if external_vlan is not None:
+            localnet["tag"] = external_vlan
+        result["localnet_ports"].append(localnet)
         result["workers"].append(worker)
 
     result["load_balancer_groups"] = [

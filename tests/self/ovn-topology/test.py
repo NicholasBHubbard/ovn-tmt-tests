@@ -82,6 +82,18 @@ def assert_scale_group_attachments(nb, workers):
     ) == {f"gwrouter-ovn-scale-{index}" for index in range(workers)}
 
 
+def assert_scale_external_vlans(nb, workers):
+    for index in {0, workers - 1}:
+        port = nb.by_name(
+            "Logical_Switch_Port",
+            f"provnet-ovn-scale-{index}",
+            "tag",
+            "tag_request",
+        )
+        assert port["tag"] == index + 1
+        assert port["tag_request"] == index + 1
+
+
 def scale_southbound_names(workers):
     names = [f"ovn-scale-{index}" for index in range(workers)]
     datapaths = {"ls-join1", "lr-cluster1"}
@@ -599,6 +611,7 @@ class TestScaleInitial:
     def test_three_workers_are_complete(self, nb, sb):
         assert_scale_counts(nb, 3)
         assert_scale_group_attachments(nb, 3)
+        assert_scale_external_vlans(nb, 3)
         assert_scale_southbound(sb, 3)
 
         assert sorted(
@@ -667,6 +680,7 @@ class TestScaleExpanded:
     def test_500_workers_are_complete(self, nb, sb, snapshots):
         assert_scale_counts(nb, 500)
         assert_scale_group_attachments(nb, 500)
+        assert_scale_external_vlans(nb, 500)
         assert_scale_southbound(sb, 500)
         assert nb.by_name("Logical_Switch", "ls-join1", "_uuid")[
             "_uuid"
@@ -1028,6 +1042,7 @@ class TestScaleResult:
     def test_contracted_topology_is_complete(self, nb, sb, snapshots):
         assert_scale_counts(nb, 2)
         assert_scale_group_attachments(nb, 2)
+        assert_scale_external_vlans(nb, 2)
         assert_scale_southbound(sb, 2)
         assert nb.by_name("Logical_Switch", "ls-join1", "_uuid")[
             "_uuid"

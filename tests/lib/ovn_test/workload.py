@@ -4,14 +4,7 @@ import math
 import time
 from pathlib import Path
 
-
-LOAD_BALANCER_OPTIONS = {
-    "event": "false",
-    "hairpin_snat_ip": "169.254.169.5 fd69::5",
-    "neighbor_responder": "none",
-    "reject": "true",
-    "skip_snat": "false",
-}
+from ovn_test.load_balancer import replace, socket
 
 
 def _command(*parts, check=True):
@@ -213,7 +206,7 @@ class Workload:
 
     @staticmethod
     def _socket(address, port, family):
-        return f"[{address}]:{port}" if family == 6 else f"{address}:{port}"
+        return socket(address, port, family)
 
     @staticmethod
     def vip(service, family):
@@ -459,45 +452,16 @@ class Workload:
         group=None,
     ):
         self.load_balancers.append(name)
-        command = [
-            "ovn-nbctl",
-            "--if-exists",
-            "lb-del",
+        replace(
+            self.runner,
+            self.name,
             name,
-            "--",
-            "--id=@lb",
-            "create",
-            "Load_Balancer",
-            f"name={json.dumps(name)}",
-            f"protocol={protocol}",
-            f"external_ids:ovn-tmt-tests-owner={json.dumps(self.name)}",
-        ]
-        command.extend(
-            f"options:{key}={json.dumps(value)}"
-            for key, value in LOAD_BALANCER_OPTIONS.items()
+            protocol,
+            vips,
+            switches,
+            routers,
+            group,
         )
-        command.extend(
-            f"vips:{json.dumps(vip)}={json.dumps(','.join(backends))}"
-            for vip, backends in (vips or {}).items()
-        )
-        for table, objects in (
-            ("Logical_Switch", switches),
-            ("Logical_Router", routers),
-        ):
-            for item in objects:
-                command.extend(["--", "add", table, item, "load_balancer", "@lb"])
-        if group:
-            command.extend(
-                [
-                    "--",
-                    "add",
-                    "Load_Balancer_Group",
-                    group,
-                    "load_balancer",
-                    "@lb",
-                ]
-            )
-        self.runner.run(*command)
 
     def add_background_load_balancers(self, protocols):
         if not self.workers:
@@ -608,6 +572,12 @@ class Workload:
         self.record_metric(index, "connectivity", start)
 
     def _remove_endpoint(self, endpoint):
+        self.runner.run(
+            "ovn-nbctl",
+            "--if-exists",
+            "lsp-del",
+            endpoint["port"],
+        )
         self.runner.run_many(
             [
                 _command(
@@ -622,6 +592,10 @@ class Workload:
             ],
             guest=endpoint["guest"],
         )
+        endpoint["removed"] = True
+
+    def remove_endpoint(self, endpoint):
+        self._remove_endpoint(endpoint)
 
     def _named_uuid(self, table, name):
         output = self.runner.output(
@@ -655,6 +629,8 @@ class Workload:
                     first_error = error
 
         for endpoint in self.endpoints:
+            if endpoint.get("removed"):
+                continue
             attempt(action=lambda endpoint=endpoint: self._remove_endpoint(endpoint))
         for load_balancer in self.load_balancers:
             attempt("ovn-nbctl", "--if-exists", "lb-del", load_balancer)
@@ -668,7 +644,7 @@ class Workload:
             attempt(
                 action=lambda name=address_set: self._destroy_named("Address_Set", name)
             )
-        attempt("ovn-nbctl", "--wait=hv", f"--timeout={self.timeout}", "sync")
+        attempt("ovn-nbctl", "--wait=hv", f"--timeout={self.sync_timeout}", "sync")
         self.cleaned = first_error is None
         self.record_metric("cleanup", "cleanup", start)
         if first_error is not None:
@@ -677,6 +653,7 @@ class Workload:
     def verify_cleanup(self):
         objects = [
             *(("Load_Balancer", name) for name in self.load_balancers),
+            *(("Logical_Switch_Port", endpoint["port"]) for endpoint in self.endpoints),
             *(("Port_Group", name) for name in self.port_groups),
             *(("Address_Set", name) for name in self.address_sets),
         ]

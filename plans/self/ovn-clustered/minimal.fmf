@@ -38,6 +38,12 @@ prepare+:
     extra-args: '-e ovn_install_method=distro -e ovs_setup_install_method=distro'
     where: [follower]
 
+  - name: Verify northd connections on all nodes
+    how: shell
+    where: [leader, follower]
+    order: 110
+    script: python3 -m pytest ./tests/self/ovn-clustered/test.py::TestNorthdConnections
+
 discover:
   - how: fmf
     where:

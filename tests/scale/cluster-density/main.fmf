@@ -1,0 +1,2 @@
+summary: Measure namespace and service convergence
+test: python3 -m pytest ./test.py

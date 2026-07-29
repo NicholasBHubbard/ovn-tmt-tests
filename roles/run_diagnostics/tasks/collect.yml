@@ -1,0 +1,133 @@
+- name: Create diagnostics output directory
+  ansible.builtin.file:
+    path: "{{ run_diagnostics_output_dir }}"
+    state: directory
+    mode: "0700"
+  failed_when: false
+
+- name: Reset diagnostics collection
+  ansible.builtin.file:
+    path: "{{ run_diagnostics_runtime_dir }}/collected"
+    state: absent
+  failed_when: false
+
+- name: Create diagnostics collection directory
+  ansible.builtin.file:
+    path: "{{ run_diagnostics_runtime_dir }}/collected"
+    state: directory
+    mode: "0700"
+  failed_when: false
+
+- name: Read diagnostics start time
+  ansible.builtin.slurp:
+    src: "{{ run_diagnostics_runtime_dir }}/started-at"
+  register: run_diagnostics_start_time
+  failed_when: false
+
+- name: Resolve diagnostics start time
+  ansible.builtin.set_fact:
+    run_diagnostics_since: >-
+      {{ run_diagnostics_start_time.content | default('') | b64decode | trim }}
+
+- name: Collect system journal
+  ansible.builtin.command:
+    argv:
+      - journalctl
+      - --no-pager
+      - --output=short-precise
+      - "{{ '--since=@' ~ run_diagnostics_since if run_diagnostics_since else '--boot' }}"
+  register: run_diagnostics_journal
+  changed_when: false
+  failed_when: false
+
+- name: Collect system state
+  ansible.builtin.command:
+    argv: "{{ item.command }}"
+  loop:
+    - name: processes.txt
+      command: [ps, auxww]
+    - name: memory.txt
+      command: [free, --human]
+    - name: filesystems.txt
+      command: [df, --human]
+    - name: sockets.txt
+      command: [ss, --listening, --numeric, --tcp, --udp, --processes]
+    - name: failed-units.txt
+      command: [systemctl, --failed, --no-pager]
+    - name: kernel.txt
+      command: [dmesg, --ctime]
+  loop_control:
+    label: "{{ item.name }}"
+  register: run_diagnostics_commands
+  changed_when: false
+  failed_when: false
+
+- name: Store system journal
+  ansible.builtin.copy:
+    content: |-
+      {{ run_diagnostics_journal.stdout | default('') }}
+      {{ run_diagnostics_journal.stderr | default('') }}
+    dest: "{{ run_diagnostics_runtime_dir }}/collected/system-journal.log"
+    mode: "0600"
+  failed_when: false
+
+- name: Store system state
+  ansible.builtin.copy:
+    content: |-
+      {{ item.stdout | default('') }}
+      {{ item.stderr | default('') }}
+    dest: "{{ run_diagnostics_runtime_dir }}/collected/{{ item.item.name }}"
+    mode: "0600"
+  loop: "{{ run_diagnostics_commands.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  failed_when: false
+
+- name: Find OVN and OVS logs
+  ansible.builtin.find:
+    paths: "{{ run_diagnostics_log_directories }}"
+    patterns: "*.log"
+    file_type: file
+    recurse: true
+  register: run_diagnostics_log_files
+  failed_when: false
+
+- name: Read tails of OVN and OVS logs
+  ansible.builtin.command:
+    argv:
+      - tail
+      - --bytes={{ run_diagnostics_log_bytes }}
+      - "{{ item.path }}"
+  loop: "{{ run_diagnostics_log_files.files | default([]) }}"
+  loop_control:
+    label: "{{ item.path }}"
+  register: run_diagnostics_logs
+  changed_when: false
+  failed_when: false
+
+- name: Store tails of OVN and OVS logs
+  ansible.builtin.copy:
+    content: |-
+      {{ item.stdout | default('') }}
+      {{ item.stderr | default('') }}
+    dest: >-
+      {{ run_diagnostics_runtime_dir }}/collected/{{
+         item.item.path | regex_replace('^/', '') | replace('/', '__') }}.tail
+    mode: "0600"
+  loop: "{{ run_diagnostics_logs.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.path }}"
+  failed_when: false
+
+- name: Archive guest diagnostics
+  ansible.builtin.command:
+    argv:
+      - tar
+      - --create
+      - --gzip
+      - --file={{ run_diagnostics_output_dir }}/{{ inventory_hostname }}.tar.gz
+      - --directory={{ run_diagnostics_runtime_dir }}
+      - collected
+  register: run_diagnostics_archive
+  changed_when: run_diagnostics_archive.rc == 0
+  failed_when: false

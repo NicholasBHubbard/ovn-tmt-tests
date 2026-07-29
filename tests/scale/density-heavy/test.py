@@ -5,8 +5,7 @@ import pytest
 
 from ovn_test.command import Runner
 from ovn_test.config import read_bool, read_int, read_list
-from ovn_test.network import ExternalPeers
-from ovn_test.system import ovsdb_control_socket
+from ovn_test.scale import ScaleBaseline, verify_scale_environment
 from ovn_test.topology import Topology
 from ovn_test.workload import (
     Workload,
@@ -15,76 +14,11 @@ from ovn_test.workload import (
 )
 
 
-def verify_cluster(runner, guests, addresses):
-    databases = (
-        ("ovnnb_db", "OVN_Northbound", 6643),
-        ("ovnsb_db", "OVN_Southbound", 6644),
-    )
-    for guest in guests:
-        for daemon, database, port in databases:
-            status = runner.output(
-                "ovn-appctl",
-                "-t",
-                ovsdb_control_socket(runner, daemon, guest=guest),
-                "cluster/status",
-                database,
-                guest=guest,
-            )
-            assert "Role:" in status
-            for address in addresses:
-                assert f"tcp:{address}:{port}" in status
-
-
-def verify_chassis(runner, guests, remotes, monitor_all):
-    for guest in guests:
-        remote = runner.output(
-            "ovs-vsctl",
-            "get",
-            "open",
-            ".",
-            "external-ids:ovn-remote",
-            guest=guest,
-        )
-        assert set(remote.strip('"').split(",")) == set(remotes)
-        result = runner.run(
-            "ovs-vsctl",
-            "get",
-            "open",
-            ".",
-            "external-ids:ovn-monitor-all",
-            guest=guest,
-            check=False,
-        )
-        configured = (
-            result.returncode == 0 and result.stdout.strip().strip('"') == "true"
-        )
-        assert configured is monitor_all
-
-
 @pytest.fixture
 def workload():
     topology = Topology.from_environment()
-    computes = topology.role("compute")
     runner = Runner(topology)
-    central = topology.role("central")
-    if read_bool(os.environ, "OTT_CLUSTERED", False):
-        central += topology.data["roles"].get("central-follower", [])
-        verify_cluster(
-            runner,
-            central,
-            [topology.hostname(guest) for guest in central],
-        )
-    protocol = "ssl" if read_bool(os.environ, "OTT_SSL_ENABLED", False) else "tcp"
-    remotes = [
-        f"{protocol}:{topology.hostname(guest)}:{os.environ['OTT_SB_PORT']}"
-        for guest in central
-    ]
-    verify_chassis(
-        runner,
-        computes,
-        remotes,
-        read_bool(os.environ, "OTT_MONITOR_ALL", False),
-    )
+    computes = verify_scale_environment(runner, topology)
     scale_topology = load_scale_topology(
         os.environ["OTT_SCALE_TOPOLOGY_PATH"],
         computes,
@@ -119,26 +53,20 @@ def workload():
     config["total"] = total
     config["base_per_worker"] = base_per_worker
     config["sync_timeout"] = sync_timeout
-    external = ExternalPeers(
-        runner,
-        scale_topology,
-        ipv4=config["ipv4"],
-        ipv6=config["ipv6"],
-        mtu=config["mtu"],
-        timeout=config["timeout"],
-    )
-    baseline = Workload(
+    baseline = ScaleBaseline(
         runner,
         computes,
+        scale_topology,
+        os.environ["TMT_TEST_DATA"],
+        base_per_worker,
+        config["protocols"],
+        config["ipv4"],
+        config["ipv6"],
+        config["mtu"],
+        config["timeout"],
+        config["sync_timeout"],
         "density-heavy-base",
         "dhb",
-        Path(os.environ["TMT_TEST_DATA"]) / "base-metrics.csv",
-        ipv4=config["ipv4"],
-        ipv6=config["ipv6"],
-        mtu=config["mtu"],
-        timeout=config["timeout"],
-        sync_timeout=config["sync_timeout"],
-        scale_topology=scale_topology,
     )
     instance = Workload(
         runner,
@@ -154,28 +82,16 @@ def workload():
         scale_topology=scale_topology,
         base_ports_per_worker=base_per_worker,
     )
-    base_count = base_per_worker * config["workers"]
     try:
-        external.create()
-        for index in range(base_count):
-            baseline.add_endpoint(index, "base", converge=False)
-        baseline.add_background_load_balancers(config["protocols"])
-        baseline.sync()
-        for index in range(base_count):
-            baseline.verify_connectivity(index, (index + 1) % base_count)
-            external.verify(baseline.endpoint(index))
-        yield instance, config, external
+        baseline.create()
+        yield instance, config, baseline.external
     finally:
         try:
             instance.cleanup()
         finally:
-            try:
-                baseline.cleanup()
-            finally:
-                external.cleanup()
+            baseline.cleanup()
         instance.verify_cleanup()
         baseline.verify_cleanup()
-        external.verify_cleanup()
 
 
 def test_density_heavy(workload):

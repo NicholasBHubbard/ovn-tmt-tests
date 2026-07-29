@@ -1,0 +1,23 @@
+- name: Create diagnostics runtime directory
+  ansible.builtin.file:
+    path: "{{ run_diagnostics_runtime_dir }}"
+    state: directory
+    mode: "0700"
+  failed_when: false
+
+- name: Read diagnostics start time
+  ansible.builtin.command:
+    argv:
+      - date
+      - +%s
+  register: run_diagnostics_start_time
+  changed_when: false
+  failed_when: false
+
+- name: Record diagnostics start time
+  ansible.builtin.copy:
+    content: "{{ run_diagnostics_start_time.stdout | default('') }}\n"
+    dest: "{{ run_diagnostics_runtime_dir }}/started-at"
+    mode: "0600"
+  when: run_diagnostics_start_time.rc | default(1) == 0
+  failed_when: false

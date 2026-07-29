@@ -151,11 +151,35 @@
       start_sb_ovsdb
   changed_when: true
 
+- name: Resolve clustered ovn-northd database connections
+  when: ovn_central_cluster_members | length > 0
+  vars:
+    ovn_central_northd_protocol: >-
+      {{ 'ssl' if ovn_central_ssl_enabled | bool else 'tcp' }}
+  ansible.builtin.set_fact:
+    ovn_central_northd_nb_db: >-
+      {{ ovn_central_cluster_members
+         | map('regex_replace', '^', ovn_central_northd_protocol ~ ':')
+         | map('regex_replace', '$', ':' ~ (ovn_central_nb_port | string))
+         | join(',') }}
+    ovn_central_northd_sb_db: >-
+      {{ ovn_central_cluster_members
+         | map('regex_replace', '^', ovn_central_northd_protocol ~ ':')
+         | map('regex_replace', '$', ':' ~ (ovn_central_sb_port | string))
+         | join(',') }}
+
 - name: Start ovn-northd (clustered)
   when: ovn_central_cluster_members | length > 0
   ansible.builtin.command:
     cmd: >-
       ovn-northd
+      --ovnnb-db={{ ovn_central_northd_nb_db }}
+      --ovnsb-db={{ ovn_central_northd_sb_db }}
+      {% if ovn_central_ssl_enabled | bool %}
+      --private-key={{ ovn_central_ssl_private_key }}
+      --certificate={{ ovn_central_ssl_certificate }}
+      --ca-cert={{ ovn_central_ssl_ca_cert }}
+      {% endif %}
       --pidfile --detach --log-file
       -vconsole:off -vfile:{{ ovn_central_log_level }}
   changed_when: true
@@ -263,3 +287,16 @@
   ansible.builtin.command:
     cmd: "ovn-sbctl {{ ovn_ctl_cluster_args | default('') }} set-connection pssl:{{ ovn_central_sb_port }}:0.0.0.0"
   changed_when: true
+
+- name: Wait for clustered ovn-northd database connections
+  when: ovn_central_cluster_members | length > 0
+  ansible.builtin.command:
+    cmd: "ovn-appctl -t ovn-northd {{ item }}-connection-status"
+  loop:
+    - nb
+    - sb
+  register: ovn_central_northd_connection
+  until: ovn_central_northd_connection.stdout | trim == 'connected'
+  retries: 10
+  delay: 2
+  changed_when: false

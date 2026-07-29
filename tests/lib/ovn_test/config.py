@@ -1,3 +1,4 @@
+import shlex
 from pathlib import Path
 
 
@@ -30,3 +31,38 @@ def read_bool(environment, name, default):
 
 def read_list(environment, name, default):
     return [value.strip() for value in environment.get(name, default).split(",")]
+
+
+def database_environment(topology, environment):
+    if not read_bool(environment, "OTT_CLUSTERED", False):
+        return {}
+
+    members = topology.role("central") + topology.data["roles"].get(
+        "central-follower", []
+    )
+    if not members:
+        raise ValueError("clustered OVN requires at least one central guest")
+
+    protocol = "ssl" if read_bool(environment, "OTT_SSL_ENABLED", False) else "tcp"
+
+    def remotes(port):
+        return ",".join(
+            f"{protocol}:{topology.hostname(member)}:{port}" for member in members
+        )
+
+    result = {
+        "OVN_NB_DB": remotes(environment.get("OTT_NB_PORT", "6641")),
+        "OVN_SB_DB": remotes(environment.get("OTT_SB_PORT", "6642")),
+    }
+    if protocol == "ssl":
+        directory = Path(environment.get("OTT_PKI_REMOTE_DIR", "/run/ovn-test-pki"))
+        options = shlex.join(
+            [
+                f"--private-key={directory / 'private-key.pem'}",
+                f"--certificate={directory / 'certificate.pem'}",
+                f"--ca-cert={directory / 'ca-cert.pem'}",
+            ]
+        )
+        result["OVN_NBCTL_OPTIONS"] = options
+        result["OVN_SBCTL_OPTIONS"] = options
+    return result

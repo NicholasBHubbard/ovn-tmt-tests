@@ -223,7 +223,10 @@ def test_multihost_parent_propagates_configuration(tree):
         "playbook: playbooks/ovn-build-artifact.yml",
         "playbook: playbooks/multihost-driver.yml",
         "playbook: playbooks/multihost-driver-authorize.yml",
+        "playbook: playbooks/run-diagnostics-start.yml",
+        "playbook: playbooks/run-diagnostics-collect.yml",
         "OTT_INSTALL_METHOD: artifact",
+        'OTT_DIAGNOSTICS: "true"',
         '-e \'ovn_artifact_enabled={{ "$OTT_INSTALL_METHOD" == "artifact" }}\'',
         "-e ovn_install_method=$OTT_INSTALL_METHOD",
         "-e ovn_artifact_build=$OTT_ARTIFACT_BUILD",
@@ -248,6 +251,26 @@ def test_multihost_parent_propagates_configuration(tree):
     for value in expected:
         assert_contains(tree, path, value)
     assert_contains(tree, path, "enabled: false")
+
+
+def test_multihost_diagnostics_are_general_and_top_down(tree):
+    path = "plans/ovn-multihost/main.fmf"
+    metadata = yaml.safe_load(content(tree, path))
+    start = prepare_phase(tree, path, "Start guest diagnostics")
+    collect = metadata["finish"][0]
+
+    assert start["playbook"] == "playbooks/run-diagnostics-start.yml"
+    assert collect["playbook"] == "playbooks/run-diagnostics-collect.yml"
+    assert extra_variables(start) == {
+        "run_diagnostics_enabled": "$OTT_DIAGNOSTICS",
+        "run_diagnostics_runtime_dir": "$OTT_DIAGNOSTICS_RUNTIME_DIR",
+    }
+    assert extra_variables(collect) == {
+        "run_diagnostics_enabled": "$OTT_DIAGNOSTICS",
+        "run_diagnostics_runtime_dir": "$OTT_DIAGNOSTICS_RUNTIME_DIR",
+        "run_diagnostics_log_bytes": "$OTT_DIAGNOSTICS_LOG_BYTES",
+        "run_diagnostics_output_dir": "$TMT_PLAN_DATA/diagnostics",
+    }
 
 
 def test_multihost_tls_contract(tree):
@@ -422,6 +445,23 @@ def test_artifact_role_contract(tree):
                 "OTT_SCALE_WORKERS:",
             ),
         ),
+        (
+            "cluster-density.fmf",
+            "cluster-density",
+            (
+                "OTT_SCALE_BASE_PODS_PER_WORKER:",
+                "OTT_SCALE_BUILD_PODS_PER_NAMESPACE:",
+                "OTT_CLUSTERED:",
+                "OTT_COMPUTE_PHYSICAL_BRIDGE:",
+                "OTT_COMPUTE_PHYSICAL_NETWORK:",
+                "OTT_MONITOR_ALL:",
+                "OTT_SCALE_INITIAL_NAMESPACES:",
+                "OTT_SCALE_LB_PROTOCOLS:",
+                "OTT_SCALE_TEST_PODS_PER_NAMESPACE:",
+                "OTT_SCALE_TOTAL_NAMESPACES:",
+                "OTT_SCALE_WORKERS:",
+            ),
+        ),
     ],
 )
 def test_scale_workload_contract(tree, plan, test, settings):
@@ -436,7 +476,7 @@ def test_scale_workload_contract(tree, plan, test, settings):
     assert "duration: $OTT_SCALE_DURATION" in plan_path.read_text()
     assert "python3 -m pytest" in (test_dir / "main.fmf").read_text()
     assert "duration:" not in (test_dir / "main.fmf").read_text()
-    if test == "density-heavy":
+    if test in {"density-heavy", "cluster-density"}:
         metadata = yaml.safe_load(plan_path.read_text())
         assert metadata["environment+"]["OTT_SCALE_IPV6"] == "false"
         assert [guest["role"] for guest in metadata["provision+"]] == [

@@ -11,6 +11,22 @@ class TestPreconditions:
         assert not runner.succeeds("ovn-sbctl", "show")
 
 
+class TestNorthdConnections:
+    def test_both_databases_are_connected(self):
+        runner = Runner()
+
+        for database in ("nb", "sb"):
+            assert (
+                runner.output(
+                    "ovn-appctl",
+                    "-t",
+                    "ovn-northd",
+                    f"{database}-connection-status",
+                )
+                == "connected"
+            )
+
+
 class TestResult:
     def test_services_and_databases(self):
         runner = Runner()

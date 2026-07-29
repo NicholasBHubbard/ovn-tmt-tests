@@ -1,0 +1,226 @@
+import ipaddress
+import json
+
+from ovn_test.load_balancer import replace, socket
+
+
+VALID_PROTOCOLS = {"tcp", "udp", "sctp"}
+
+
+def validate_cluster_density(
+    startup,
+    total,
+    build_pods,
+    test_pods,
+    protocols,
+    timeout,
+    ipv4,
+    ipv6,
+    mtu,
+    chassis,
+    workers,
+    base_pods,
+):
+    positive = {
+        "total namespaces": total,
+        "test pods per namespace": test_pods,
+        "timeout": timeout,
+        "chassis": chassis,
+        "workers": workers,
+    }
+    if any(
+        isinstance(value, bool) or not isinstance(value, int) or value < 1
+        for value in positive.values()
+    ):
+        raise ValueError(
+            "namespace, pod, timeout, chassis and worker counts must be positive"
+        )
+    if any(
+        isinstance(value, bool) or not isinstance(value, int) or value < 0
+        for value in (startup, build_pods, base_pods)
+    ):
+        raise ValueError("startup, build pod and base pod counts must be non-negative")
+    if startup > total:
+        raise ValueError("startup namespaces cannot exceed total namespaces")
+    if test_pods < 4:
+        raise ValueError(
+            "cluster density requires at least four test pods per namespace"
+        )
+    if chassis < 2:
+        raise ValueError("cluster density requires at least two compute chassis")
+    if not isinstance(ipv4, bool) or not isinstance(ipv6, bool) or not (ipv4 or ipv6):
+        raise ValueError("at least one boolean IP family setting must be enabled")
+    minimum_mtu = 1280 if ipv6 else 576
+    if not minimum_mtu <= mtu <= 65535:
+        raise ValueError(f"MTU must be between {minimum_mtu} and 65535")
+    if not protocols or len(protocols) != len(set(protocols)):
+        raise ValueError("load-balancer protocols must be unique")
+    if set(protocols) - VALID_PROTOCOLS:
+        raise ValueError("load-balancer protocols must be tcp, udp or sctp")
+    endpoint_count = total * test_pods + (total - startup) * build_pods
+    if endpoint_count > 65534:
+        raise ValueError("cluster density exceeds its endpoint identity space")
+
+
+class OvnNamespace:
+    def __init__(self, runner, owner, name, index, ipv4=True, ipv6=True):
+        self.runner = runner
+        self.owner = owner
+        self.name = name
+        self.index = index
+        self.ipv4 = ipv4
+        self.ipv6 = ipv6
+        self.port_groups = [
+            f"pg_{name}",
+            f"pg_deny_igr_{name}",
+            f"pg_deny_egr_{name}",
+        ]
+        self.address_sets = {
+            4: f"as_{name}",
+            6: f"as6_{name}",
+        }
+        self.address_set_ids = {}
+        self.load_balancers = []
+        self.cleaned = False
+
+    def _destroy_named(self, table, name):
+        output = self.runner.output(
+            "ovn-nbctl",
+            "--bare",
+            "--columns=_uuid",
+            "find",
+            table,
+            f"name={json.dumps(name)}",
+        )
+        for uuid in output.split():
+            self.runner.run("ovn-nbctl", "destroy", table, uuid)
+
+    def create(self):
+        for name in self.port_groups:
+            self._destroy_named("Port_Group", name)
+            self.runner.run(
+                "ovn-nbctl",
+                "pg-add",
+                name,
+                "--",
+                "set",
+                "Port_Group",
+                name,
+                f"external_ids:ovn-tmt-tests-owner={json.dumps(self.owner)}",
+            )
+        for family, enabled in ((4, self.ipv4), (6, self.ipv6)):
+            if not enabled:
+                continue
+            name = self.address_sets[family]
+            self._destroy_named("Address_Set", name)
+            self.address_set_ids[family] = self.runner.output(
+                "ovn-nbctl",
+                "create",
+                "Address_Set",
+                f"name={json.dumps(name)}",
+                f"external_ids:ovn-tmt-tests-owner={json.dumps(self.owner)}",
+            )
+
+    def add_endpoints(self, endpoints):
+        for family, enabled in ((4, self.ipv4), (6, self.ipv6)):
+            if not enabled:
+                continue
+            self.runner.run(
+                "ovn-nbctl",
+                "add",
+                "Address_Set",
+                self.address_set_ids[family],
+                "addresses",
+                *(json.dumps(endpoint[f"ipv{family}"]) for endpoint in endpoints),
+            )
+
+    def _vip(self, family, position):
+        network = ipaddress.ip_network("30.0.0.0/16" if family == 4 else "30::/32")
+        address = (
+            int(network.network_address)
+            + (self.index + 1) * network.num_addresses
+            + position
+            + 1
+        )
+        return str(ipaddress.ip_address(address))
+
+    def add_services(self, endpoints, protocols, group):
+        if len(endpoints) < 4:
+            raise ValueError("namespace services require at least four endpoints")
+        backend_groups = [endpoints[:2], endpoints[2:3], endpoints[3:]]
+        vips = {}
+        for family, enabled in ((4, self.ipv4), (6, self.ipv6)):
+            if not enabled:
+                continue
+            for position, backends in enumerate(backend_groups):
+                vips[socket(self._vip(family, position), 80, family)] = [
+                    socket(endpoint[f"ipv{family}"], 8080, family)
+                    for endpoint in backends
+                ]
+        for protocol in protocols:
+            name = f"lb_{self.name}-{protocol}"
+            self.load_balancers.append(name)
+            replace(
+                self.runner,
+                self.owner,
+                name,
+                protocol,
+                vips,
+                group=group,
+            )
+
+    def cleanup(self):
+        if self.cleaned:
+            return
+        first_error = None
+
+        def attempt(action):
+            nonlocal first_error
+            try:
+                action()
+            except Exception as error:
+                if first_error is None:
+                    first_error = error
+
+        for name in self.load_balancers:
+            attempt(
+                lambda name=name: self.runner.run(
+                    "ovn-nbctl",
+                    "--if-exists",
+                    "lb-del",
+                    name,
+                )
+            )
+        for name in self.port_groups:
+            attempt(lambda name=name: self._destroy_named("Port_Group", name))
+        for family, name in self.address_sets.items():
+            if (family == 4 and self.ipv4) or (family == 6 and self.ipv6):
+                attempt(lambda name=name: self._destroy_named("Address_Set", name))
+        self.cleaned = first_error is None
+        if first_error is not None:
+            raise first_error
+
+    def verify_cleanup(self):
+        for table, names in (
+            ("Load_Balancer", self.load_balancers),
+            ("Port_Group", self.port_groups),
+            (
+                "Address_Set",
+                [
+                    name
+                    for family, name in self.address_sets.items()
+                    if (family == 4 and self.ipv4) or (family == 6 and self.ipv6)
+                ],
+            ),
+        ):
+            for name in names:
+                output = self.runner.output(
+                    "ovn-nbctl",
+                    "--bare",
+                    "--columns=name",
+                    "find",
+                    table,
+                    f"name={json.dumps(name)}",
+                )
+                if output:
+                    raise AssertionError(f"{table} remains after cleanup: {name}")

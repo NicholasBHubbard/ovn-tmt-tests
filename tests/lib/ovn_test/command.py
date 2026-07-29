@@ -5,7 +5,7 @@ import subprocess
 import sys
 import time
 
-from ovn_test.config import driver_connection
+from ovn_test.config import database_environment, driver_connection
 
 
 RUN_MANY = """\
@@ -53,6 +53,9 @@ class Runner:
         self.key = configured_key if key is None else key
         self.sleep = sleep
         self.user = configured_user if user is None else user
+        self.database_environment = (
+            database_environment(topology, environment) if topology else {}
+        )
 
     def run(
         self,
@@ -66,6 +69,8 @@ class Runner:
     ):
         command = [str(part) for part in command]
         shown = command
+        if self.database_environment:
+            env = {**os.environ, **self.database_environment, **(env or {})}
         if guest is not None and self.topology is None:
             raise ValueError("guest execution requires a tmt topology")
         if guest is not None and not self.topology.is_local(guest):

@@ -5,7 +5,9 @@ import yaml
 
 from ovn_test.command import Runner
 from ovn_test.config import read_bool, read_int, read_list
+from ovn_test.namespace import OvnNamespace, validate_cluster_density
 from ovn_test.network import ExternalPeers
+from ovn_test.scale import ScaleBaseline
 from ovn_test.topology import Topology
 from ovn_test.workload import (
     Workload,
@@ -31,17 +33,15 @@ class FakeRunner:
         stdout = ""
         if command[:3] == ("ovn-nbctl", "create", "Address_Set"):
             stdout = f"uuid-{len(self.calls)}\n"
-        if "Load_Balancer_Group" in command:
+        if "Load_Balancer_Group" in command and "--columns=_uuid" in command:
             stdout = "load-balancer-group-uuid\n"
-        elif "Load_Balancer" in command:
+        elif "Load_Balancer" in command and "--columns=_uuid" in command:
             stdout = "load-balancer-uuid\n"
         if "Logical_Switch" in command and command[-1] in {
             'name="switch-0"',
             'name="switch-1"',
         }:
             stdout = "logical-switch-uuid\n"
-        if "Logical_Switch_Port" in command:
-            stdout = "logical-port-uuid\n"
         if "Port_Binding" in command:
             stdout = "chassis-uuid\n"
         stdout = self.outputs.get((guest, command), stdout)
@@ -168,6 +168,54 @@ def test_runner_uses_configured_driver_connection():
 
     assert calls[0][calls[0].index("-i") + 1] == "/custom/driver/id_ed25519"
     assert "tester@192.0.2.2" in calls[0]
+
+
+@pytest.mark.parametrize("ssl", (False, True))
+def test_runner_uses_cluster_database_remotes(ssl):
+    calls = []
+    data = topology_data()
+    data["guests"]["central-2"] = {
+        "name": "central-2",
+        "hostname": "198.51.100.2",
+        "role": "central-follower",
+    }
+    data["roles"]["central-follower"] = ["central-2"]
+    environment = {
+        "OTT_CLUSTERED": "true",
+        "OTT_NB_PORT": "16641",
+        "OTT_SB_PORT": "16642",
+        "OTT_SSL_ENABLED": str(ssl).lower(),
+        "OTT_PKI_REMOTE_DIR": "/custom/pki",
+    }
+
+    runner = Runner(
+        Topology(data),
+        execute=lambda command, **kwargs: (
+            calls.append((command, kwargs))
+            or subprocess.CompletedProcess(command, 0, "", "")
+        ),
+        environment=environment,
+    )
+    runner.run("ovn-nbctl", "show")
+
+    command_environment = calls[0][1]["env"]
+    protocol = "ssl" if ssl else "tcp"
+    assert command_environment["OVN_NB_DB"] == (
+        f"{protocol}:192.0.2.1:16641,{protocol}:198.51.100.2:16641"
+    )
+    assert command_environment["OVN_SB_DB"] == (
+        f"{protocol}:192.0.2.1:16642,{protocol}:198.51.100.2:16642"
+    )
+    if ssl:
+        for name in ("OVN_NBCTL_OPTIONS", "OVN_SBCTL_OPTIONS"):
+            assert command_environment[name] == (
+                "--private-key=/custom/pki/private-key.pem "
+                "--certificate=/custom/pki/certificate.pem "
+                "--ca-cert=/custom/pki/ca-cert.pem"
+            )
+    else:
+        assert "OVN_NBCTL_OPTIONS" not in command_environment
+        assert "OVN_SBCTL_OPTIONS" not in command_environment
 
 
 def test_workload_identity_is_deterministic(tmp_path):
@@ -400,6 +448,7 @@ def test_external_peers_exercise_worker_gateway_paths():
                 {
                     "name": "worker-0",
                     "chassis": "compute-1",
+                    "external_vlan": 37,
                     "external": {
                         "ipv4": "172.16.0.0/24",
                         "ipv6": "fd20::/80",
@@ -451,6 +500,11 @@ def test_external_peers_exercise_worker_gateway_paths():
         "add-port",
         "br-provider",
         "dhe00000-p",
+        "--",
+        "set",
+        "Port",
+        "dhe00000-p",
+        "tag=37",
     ) in commands
     assert [wait[0][-1] for wait in runner.waits] == [
         "172.16.0.253",
@@ -584,6 +638,33 @@ def test_workload_can_defer_endpoint_convergence(tmp_path):
     assert sync in [call[1] for call in runner.calls]
 
 
+def test_workload_removes_logical_and_local_endpoint_state(tmp_path):
+    runner = FakeRunner()
+    workload = Workload(
+        runner,
+        ["compute-1", "compute-2"],
+        "cluster-density",
+        "cd",
+        tmp_path / "metrics.csv",
+    )
+    endpoint = workload.add_endpoint(0, "iteration", converge=False)
+
+    workload.remove_endpoint(endpoint)
+    calls_after_removal = len(runner.calls)
+    batches_after_removal = len(runner.batches)
+    workload.cleanup()
+
+    assert (
+        "ovn-nbctl",
+        "--if-exists",
+        "lsp-del",
+        "cluster-density-00000",
+    ) in [call[1] for call in runner.calls]
+    assert endpoint["removed"]
+    assert len(runner.batches) == batches_after_removal
+    assert len(runner.calls) > calls_after_removal
+
+
 def test_workload_adds_every_service_load_balancer(tmp_path):
     runner = FakeRunner()
     workload = Workload(
@@ -706,6 +787,170 @@ def test_workload_reproduces_scale_background_load_balancers(tmp_path):
         command for command in commands if 'name="lb-gwrouter-worker-06-tcp"' in command
     )
     assert not [argument for argument in gateway if argument.startswith("vips:")]
+
+
+def test_ovn_namespace_reproduces_cluster_density_state():
+    runner = FakeRunner()
+    namespace = OvnNamespace(
+        runner,
+        "cluster-density",
+        "NS_density_0",
+        0,
+    )
+    endpoints = [
+        {
+            "ipv4": f"10.0.0.{index}",
+            "ipv6": f"fd10::{index}",
+        }
+        for index in range(1, 6)
+    ]
+
+    namespace.create()
+    namespace.add_endpoints(endpoints)
+    namespace.add_services(endpoints, ["tcp", "udp", "sctp"], "group-uuid")
+
+    commands = [call[1] for call in runner.calls]
+    assert len([command for command in commands if "pg-add" in command]) == 3
+    assert (
+        len(
+            [
+                command
+                for command in commands
+                if command[:3] == ("ovn-nbctl", "create", "Address_Set")
+            ]
+        )
+        == 2
+    )
+    load_balancers = [
+        command for command in commands if contains(command, "create", "Load_Balancer")
+    ]
+    assert len(load_balancers) == 3
+    tcp = next(command for command in load_balancers if "protocol=tcp" in command)
+    assert 'vips:"30.1.0.1:80"="10.0.0.1:8080,10.0.0.2:8080"' in tcp
+    assert 'vips:"30.1.0.2:80"="10.0.0.3:8080"' in tcp
+    assert 'vips:"30.1.0.3:80"="10.0.0.4:8080,10.0.0.5:8080"' in tcp
+    assert 'vips:"[30:1::1]:80"="[fd10::1]:8080,[fd10::2]:8080"' in tcp
+    assert contains(
+        tcp,
+        "add",
+        "Load_Balancer_Group",
+        "group-uuid",
+        "load_balancer",
+        "@lb",
+    )
+
+    namespace.cleanup()
+    namespace.verify_cleanup()
+    assert namespace.cleaned
+
+
+def test_ovn_namespace_cleans_partially_created_address_sets():
+    runner = FakeRunner()
+    namespace = OvnNamespace(
+        runner,
+        "cluster-density",
+        "NS_density_0",
+        0,
+    )
+    runner.fail.add(
+        (
+            "ovn-nbctl",
+            "create",
+            "Address_Set",
+            'name="as6_NS_density_0"',
+            'external_ids:ovn-tmt-tests-owner="cluster-density"',
+        )
+    )
+
+    with pytest.raises(subprocess.CalledProcessError):
+        namespace.create()
+    runner.fail.clear()
+    namespace.cleanup()
+
+    commands = [call[1] for call in runner.calls]
+    for name in ("as_NS_density_0", "as6_NS_density_0"):
+        assert (
+            "ovn-nbctl",
+            "--bare",
+            "--columns=_uuid",
+            "find",
+            "Address_Set",
+            f'name="{name}"',
+        ) in commands
+
+
+def test_scale_baseline_reuses_worker_topology(tmp_path):
+    runner = FakeRunner()
+    topology = {
+        "physical_bridge": "br-provider",
+        "load_balancer_group": "cluster-lb-group",
+        "workers": [
+            {
+                "name": "worker-0",
+                "chassis": "compute-1",
+                "switch": "switch-0",
+                "gateway_router": "gwrouter-worker-0",
+                "internal": {
+                    "ipv4": "10.0.0.0/24",
+                    "ipv6": "fd10::/80",
+                },
+                "external": {
+                    "ipv4": "172.16.0.0/24",
+                    "ipv6": "fd20::/80",
+                },
+            },
+            {
+                "name": "worker-1",
+                "chassis": "compute-2",
+                "switch": "switch-1",
+                "gateway_router": "gwrouter-worker-1",
+                "internal": {
+                    "ipv4": "10.0.1.0/24",
+                    "ipv6": "fd10:0:0:1::/80",
+                },
+                "external": {
+                    "ipv4": "172.16.1.0/24",
+                    "ipv6": "fd20:0:0:1::/80",
+                },
+            },
+        ],
+    }
+    baseline = ScaleBaseline(
+        runner,
+        ["compute-1", "compute-2"],
+        topology,
+        tmp_path,
+        1,
+        ["tcp"],
+        True,
+        False,
+        1400,
+        3,
+        10,
+        "scale-base",
+        "sb",
+    )
+
+    baseline.create()
+
+    assert len(baseline.workload.endpoints) == 2
+    assert set(baseline.external.peers) == {"worker-0", "worker-1"}
+    assert ("ovn-nbctl", "--wait=hv", "--timeout=10", "sync") in [
+        call[1] for call in runner.calls
+    ]
+    assert (
+        len(
+            [
+                command
+                for _, command, _ in runner.calls
+                if contains(command, "create", "Load_Balancer")
+            ]
+        )
+        == 3
+    )
+
+    baseline.cleanup()
+    assert baseline.workload.cleaned
 
 
 def test_workload_uses_shared_command_waits(tmp_path):
@@ -832,6 +1077,66 @@ def test_cleanup_verification_checks_remote_endpoint_state(tmp_path):
     runner.outputs[("compute-1", ports)] = f"{first['interface']}\nunrelated-p\n"
     with pytest.raises(AssertionError, match="OVS port remains"):
         workload.verify_cleanup()
+
+
+@pytest.mark.parametrize(
+    "values",
+    [
+        {"startup": -1},
+        {"startup": 3, "total": 2},
+        {"total": 0},
+        {"build_pods": -1},
+        {"test_pods": 3},
+        {"protocols": []},
+        {"protocols": ["tcp", "tcp"]},
+        {"protocols": ["tcp", "http"]},
+        {"timeout": 0},
+        {"ipv4": False, "ipv6": False},
+        {"ipv4": "true"},
+        {"ipv6": False, "mtu": 575},
+        {"mtu": 65536},
+        {"chassis": 1},
+        {"workers": 0},
+        {"base_pods": -1},
+        {"startup": 0, "total": 65535, "build_pods": 0},
+    ],
+)
+def test_cluster_density_validation_rejects_invalid_values(values):
+    config = {
+        "startup": 1,
+        "total": 2,
+        "build_pods": 6,
+        "test_pods": 4,
+        "protocols": ["tcp", "udp", "sctp"],
+        "timeout": 60,
+        "ipv4": True,
+        "ipv6": False,
+        "mtu": 576,
+        "chassis": 2,
+        "workers": 2,
+        "base_pods": 10,
+    }
+    config.update(values)
+
+    with pytest.raises(ValueError):
+        validate_cluster_density(**config)
+
+
+def test_cluster_density_validation_accepts_original_defaults():
+    validate_cluster_density(
+        startup=3800,
+        total=4000,
+        build_pods=6,
+        test_pods=4,
+        protocols=["tcp", "udp", "sctp"],
+        timeout=60,
+        ipv4=True,
+        ipv6=False,
+        mtu=1342,
+        chassis=2,
+        workers=250,
+        base_pods=10,
+    )
 
 
 @pytest.mark.parametrize(

@@ -1,0 +1,8 @@
+- name: Start guest diagnostics
+  hosts: all
+  become: true
+  gather_facts: false
+  ignore_unreachable: true
+  roles:
+    - role: run_diagnostics
+      run_diagnostics_action: start

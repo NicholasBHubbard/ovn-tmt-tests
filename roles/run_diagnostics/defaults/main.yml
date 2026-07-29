@@ -1,0 +1,10 @@
+run_diagnostics_action: start
+run_diagnostics_enabled: true
+run_diagnostics_runtime_dir: /run/ovn-tmt-tests/diagnostics
+run_diagnostics_output_dir: "{{ run_diagnostics_runtime_dir }}"
+run_diagnostics_log_bytes: 10485760
+run_diagnostics_log_directories:
+  - /var/log/ovn
+  - /usr/local/var/log/ovn
+  - /var/log/openvswitch
+  - /usr/local/var/log/openvswitch

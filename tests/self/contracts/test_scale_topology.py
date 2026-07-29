@@ -104,11 +104,28 @@ def test_assigns_logical_workers_to_provisioned_chassis(tree):
         "compute-2",
         "compute-1",
     ]
+    assert [worker.get("external_vlan") for worker in topology["workers"]] == [
+        1,
+        None,
+        2,
+    ]
+    assert [port.get("tag") for port in topology["localnet_ports"]] == [1, None, 2]
     assert all(
         "snat-ct-zone" not in router["options"]
         for router in topology["routers"]
         if router["name"].startswith("gwrouter-")
     )
+
+
+def test_rejects_exhausted_chassis_vlan_space(tree):
+    generate = load(
+        tree,
+        "scale_topology_vlan_limit",
+        "roles/ovn_scale_topology/files/generate.py",
+    ).generate
+
+    with pytest.raises(ValueError, match="external VLAN space"):
+        generate(configuration(worker_count=4095, chassis=["compute-1"]))
 
 
 def test_configures_requested_snat_conntrack_zone(tree):

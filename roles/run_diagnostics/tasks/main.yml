@@ -1,0 +1,10 @@
+- name: Verify diagnostics action
+  when: run_diagnostics_enabled | bool
+  ansible.builtin.assert:
+    that:
+      - run_diagnostics_action in ['start', 'collect']
+    fail_msg: "run_diagnostics_action must be start or collect."
+
+- name: Run diagnostics action
+  when: run_diagnostics_enabled | bool
+  ansible.builtin.include_tasks: "{{ run_diagnostics_action }}.yml"
