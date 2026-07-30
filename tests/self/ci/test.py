@@ -60,7 +60,10 @@ class TestResult:
         text = self.ci.read_text()
 
         assert "actions/checkout@v5" in text
-        assert "actions/setup-python" not in text
+        assert "actions/setup-python@v6" in text
+        assert 'python-version: ["3.9", "3.x"]' in text
+        assert "if: matrix.python-version == '3.x'" in text
+        assert "run: python3 -m pytest tests/self/contracts" in text
         assert "ubuntu-26.04" in text
         assert "ubuntu-latest" not in text
         assert "ubuntu-24.04" not in text
@@ -98,9 +101,10 @@ class TestResult:
             "tmt lint plans tests",
             "pip install ansible-lint",
             "ansible-lint --strict playbooks roles",
-            "pip install ansible-core pytest pyyaml ruff==0.15.22",
-            "ruff check tests",
-            "ruff format --check tests",
+            "pip install ansible-core pytest pyyaml ruff==0.15.22 ty==0.0.44",
+            "ruff check .",
+            "ruff format --check .",
+            "ty check",
         ):
             assert expected in text
 

@@ -3,6 +3,19 @@ import json
 import os
 from collections import Counter
 from pathlib import Path
+from typing import TypedDict, Union
+
+
+Network = Union[ipaddress.IPv4Network, ipaddress.IPv6Network]
+
+
+class Family(TypedDict):
+    version: int
+    internal: str
+    external: str
+    join: Network
+    cluster: str
+    default: str
 
 
 def _next(network, index):
@@ -50,7 +63,7 @@ def generate(config):
             raise ValueError(f"chassis {chassis_name} exceeds its external VLAN space")
     next_vlan = Counter()
 
-    families = []
+    families: list[Family] = []
     for version in (4, 6):
         if not config[f"ipv{version}"]:
             continue

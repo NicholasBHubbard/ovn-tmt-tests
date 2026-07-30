@@ -4,3 +4,8 @@ pythonpath = ["tests/lib"]
 
 [tool.ruff]
 show-fixes = true
+target-version = "py39"
+
+[tool.ty.environment]
+python-version = "3.9"
+root = ["tests/lib", "."]

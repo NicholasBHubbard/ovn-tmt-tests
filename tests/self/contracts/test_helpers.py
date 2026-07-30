@@ -360,6 +360,10 @@ def test_ovsdb_decodes_json_rows():
     assert calls[5][0][-1] == 'external_ids:ovn-tmt-tests-id="managed:0"'
     assert calls[6][0][-1] == "ports{>=}port-1"
 
+    payload["data"] = [["sw0"]]
+    with pytest.raises(ValueError, match="does not match"):
+        database.find("Logical_Switch", columns=("name",))
+
 
 def test_ovsdb_one_requires_exactly_one_row():
     class FakeRunner:

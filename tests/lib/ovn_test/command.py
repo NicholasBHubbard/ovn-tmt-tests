@@ -71,28 +71,29 @@ class Runner:
         shown = command
         if self.database_environment:
             env = {**os.environ, **self.database_environment, **(env or {})}
-        if guest is not None and self.topology is None:
-            raise ValueError("guest execution requires a tmt topology")
-        if guest is not None and not self.topology.is_local(guest):
-            remote = shlex.join(command)
-            command = [
-                "ssh",
-                "-i",
-                self.key,
-                "-o",
-                "BatchMode=yes",
-                "-o",
-                "ConnectTimeout=30",
-                "-o",
-                "LogLevel=ERROR",
-                "-o",
-                "StrictHostKeyChecking=no",
-                "-o",
-                "UserKnownHostsFile=/dev/null",
-                f"{self.user}@{self.topology.hostname(guest)}",
-                remote,
-            ]
-            shown = ["ssh", guest, "--", *shown]
+        if guest is not None:
+            if self.topology is None:
+                raise ValueError("guest execution requires a tmt topology")
+            if not self.topology.is_local(guest):
+                remote = shlex.join(command)
+                command = [
+                    "ssh",
+                    "-i",
+                    self.key,
+                    "-o",
+                    "BatchMode=yes",
+                    "-o",
+                    "ConnectTimeout=30",
+                    "-o",
+                    "LogLevel=ERROR",
+                    "-o",
+                    "StrictHostKeyChecking=no",
+                    "-o",
+                    "UserKnownHostsFile=/dev/null",
+                    f"{self.user}@{self.topology.hostname(guest)}",
+                    remote,
+                ]
+                shown = ["ssh", guest, "--", *shown]
 
         if announce:
             print(f"+ {shlex.join(shown)}", flush=True)

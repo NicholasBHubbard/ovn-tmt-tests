@@ -40,4 +40,6 @@ def test_run_diagnostics_preserves_guest_state(tree, tmp_path):
         assert "collected/system-journal.log" in names
         assert "collected/processes.txt" in names
         log = next(name for name in names if name.endswith("ovn.log.tail"))
-        assert archive.extractfile(log).read() == b"diagnostic marker\n"
+        stream = archive.extractfile(log)
+        assert stream is not None
+        assert stream.read() == b"diagnostic marker\n"

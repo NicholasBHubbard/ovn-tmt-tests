@@ -34,8 +34,10 @@ def generate(config):
     if not isinstance(config["ports"], list):
         raise ValueError("ports must be a list")
     for name in ("nbctl", "ovs_vsctl"):
-        if not isinstance(config[name], list) or not config[name] or not all(
-            isinstance(item, str) and item for item in config[name]
+        if (
+            not isinstance(config[name], list)
+            or not config[name]
+            or not all(isinstance(item, str) and item for item in config[name])
         ):
             raise ValueError(f"{name} must be a non-empty command list")
 

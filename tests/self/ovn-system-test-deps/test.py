@@ -35,5 +35,6 @@ class TestResult:
         if not Path("/etc/fedora-release").exists():
             pytest.skip("not Fedora")
 
-        assert shutil.which("nc")
-        assert Path(shutil.which("nc")).resolve() == Path("/usr/bin/ncat")
+        nc = shutil.which("nc")
+        assert nc
+        assert Path(nc).resolve() == Path("/usr/bin/ncat")

@@ -34,12 +34,12 @@ class Ovsdb:
         )
         result = json.loads(output)
         headings = result["headings"]
+        rows = result["data"]
+        if any(len(row) != len(headings) for row in rows):
+            raise ValueError("OVSDB row does not match its headings")
         return [
-            {
-                heading: _decode(value)
-                for heading, value in zip(headings, row, strict=True)
-            }
-            for row in result["data"]
+            {heading: _decode(value) for heading, value in zip(headings, row)}
+            for row in rows
         ]
 
     def one(self, table, *conditions, columns):
