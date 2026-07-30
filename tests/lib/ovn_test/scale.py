@@ -1,11 +1,9 @@
 import os
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
-from ovn_test.command import Runner
 from ovn_test.config import read_bool
-from ovn_test.models import ScaleTopology
 from ovn_test.network import ExternalPeers
 from ovn_test.system import ovsdb_control_socket
 from ovn_test.topology import Topology
@@ -13,7 +11,7 @@ from ovn_test.workload import Workload
 
 
 def verify_scale_environment(
-    runner: Runner,
+    runner: Any,
     topology: Topology,
     environment: Optional[Mapping[str, str]] = None,
 ) -> list[str]:
@@ -75,9 +73,9 @@ def verify_scale_environment(
 class ScaleBaseline:
     def __init__(
         self,
-        runner: Runner,
+        runner: Any,
         computes: Sequence[str],
-        scale_topology: ScaleTopology,
+        scale_topology: dict[str, Any],
         data_dir: Union[str, os.PathLike[str]],
         pods_per_worker: int,
         protocols: Sequence[str],

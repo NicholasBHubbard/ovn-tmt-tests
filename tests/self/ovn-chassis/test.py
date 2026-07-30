@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from typing import Any
 
 import pytest
 from ovn_test.command import Runner
@@ -31,11 +32,8 @@ def sb(runner: Runner) -> Ovsdb:
     return Ovsdb(runner, "ovn-sbctl")
 
 
-def external_ids(ovs: Ovsdb) -> dict[str, str]:
-    return {
-        key: str(value)
-        for key, value in ovs.mapping("Open_vSwitch", "external_ids").items()
-    }
+def external_ids(ovs: Ovsdb) -> Any:
+    return ovs.value("Open_vSwitch", "external_ids")
 
 
 class TestPreconditions:
@@ -85,7 +83,7 @@ class TestInvalid:
         ),
     )
     def test_configuration_is_rejected(
-        self, runner: Runner, tree: Path, case: str, message: str
+        self, runner: Runner, tree: Path, case: Any, message: str
     ) -> None:
         result = runner.run(
             "ansible-playbook",

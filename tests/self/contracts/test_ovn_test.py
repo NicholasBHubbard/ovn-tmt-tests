@@ -1,17 +1,15 @@
 import subprocess
-from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
-from typing import Callable, Optional, Union, cast
+from typing import Any, Optional
 
 import pytest
 import yaml
 from ovn_test.command import Runner
 from ovn_test.config import read_bool, read_int, read_list
-from ovn_test.models import Endpoint, ScaleTopology
 from ovn_test.namespace import OvnNamespace, validate_cluster_density
 from ovn_test.network import ExternalPeers
 from ovn_test.scale import ScaleBaseline
-from ovn_test.topology import Topology, TopologyData
+from ovn_test.topology import Topology
 from ovn_test.workload import (
     Workload,
     load_scale_topology,
@@ -20,7 +18,7 @@ from ovn_test.workload import (
 )
 
 
-class FakeRunner(Runner):
+class FakeRunner:
     def __init__(self) -> None:
         self.calls = []
         self.batches = []
@@ -31,17 +29,14 @@ class FakeRunner(Runner):
 
     def run(
         self,
-        *command: object,
+        *command: Any,
         guest: Optional[str] = None,
-        input: Optional[str] = None,
+        input: Any = None,
         check: bool = True,
-        cwd: Optional[Union[str, Path]] = None,
-        env: Optional[Mapping[str, str]] = None,
-        announce: bool = True,
     ) -> subprocess.CompletedProcess[str]:
         self.calls.append((guest, command, input))
         if command in self.fail:
-            raise subprocess.CalledProcessError(1, tuple(map(str, command)))
+            raise subprocess.CalledProcessError(1, command)
         stdout = ""
         if command[:3] == ("ovn-nbctl", "create", "Address_Set"):
             stdout = f"uuid-{len(self.calls)}\n"
@@ -58,53 +53,36 @@ class FakeRunner(Runner):
             stdout = "chassis-uuid\n"
         stdout = self.outputs.get((guest, command), stdout)
         return subprocess.CompletedProcess(
-            tuple(map(str, command)),
+            command,
             self.returncodes.get(command, 0),
             stdout,
             "",
         )
 
+    def output(self, *command: Any, **options: Any) -> str:
+        return self.run(*command, **options).stdout.strip()
+
+    def namespace(
+        self, namespace: str, *command: Any, **options: Any
+    ) -> subprocess.CompletedProcess[str]:
+        return self.run("ip", "netns", "exec", namespace, *command, **options)
+
     def run_many(
-        self,
-        commands: Iterable[tuple[Sequence[object], bool]],
-        guest: Optional[str] = None,
+        self, commands: Any, guest: Optional[str] = None
     ) -> subprocess.CompletedProcess[str]:
         self.batches.append((guest, commands))
         return subprocess.CompletedProcess([], 0, "", "")
 
-    def wait(
-        self,
-        *command: object,
-        attempts: int = 30,
-        interval: float = 1,
-        until: Optional[Callable[[subprocess.CompletedProcess[str]], bool]] = None,
-        guest: Optional[str] = None,
-        input: Optional[str] = None,
-        cwd: Optional[Union[str, Path]] = None,
-        env: Optional[Mapping[str, str]] = None,
-    ) -> subprocess.CompletedProcess[str]:
-        options: dict[str, object] = {
-            "attempts": attempts,
-            "interval": interval,
-        }
-        for name, value in (
-            ("until", until),
-            ("guest", guest),
-            ("input", input),
-            ("cwd", cwd),
-            ("env", env),
-        ):
-            if value is not None:
-                options[name] = value
+    def wait(self, *command: Any, **options: Any) -> subprocess.CompletedProcess[str]:
         self.waits.append((command, options))
-        result = self.run(*command, check=False, guest=guest)
-        condition = until
+        result = self.run(*command, check=False, guest=options.get("guest"))
+        condition = options.get("until")
         if condition is not None and not condition(result):
             raise TimeoutError(command)
         return result
 
 
-def topology_data() -> TopologyData:
+def topology_data() -> dict[str, Any]:
     return {
         "guest": {"name": "central", "hostname": "192.0.2.1", "role": "central"},
         "guests": {
@@ -128,7 +106,7 @@ def topology_data() -> TopologyData:
     }
 
 
-def contains(command: Sequence[object], *parts: object) -> bool:
+def contains(command: Any, *parts: Any) -> bool:
     return any(
         command[index : index + len(parts)] == parts
         for index in range(len(command) - len(parts) + 1)
@@ -153,9 +131,7 @@ def test_runner_executes_locally_and_over_ssh(
 ) -> None:
     calls = []
 
-    def execute(
-        command: list[str], **kwargs: object
-    ) -> subprocess.CompletedProcess[str]:
+    def execute(command: Any, **kwargs: Any) -> Any:
         calls.append((command, kwargs))
         return subprocess.CompletedProcess(command, 0, "ok\n", "")
 
@@ -189,9 +165,7 @@ def test_runner_executes_locally_and_over_ssh(
 def test_runner_uses_configured_driver_connection() -> None:
     calls = []
 
-    def execute(
-        command: list[str], **kwargs: object
-    ) -> subprocess.CompletedProcess[str]:
+    def execute(command: Any, **kwargs: Any) -> Any:
         calls.append(command)
         return subprocess.CompletedProcess(command, 0, "", "")
 
@@ -307,7 +281,7 @@ def test_loads_scale_topology_for_provisioned_guests(tmp_path: Path) -> None:
 
 def test_workload_uses_prepared_scale_topology(tmp_path: Path) -> None:
     runner = FakeRunner()
-    topology: ScaleTopology = {
+    topology = {
         "load_balancer_group": "cluster-lb-group",
         "workers": [
             {
@@ -393,7 +367,7 @@ def test_workload_uses_prepared_scale_topology(tmp_path: Path) -> None:
 
 
 def test_workload_reserves_base_worker_addresses_and_identities(tmp_path: Path) -> None:
-    topology: ScaleTopology = {
+    topology = {
         "load_balancer_group": "cluster-lb-group",
         "workers": [
             {
@@ -433,7 +407,7 @@ def test_workload_reserves_base_worker_addresses_and_identities(tmp_path: Path) 
 
 def test_workload_base_ports_do_not_require_namespace_state(tmp_path: Path) -> None:
     runner = FakeRunner()
-    topology: ScaleTopology = {
+    topology = {
         "load_balancer_group": "cluster-lb-group",
         "workers": [
             {
@@ -752,7 +726,7 @@ def test_workload_adds_every_service_load_balancer(tmp_path: Path) -> None:
 
 def test_workload_reproduces_scale_background_load_balancers(tmp_path: Path) -> None:
     runner = FakeRunner()
-    topology: ScaleTopology = {
+    topology = {
         "load_balancer_group": "cluster-lb-group",
         "workers": [
             {
@@ -836,7 +810,7 @@ def test_ovn_namespace_reproduces_cluster_density_state() -> None:
         "NS_density_0",
         0,
     )
-    endpoints: list[Endpoint] = [
+    endpoints = [
         {
             "ipv4": f"10.0.0.{index}",
             "ipv6": f"fd10::{index}",
@@ -920,7 +894,7 @@ def test_ovn_namespace_cleans_partially_created_address_sets() -> None:
 
 def test_scale_baseline_reuses_worker_topology(tmp_path: Path) -> None:
     runner = FakeRunner()
-    topology: ScaleTopology = {
+    topology = {
         "physical_bridge": "br-provider",
         "load_balancer_group": "cluster-lb-group",
         "workers": [
@@ -1140,10 +1114,8 @@ def test_cleanup_verification_checks_remote_endpoint_state(tmp_path: Path) -> No
         {"startup": 0, "total": 65535, "build_pods": 0},
     ),
 )
-def test_cluster_density_validation_rejects_invalid_values(
-    values: dict[str, object],
-) -> None:
-    config: dict[str, object] = {
+def test_cluster_density_validation_rejects_invalid_values(values: Any) -> None:
+    config = {
         "startup": 1,
         "total": 2,
         "build_pods": 6,
@@ -1160,20 +1132,7 @@ def test_cluster_density_validation_rejects_invalid_values(
     config.update(values)
 
     with pytest.raises(ValueError, match=r".+"):
-        validate_cluster_density(
-            startup=cast(int, config["startup"]),
-            total=cast(int, config["total"]),
-            build_pods=cast(int, config["build_pods"]),
-            test_pods=cast(int, config["test_pods"]),
-            protocols=config["protocols"],
-            timeout=cast(int, config["timeout"]),
-            ipv4=cast(bool, config["ipv4"]),
-            ipv6=cast(bool, config["ipv6"]),
-            mtu=cast(int, config["mtu"]),
-            chassis=cast(int, config["chassis"]),
-            workers=cast(int, config["workers"]),
-            base_pods=cast(int, config["base_pods"]),
-        )
+        validate_cluster_density(**config)
 
 
 def test_cluster_density_validation_accepts_original_defaults() -> None:
@@ -1209,8 +1168,8 @@ def test_cluster_density_validation_accepts_original_defaults() -> None:
         {"initial": 65534},
     ),
 )
-def test_light_validation_rejects_invalid_values(values: dict[str, object]) -> None:
-    config: dict[str, object] = {
+def test_light_validation_rejects_invalid_values(values: Any) -> None:
+    config = {
         "initial": 2,
         "iterations": 1,
         "timeout": 60,
@@ -1222,15 +1181,7 @@ def test_light_validation_rejects_invalid_values(values: dict[str, object]) -> N
     config.update(values)
 
     with pytest.raises(ValueError, match=r".+"):
-        validate_light(
-            initial=cast(int, config["initial"]),
-            iterations=cast(int, config["iterations"]),
-            timeout=cast(int, config["timeout"]),
-            ipv4=cast(bool, config["ipv4"]),
-            ipv6=cast(bool, config["ipv6"]),
-            mtu=cast(int, config["mtu"]),
-            chassis=cast(int, config["chassis"]),
-        )
+        validate_light(**config)
 
 
 def test_light_validation_accepts_address_boundary() -> None:
@@ -1255,8 +1206,8 @@ def test_light_validation_accepts_address_boundary() -> None:
         {"initial": 65534},
     ),
 )
-def test_heavy_validation_rejects_invalid_values(values: dict[str, object]) -> None:
-    config: dict[str, object] = {
+def test_heavy_validation_rejects_invalid_values(values: Any) -> None:
+    config = {
         "initial": 4,
         "iterations": 2,
         "pods_per_service": 2,
@@ -1270,17 +1221,7 @@ def test_heavy_validation_rejects_invalid_values(values: dict[str, object]) -> N
     config.update(values)
 
     with pytest.raises(ValueError, match=r".+"):
-        validate_heavy(
-            initial=cast(int, config["initial"]),
-            iterations=cast(int, config["iterations"]),
-            pods_per_service=cast(int, config["pods_per_service"]),
-            protocols=config["protocols"],
-            timeout=cast(int, config["timeout"]),
-            ipv4=cast(bool, config["ipv4"]),
-            ipv6=cast(bool, config["ipv6"]),
-            mtu=cast(int, config["mtu"]),
-            chassis=cast(int, config["chassis"]),
-        )
+        validate_heavy(**config)
 
 
 def test_environment_configuration_is_parsed() -> None:
@@ -1302,6 +1243,6 @@ def test_environment_integer_rejects_invalid_values() -> None:
 
 
 @pytest.mark.parametrize("value", ("maybe", "", "2"))
-def test_environment_boolean_rejects_invalid_values(value: str) -> None:
+def test_environment_boolean_rejects_invalid_values(value: Any) -> None:
     with pytest.raises(ValueError, match="ENABLED must be a boolean"):
         read_bool({"ENABLED": value}, "ENABLED", True)

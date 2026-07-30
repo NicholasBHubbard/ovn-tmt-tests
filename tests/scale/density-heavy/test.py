@@ -1,12 +1,11 @@
 import os
 from collections.abc import Iterator
 from pathlib import Path
-from typing import TypedDict
+from typing import Any
 
 import pytest
 from ovn_test.command import Runner
 from ovn_test.config import read_bool, read_int, read_list
-from ovn_test.network import ExternalPeers
 from ovn_test.scale import ScaleBaseline, verify_scale_environment
 from ovn_test.topology import Topology
 from ovn_test.workload import (
@@ -16,27 +15,8 @@ from ovn_test.workload import (
 )
 
 
-class HeavyConfig(TypedDict):
-    initial: int
-    iterations: int
-    pods_per_service: int
-    protocols: list[str]
-    timeout: int
-    ipv4: bool
-    ipv6: bool
-    mtu: int
-    chassis: int
-    workers: int
-    total: int
-    base_per_worker: int
-    sync_timeout: int
-
-
-WorkloadFixture = tuple[Workload, HeavyConfig, ExternalPeers]
-
-
 @pytest.fixture
-def workload() -> Iterator[WorkloadFixture]:
+def workload() -> Iterator[Any]:
     topology = Topology.from_environment()
     runner = Runner(topology)
     computes = verify_scale_environment(runner, topology)
@@ -58,7 +38,7 @@ def workload() -> Iterator[WorkloadFixture]:
     measured = total - initial
     if measured % pods_per_service:
         raise ValueError("measured pods must contain complete services")
-    config: HeavyConfig = {
+    config = {
         "initial": initial,
         "iterations": measured // pods_per_service,
         "pods_per_service": pods_per_service,
@@ -68,22 +48,12 @@ def workload() -> Iterator[WorkloadFixture]:
         "ipv6": read_bool(os.environ, "OTT_SCALE_IPV6", True),
         "mtu": read_int(os.environ, "OTT_SCALE_MTU", 1342),
         "chassis": len(computes),
-        "workers": len(scale_topology["workers"]),
-        "total": total,
-        "base_per_worker": base_per_worker,
-        "sync_timeout": sync_timeout,
     }
-    validate_heavy(
-        initial=config["initial"],
-        iterations=config["iterations"],
-        pods_per_service=config["pods_per_service"],
-        protocols=config["protocols"],
-        timeout=config["timeout"],
-        ipv4=config["ipv4"],
-        ipv6=config["ipv6"],
-        mtu=config["mtu"],
-        chassis=config["chassis"],
-    )
+    validate_heavy(**config)
+    config["workers"] = len(scale_topology["workers"])
+    config["total"] = total
+    config["base_per_worker"] = base_per_worker
+    config["sync_timeout"] = sync_timeout
     baseline = ScaleBaseline(
         runner,
         computes,
@@ -125,7 +95,7 @@ def workload() -> Iterator[WorkloadFixture]:
         baseline.verify_cleanup()
 
 
-def test_density_heavy(workload: WorkloadFixture) -> None:
+def test_density_heavy(workload: Any) -> None:
     instance, config, external = workload
     instance.measure("startup", "namespace", instance.create_namespace)
 

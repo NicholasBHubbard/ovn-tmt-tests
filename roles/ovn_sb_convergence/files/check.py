@@ -3,48 +3,23 @@ import json
 import os
 import subprocess
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from pathlib import Path
-from typing import TypedDict, cast
+from typing import Any
 
 
-class ConvergenceConfig(TypedDict, total=False):
-    timeout: int
-    nbctl: list[str]
-    sbctl: list[str]
-    started_ns: int
-    datapaths: list[str]
-    ports: list[str]
-    absent_datapaths: list[str]
-    absent_ports: list[str]
-
-
-class CheckResult(TypedDict):
-    duration_seconds: float
-    datapaths: int
-    ports: int
-
-
-def _decode(value: object) -> object:
+def _decode(value: Any) -> Any:
     if not isinstance(value, list) or len(value) != 2:
         return value
     kind, contents = value
-    if not isinstance(kind, str):
-        return value
-    if kind == "map" and isinstance(contents, list):
-        result = {}
-        for pair in contents:
-            if not isinstance(pair, list) or len(pair) != 2:
-                return value
-            key, item = pair
-            result[_decode(key)] = _decode(item)
-        return result
-    if kind == "set" and isinstance(contents, list):
+    if kind == "map":
+        return {_decode(key): _decode(item) for key, item in contents}
+    if kind == "set":
         return [_decode(item) for item in contents]
     return contents if kind in {"uuid", "named-uuid"} else value
 
 
-def _rows(command: Sequence[str], table: str, *columns: str) -> list[dict[str, object]]:
+def _rows(command: Sequence[str], table: str, *columns: str) -> list[dict[str, Any]]:
     output = subprocess.run(
         [
             *command,
@@ -68,7 +43,7 @@ def _rows(command: Sequence[str], table: str, *columns: str) -> list[dict[str, o
     ]
 
 
-def verify(expected: ConvergenceConfig, actual: Mapping[str, set[str]]) -> None:
+def verify(expected: dict[str, Any], actual: dict[str, Any]) -> None:
     problems = {}
     for kind in ("datapaths", "ports"):
         values = expected.get(kind, [])
@@ -93,7 +68,7 @@ def verify(expected: ConvergenceConfig, actual: Mapping[str, set[str]]) -> None:
         raise RuntimeError(f"Southbound topology did not converge: {summary}")
 
 
-def check(config: ConvergenceConfig) -> CheckResult:
+def check(config: dict[str, Any]) -> dict[str, Any]:
     timeout = config["timeout"]
     if isinstance(timeout, bool) or not isinstance(timeout, int) or timeout < 1:
         raise ValueError("timeout must be a positive integer")
@@ -119,19 +94,16 @@ def check(config: ConvergenceConfig) -> CheckResult:
     if duration < 0:
         raise ValueError("started_ns cannot be in the future")
 
-    datapaths = set()
-    for row in _rows(config["sbctl"], "Datapath_Binding", "external_ids"):
-        external_ids = row["external_ids"]
-        if isinstance(external_ids, dict):
-            name = {str(key): value for key, value in external_ids.items()}.get("name")
-            if isinstance(name, str):
-                datapaths.add(name)
+    datapaths = {
+        row["external_ids"].get("name")
+        for row in _rows(config["sbctl"], "Datapath_Binding", "external_ids")
+    }
     ports = {
-        str(row["logical_port"])
+        row["logical_port"]
         for row in _rows(config["sbctl"], "Port_Binding", "logical_port")
     }
     actual = {
-        "datapaths": datapaths,
+        "datapaths": datapaths - {None},
         "ports": ports,
     }
     verify(config, actual)
@@ -143,13 +115,12 @@ def check(config: ConvergenceConfig) -> CheckResult:
 
 
 def main() -> None:
-    config = cast(
-        ConvergenceConfig,
-        json.loads(base64.b64decode(os.environ["OVN_SB_CONVERGENCE_CONFIG"]).decode()),
+    config = json.loads(
+        base64.b64decode(os.environ["OVN_SB_CONVERGENCE_CONFIG"]).decode()
     )
     if path := os.environ.get("OVN_SB_CONVERGENCE_STATE_PATH"):
         state = json.loads(Path(path).read_text())
-        config.update(cast(ConvergenceConfig, state.get("southbound", state)))
+        config.update(state.get("southbound", state))
     print(json.dumps(check(config)))
 
 

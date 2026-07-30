@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import pytest
 from ovn_test.ansible import Ansible
@@ -60,7 +60,7 @@ def ssl_configuration(
 
 class TestPreconditions:
     @pytest.mark.parametrize("process", ("ovn-northd", "ovn-controller"))
-    def test_ovn_process_is_absent(self, runner: Runner, process: str) -> None:
+    def test_ovn_process_is_absent(self, runner: Runner, process: Any) -> None:
         assert processes(runner, process) == []
 
     def test_southbound_database_is_unavailable(self, runner: Runner) -> None:
@@ -184,7 +184,7 @@ class TestResult:
         (("central", 1), ("compute-1", 2), ("compute-2", 1)),
     )
     def test_provider_mesh_tunnels(
-        self, runner: Runner, guest: str, expected: int
+        self, runner: Runner, guest: str, expected: Any
     ) -> None:
         if os.environ.get("OTT_EXPECTED_CHASSIS") != "2":
             pytest.skip("provider mesh belongs to the standard plan")

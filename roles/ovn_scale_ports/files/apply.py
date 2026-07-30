@@ -4,56 +4,21 @@ import subprocess
 import time
 from collections.abc import Sequence
 from pathlib import Path
-from typing import TypedDict, cast
+from typing import Any
 
 OWNER = "ovn-tmt-tests-owner"
-Command = list[object]
-CommandGroup = list[Command]
 
 
-class Port(TypedDict):
-    name: str
-    interface: str
-    switch: str
-    bridge: str
-    addresses: str
-    mtu: int
-
-
-class Southbound(TypedDict):
-    datapaths: list[str]
-    ports: list[str]
-    absent_datapaths: list[str]
-    absent_ports: list[str]
-    started_ns: int
-
-
-class State(TypedDict):
-    owner: str
-    nbctl: list[str]
-    ovs_vsctl: list[str]
-    ports: list[Port]
-    southbound: Southbound
-
-
-def _decode(value: object) -> object:
+def _decode(value: Any) -> Any:
     if not isinstance(value, list) or len(value) != 2:
         return value
     kind, contents = value
-    if not isinstance(kind, str):
-        return value
     if kind in {"uuid", "named-uuid"}:
         return contents
-    if kind == "set" and isinstance(contents, list):
+    if kind == "set":
         return [_decode(item) for item in contents]
-    if kind == "map" and isinstance(contents, list):
-        result = {}
-        for pair in contents:
-            if not isinstance(pair, list) or len(pair) != 2:
-                return value
-            key, item = pair
-            result[_decode(key)] = _decode(item)
-        return result
+    if kind == "map":
+        return {_decode(key): _decode(item) for key, item in contents}
     return value
 
 
@@ -66,7 +31,7 @@ def _run(command: Sequence[object]) -> str:
     ).stdout.strip()
 
 
-def _rows(command: Sequence[str], table: str, *columns: str) -> list[dict[str, object]]:
+def _rows(command: Sequence[str], table: str, *columns: str) -> list[dict[str, Any]]:
     result = json.loads(
         _run(
             [
@@ -88,9 +53,7 @@ def _rows(command: Sequence[str], table: str, *columns: str) -> list[dict[str, o
     ]
 
 
-def _batch(
-    command: Sequence[str], groups: Sequence[CommandGroup], size: int = 50
-) -> None:
+def _batch(command: Sequence[str], groups: Sequence[Any], size: int = 50) -> None:
     for offset in range(0, len(groups), size):
         arguments = []
         for group in groups[offset : offset + size]:
@@ -102,56 +65,39 @@ def _batch(
             _run([*command, *arguments])
 
 
-def _quoted(value: object) -> str:
+def _quoted(value: Any) -> str:
     return json.dumps(value, separators=(",", ":"))
 
 
-def _external_id(key: str, value: object) -> str:
+def _external_id(key: str, value: Any) -> str:
     return f"external_ids:{key}={_quoted(value)}"
 
 
-def _references(rows: Sequence[dict[str, object]], column: str) -> dict[str, str]:
-    result: dict[str, str] = {}
+def _references(rows: Sequence[dict[str, Any]], column: str) -> dict[str, str]:
+    result = {}
     for row in rows:
         values = row[column]
         values = values if isinstance(values, list) else [values]
-        name = row["name"]
-        if not isinstance(name, str):
-            raise TypeError("OVSDB name is not text")
-        result.update({str(value): name for value in values if value})
+        result.update({value: row["name"] for value in values if value})
     return result
 
 
-def _external_ids(row: dict[str, object]) -> dict[str, object]:
-    value = row.get("external_ids", {})
-    if not isinstance(value, dict):
-        return {}
-    return {str(key): item for key, item in value.items()}
-
-
-def _text(row: dict[str, object], column: str) -> str:
-    value = row[column]
-    if not isinstance(value, str):
-        raise TypeError(f"OVSDB {column} is not text")
-    return value
-
-
-def _configure_nb(state: State) -> None:
+def _configure_nb(state: dict[str, Any]) -> None:
     command = state["nbctl"]
     owner = state["owner"]
     switches = _rows(command, "Logical_Switch", "_uuid", "name", "ports")
     rows = _rows(command, "Logical_Switch_Port", "_uuid", "name", "external_ids")
     parents = _references(switches, "ports")
-    current = {str(row["name"]): row for row in rows}
+    current = {row["name"]: row for row in rows}
     wanted = {port["name"] for port in state["ports"]}
-    groups: list[CommandGroup] = []
+    groups = []
 
     for port in state["ports"]:
         name = port["name"]
         row = current.get(name)
-        commands: CommandGroup = []
+        commands = []
         if row:
-            parent = parents.get(_text(row, "_uuid"))
+            parent = parents.get(row["_uuid"])
             if parent != port["switch"]:
                 commands.extend(
                     [
@@ -179,31 +125,31 @@ def _configure_nb(state: State) -> None:
         groups.append(commands)
 
     stale = [
-        _text(row, "name")
+        row["name"]
         for row in rows
-        if _external_ids(row).get(OWNER) == owner and row["name"] not in wanted
+        if row.get("external_ids", {}).get(OWNER) == owner and row["name"] not in wanted
     ]
     groups.extend([[["--if-exists", "lsp-del", name]] for name in stale])
     state["southbound"]["absent_ports"] = sorted(stale)
     _batch(command, groups)
 
 
-def _configure_ovs(state: State) -> None:
+def _configure_ovs(state: dict[str, Any]) -> None:
     owner = state["owner"]
     command = state["ovs_vsctl"]
     bridges = _rows(command, "Bridge", "_uuid", "name", "ports")
     rows = _rows(command, "Port", "_uuid", "name", "external_ids")
     parents = _references(bridges, "ports")
-    current = {str(row["name"]): row for row in rows}
+    current = {row["name"]: row for row in rows}
     wanted = {port["interface"] for port in state["ports"]}
-    groups: list[CommandGroup] = []
+    groups = []
 
     for port in state["ports"]:
         interface = port["interface"]
         row = current.get(interface)
-        commands: CommandGroup = []
+        commands = []
         if row:
-            parent = parents.get(_text(row, "_uuid"))
+            parent = parents.get(row["_uuid"])
             if parent != port["bridge"]:
                 commands.extend(
                     [
@@ -236,12 +182,12 @@ def _configure_ovs(state: State) -> None:
     groups.extend(
         [["--if-exists", "del-port", row["name"]]]
         for row in rows
-        if _external_ids(row).get(OWNER) == owner and row["name"] not in wanted
+        if row.get("external_ids", {}).get(OWNER) == owner and row["name"] not in wanted
     )
     _batch(command, groups)
 
 
-def apply(state: State) -> None:
+def apply(state: dict[str, Any]) -> None:
     state["southbound"]["started_ns"] = time.monotonic_ns()
     _configure_nb(state)
     _configure_ovs(state)
@@ -250,7 +196,7 @@ def apply(state: State) -> None:
 def main() -> None:
     path = Path(os.environ["OVN_SCALE_PORTS_PATH"])
     state = json.loads(path.read_text())
-    apply(cast(State, state))
+    apply(state)
     path.write_text(json.dumps(state))
 
 

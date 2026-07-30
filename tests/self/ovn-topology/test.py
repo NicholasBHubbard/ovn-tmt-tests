@@ -1,7 +1,7 @@
 import json
 import os
 import time
-from typing import Optional
+from typing import Any, Optional
 
 import pytest
 from ovn_test.command import Runner
@@ -29,29 +29,27 @@ def sb(runner: Runner) -> Ovsdb:
     return Ovsdb(runner, "ovn-sbctl")
 
 
-def scale_rows(nb: Ovsdb, table: str) -> list[dict[str, object]]:
+def scale_rows(nb: Ovsdb, table: str) -> list[dict[str, Any]]:
     return nb.find(table, f"{OWNER}self-scale", columns=("_uuid", "name"))
 
 
-def scale_managed_rows(nb: Ovsdb, table: str) -> list[dict[str, object]]:
+def scale_managed_rows(nb: Ovsdb, table: str) -> list[dict[str, Any]]:
     return [
         row
         for row in nb.find(table, columns=("_uuid", "external_ids"))
-        if str(
-            nb.row_mapping(row, "external_ids").get("ovn-tmt-tests-id", "")
-        ).startswith("self-scale:")
+        if row["external_ids"].get("ovn-tmt-tests-id", "").startswith("self-scale:")
     ]
 
 
-def scale_gateway_rows(nb: Ovsdb) -> list[dict[str, object]]:
+def scale_gateway_rows(nb: Ovsdb) -> list[dict[str, Any]]:
     return [
         row
         for row in nb.find("Gateway_Chassis", columns=("_uuid", "name"))
-        if nb.text(row, "name").startswith("self-scale:")
+        if row["name"].startswith("self-scale:")
     ]
 
 
-def assert_scale_counts(nb: Ovsdb, workers: int) -> None:
+def assert_scale_counts(nb: Ovsdb, workers: Any) -> None:
     assert len(scale_rows(nb, "Logical_Switch")) == 1 + 2 * workers
     assert len(scale_rows(nb, "Logical_Router")) == 1 + workers
     assert len(scale_rows(nb, "Logical_Router_Port")) == 1 + 3 * workers
@@ -69,7 +67,7 @@ def assert_scale_counts(nb: Ovsdb, workers: int) -> None:
     )
 
 
-def assert_scale_group_attachments(nb: Ovsdb, workers: int) -> None:
+def assert_scale_group_attachments(nb: Ovsdb, workers: Any) -> None:
     group = nb.by_name(
         "Load_Balancer_Group",
         "cluster-lb-group1",
@@ -85,7 +83,7 @@ def assert_scale_group_attachments(nb: Ovsdb, workers: int) -> None:
     ) == {f"gwrouter-ovn-scale-{index}" for index in range(workers)}
 
 
-def assert_scale_external_vlans(nb: Ovsdb, workers: int) -> None:
+def assert_scale_external_vlans(nb: Ovsdb, workers: Any) -> None:
     for index in {0, workers - 1}:
         port = nb.by_name(
             "Logical_Switch_Port",
@@ -97,7 +95,7 @@ def assert_scale_external_vlans(nb: Ovsdb, workers: int) -> None:
         assert port["tag_request"] == index + 1
 
 
-def scale_southbound_names(workers: int) -> tuple[set[str], set[str]]:
+def scale_southbound_names(workers: Any) -> tuple[set[str], set[str]]:
     names = [f"ovn-scale-{index}" for index in range(workers)]
     datapaths = {"ls-join1", "lr-cluster1"}
     ports = {"ls-join1-to-rtr"}
@@ -120,19 +118,16 @@ def scale_southbound_names(workers: int) -> tuple[set[str], set[str]]:
     return datapaths, ports
 
 
-def southbound_names(sb: Ovsdb) -> tuple[set[str], set[str]]:
-    datapaths = set()
-    for external_ids in sb.values("Datapath_Binding", "external_ids"):
-        if not isinstance(external_ids, dict):
-            raise TypeError("Datapath_Binding.external_ids is not a mapping")
-        name = {str(key): value for key, value in external_ids.items()}.get("name")
-        if name is not None:
-            datapaths.add(str(name))
-    ports = {str(value) for value in sb.values("Port_Binding", "logical_port")}
-    return datapaths, ports
+def southbound_names(sb: Ovsdb) -> tuple[set[Any], set[Any]]:
+    datapaths = {
+        external_ids.get("name")
+        for external_ids in sb.values("Datapath_Binding", "external_ids")
+    }
+    ports = set(sb.values("Port_Binding", "logical_port"))
+    return datapaths - {None}, ports
 
 
-def assert_scale_southbound(sb: Ovsdb, workers: int) -> None:
+def assert_scale_southbound(sb: Ovsdb, workers: Any) -> None:
     expected_datapaths, expected_ports = scale_southbound_names(workers)
     datapaths, ports = southbound_names(sb)
     assert expected_datapaths <= datapaths
@@ -157,10 +152,10 @@ def scale_chassis_sync(runner: Runner) -> int:
 
 def assert_scale_chassis(runner: Runner, nb: Ovsdb, sb: Ovsdb) -> str:
     timeout = scale_chassis_sync(runner)
-    nb_cfg = nb.integer(nb.one("NB_Global", columns=("nb_cfg",)), "nb_cfg")
+    nb_cfg = nb.value("NB_Global", "nb_cfg")
     row = sb.by_name("Chassis", SCALE_CHASSIS, "_uuid")
     private = sb.by_name("Chassis_Private", SCALE_CHASSIS, "nb_cfg")
-    assert sb.integer(private, "nb_cfg") >= nb_cfg
+    assert private["nb_cfg"] >= nb_cfg
     assert (
         runner.output(
             "ovn-appctl",
@@ -172,7 +167,6 @@ def assert_scale_chassis(runner: Runner, nb: Ovsdb, sb: Ovsdb) -> str:
     )
 
     logical_port = f"cr-rtr-to-node-{SCALE_CHASSIS}"
-    chassis_uuid = sb.text(row, "_uuid")
     runner.wait(
         "ovn-sbctl",
         "--bare",
@@ -182,7 +176,7 @@ def assert_scale_chassis(runner: Runner, nb: Ovsdb, sb: Ovsdb) -> str:
         f"logical_port={logical_port}",
         attempts=timeout * 5,
         interval=0.2,
-        until=lambda result: chassis_uuid in result.stdout,
+        until=lambda result, uuid=row["_uuid"]: uuid in result.stdout,
     )
     binding = sb.one(
         "Port_Binding",
@@ -191,11 +185,11 @@ def assert_scale_chassis(runner: Runner, nb: Ovsdb, sb: Ovsdb) -> str:
         columns=("chassis",),
     )
     assert binding["chassis"] == row["_uuid"]
-    return chassis_uuid
+    return row["_uuid"]
 
 
-def scale_ports(count: int) -> list[dict[str, object]]:
-    result: list[dict[str, object]] = []
+def scale_ports(count: int) -> list[dict[str, Any]]:
+    result = []
     for index in range(count):
         mac = "02:0a:" + ":".join(
             f"{index >> shift & 255:02x}" for shift in (24, 16, 8, 0)
@@ -212,7 +206,7 @@ def scale_ports(count: int) -> list[dict[str, object]]:
     return result
 
 
-def scale_port_rows(nb: Ovsdb) -> list[dict[str, object]]:
+def scale_port_rows(nb: Ovsdb) -> list[dict[str, Any]]:
     return nb.find(
         "Logical_Switch_Port",
         f"{OWNER}{json.dumps(f'self-scale-ports:{SCALE_CHASSIS}')}",
@@ -239,8 +233,7 @@ def assert_scale_ports(
         assert nb.referring_names("Logical_Switch", "ports", row["_uuid"]) == [
             port["switch"]
         ]
-        chassis = sb.by_name("Chassis", str(port["chassis"]), "_uuid")
-        chassis_uuid = sb.text(chassis, "_uuid")
+        chassis = sb.by_name("Chassis", port["chassis"], "_uuid")
         runner.wait(
             "ovn-sbctl",
             "--bare",
@@ -250,7 +243,7 @@ def assert_scale_ports(
             f"logical_port={port['name']}",
             attempts=timeout * 5,
             interval=0.2,
-            until=lambda result, uuid=chassis_uuid: uuid in result.stdout,
+            until=lambda result, uuid=chassis["_uuid"]: uuid in result.stdout,
         )
         assert (
             sb.one(
@@ -363,7 +356,7 @@ class TestInitial:
         )
 
         assert port["mac"] == "02:00:00:00:10:01"
-        assert sorted(nb.strings(port, "networks")) == [
+        assert sorted(port["networks"]) == [
             "192.0.2.254/24",
             "2001:db8:1::ff/64",
         ]
@@ -372,7 +365,7 @@ class TestInitial:
             "redirect-type": "bridged",
         }
         assert switch_port["type"] == "router"
-        assert nb.row_mapping(switch_port, "options")["router-port"] == "self-rp"
+        assert switch_port["options"]["router-port"] == "self-rp"
         assert switch_port["addresses"] == "router"
         assert nb.referring_names("Logical_Router", "ports", port["_uuid"]) == [
             "self-r1"
@@ -406,7 +399,7 @@ class TestInitial:
         )
 
         assert localnet["type"] == "localnet"
-        assert nb.row_mapping(localnet, "options")["network_name"] == "self-provider"
+        assert localnet["options"]["network_name"] == "self-provider"
         assert localnet["tag"] == 100
         assert localnet["addresses"] == "unknown"
         assert nb.referring_names("Logical_Switch", "ports", localnet["_uuid"]) == [
@@ -439,10 +432,10 @@ class TestInitial:
         dhcp_v6 = nb.managed("DHCP_Options", "self-dhcp-v6", "_uuid", "cidr", "options")
 
         assert dhcp["cidr"] == "192.0.2.0/24"
-        assert nb.row_mapping(dhcp, "options")["lease_time"] == "3600"
-        assert nb.row_mapping(dhcp, "options")["ip_forward_enable"] == "0"
+        assert dhcp["options"]["lease_time"] == "3600"
+        assert dhcp["options"]["ip_forward_enable"] == "0"
         assert dhcp_v6["cidr"] == "2001:db8:1::/64"
-        assert nb.row_mapping(dhcp_v6, "options")["dns_server"] == "2001:db8::53"
+        assert dhcp_v6["options"]["dns_server"] == "2001:db8::53"
         assert nb.exists("DHCP_Options", f"{MANAGED}self-dhcp-delete")
         snapshots.save("dhcp", dhcp["_uuid"])
         snapshots.save("dhcp-v6", dhcp_v6["_uuid"])
@@ -517,7 +510,7 @@ class TestInitial:
             "192.0.2.100:80": "192.0.2.1:8080,192.0.2.2:8080",
             "192.0.2.101:80": "192.0.2.3:8080",
         }
-        assert nb.row_mapping(load_balancer, "options")["reject"] == "true"
+        assert load_balancer["options"]["reject"] == "true"
         assert load_balancer["selection_fields"] == "ip_src"
         assert sorted(
             nb.referring_names(
@@ -641,27 +634,21 @@ class TestScaleInitial:
         assert_scale_southbound(sb, 3)
 
         assert sorted(
-            nb.strings(
-                nb.by_name(
-                    "Logical_Router_Port",
-                    "rtr-to-node-ovn-scale-0",
-                    "networks",
-                ),
+            nb.by_name(
+                "Logical_Router_Port",
+                "rtr-to-node-ovn-scale-0",
                 "networks",
-            )
+            )["networks"]
         ) == [
             "16.0.255.254/16",
             "16::ffff:ffff:ffff:fffe/64",
         ]
         assert sorted(
-            nb.strings(
-                nb.by_name(
-                    "Logical_Router_Port",
-                    "gw-to-join-ovn-scale-0",
-                    "networks",
-                ),
+            nb.by_name(
+                "Logical_Router_Port",
+                "gw-to-join-ovn-scale-0",
                 "networks",
-            )
+            )["networks"]
         ) == [
             "30.0.255.253/16",
             "30::ffff:ffff:ffff:fffd/64",
@@ -730,14 +717,11 @@ class TestScaleExpanded:
             "_uuid",
         )["_uuid"] == snapshots.load("scale-worker-port")
         assert sorted(
-            nb.strings(
-                nb.by_name(
-                    "Logical_Router_Port",
-                    "rtr-to-node-ovn-scale-499",
-                    "networks",
-                ),
+            nb.by_name(
+                "Logical_Router_Port",
+                "rtr-to-node-ovn-scale-499",
                 "networks",
-            )
+            )["networks"]
         ) == [
             "16::1f3:ffff:ffff:ffff:fffe/64",
             "17.243.255.254/16",
@@ -831,7 +815,7 @@ class TestResult:
         assert port["_uuid"] == snapshots.load("router-port")
         assert switch_port["_uuid"] == snapshots.load("router-switch-port")
         assert port["mac"] == "02:00:00:00:10:03"
-        assert sorted(nb.strings(port, "networks")) == [
+        assert sorted(port["networks"]) == [
             "2001:db8:2::ff/64",
             "203.0.113.1/24",
         ]
@@ -869,9 +853,7 @@ class TestResult:
         )
 
         assert localnet["type"] == "localnet"
-        assert (
-            nb.row_mapping(localnet, "options")["network_name"] == "self-provider-moved"
-        )
+        assert localnet["options"]["network_name"] == "self-provider-moved"
         assert localnet["tag"] == []
         assert localnet["addresses"] == "unknown"
         assert nb.referring_names("Logical_Switch", "ports", localnet["_uuid"]) == [
@@ -928,7 +910,7 @@ class TestResult:
         assert dhcp["_uuid"] == snapshots.load("dhcp-moved")
         assert dhcp_v6["_uuid"] == snapshots.load("dhcp-v6")
         assert dhcp_v6["cidr"] == "2001:db8:1::/64"
-        assert nb.row_mapping(dhcp_v6, "options")["dns_server"] == "2001:db8::53"
+        assert dhcp_v6["options"]["dns_server"] == "2001:db8::53"
         assert not nb.exists("DHCP_Options", f"{MANAGED}self-dhcp-delete")
         assert nb.exists("DHCP_Options", "cidr=10.10.0.0/24")
 
@@ -1134,8 +1116,7 @@ class TestScaleResult:
             f"name=rtr-to-node-{name}",
         )
         assert not scale_managed_rows(nb, "NAT") or all(
-            name
-            not in str(nb.row_mapping(row, "external_ids").get("ovn-tmt-tests-id", ""))
+            name not in row["external_ids"]["ovn-tmt-tests-id"]
             for row in scale_managed_rows(nb, "NAT")
         )
 

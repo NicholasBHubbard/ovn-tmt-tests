@@ -5,21 +5,15 @@ import os
 import time
 from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
-from typing import Callable, Optional, TypeVar, Union, cast
+from typing import Any, Callable, Optional, TypeVar, Union
 
-from ovn_test.command import Runner
 from ovn_test.load_balancer import replace, socket
-from ovn_test.models import Endpoint, ScaleTopology
 
 T = TypeVar("T")
 
 
 def _command(*parts: object, check: bool = True) -> tuple[tuple[object, ...], bool]:
     return parts, check
-
-
-def _address(endpoint: Endpoint, family: int) -> str:
-    return endpoint["ipv4"] if family == 4 else endpoint["ipv6"]
 
 
 def _positive(name: str, value: int) -> None:
@@ -113,8 +107,8 @@ def validate_heavy(
 
 def load_scale_topology(
     path: Union[str, os.PathLike[str]], computes: Sequence[str]
-) -> ScaleTopology:
-    topology = cast(ScaleTopology, json.loads(Path(path).read_text()))
+) -> dict[str, Any]:
+    topology = json.loads(Path(path).read_text())
     workers = topology.get("workers", [])
     if not workers:
         raise ValueError("scale topology does not contain workers")
@@ -132,7 +126,7 @@ def load_scale_topology(
 class Workload:
     def __init__(
         self,
-        runner: Runner,
+        runner: Any,
         computes: Sequence[str],
         name: str,
         prefix: str,
@@ -142,7 +136,7 @@ class Workload:
         mtu: int = 1342,
         timeout: int = 60,
         sync_timeout: Optional[int] = None,
-        scale_topology: Optional[ScaleTopology] = None,
+        scale_topology: Optional[dict[str, Any]] = None,
         base_ports_per_worker: int = 0,
     ) -> None:
         self.runner = runner
@@ -182,9 +176,9 @@ class Workload:
         self.metrics_file.parent.mkdir(parents=True, exist_ok=True)
         self.metrics_file.write_text("iteration,phase,duration_ns\n")
 
-    def endpoint(self, index: int) -> Endpoint:
+    def endpoint(self, index: int) -> dict[str, Any]:
         value = index + 1
-        endpoint: Endpoint = {
+        endpoint: dict[str, Any] = {
             "guest": self.computes[index % len(self.computes)],
             "namespace": f"{self.prefix}{index:05d}",
             "interface": f"{self.prefix}{index:05d}-p",
@@ -222,14 +216,9 @@ class Workload:
             network = ipaddress.ip_network(worker["internal"][f"ipv{version}"])
             if local_index >= network.num_addresses - 2:
                 raise ValueError(f"worker {worker['name']} address space is exhausted")
-            if version == 4:
-                endpoint["ipv4"] = str(network[local_index])
-                endpoint["gateway4"] = str(network[-2])
-                endpoint["prefix4"] = network.prefixlen
-            else:
-                endpoint["ipv6"] = str(network[local_index])
-                endpoint["gateway6"] = str(network[-2])
-                endpoint["prefix6"] = network.prefixlen
+            endpoint[f"ipv{version}"] = str(network[local_index])
+            endpoint[f"gateway{version}"] = str(network[-2])
+            endpoint[f"prefix{version}"] = network.prefixlen
         return endpoint
 
     def service_name(self, service: int, protocol: str, family: int) -> str:
@@ -306,7 +295,7 @@ class Workload:
         phase: str,
         passive: bool = False,
         converge: bool = True,
-    ) -> Endpoint:
+    ) -> dict[str, Any]:
         endpoint = self.endpoint(index)
         self.endpoints.append(endpoint)
         addresses = [endpoint["mac"]]
@@ -333,7 +322,7 @@ class Workload:
         )
         for family, enabled in enumerate((self.ipv4_enabled, self.ipv6_enabled)):
             if enabled and self.address_set_ids[family] is not None:
-                address = _address(endpoint, family * 2 + 4)
+                address = endpoint[f"ipv{family * 2 + 4}"]
                 self.runner.run(
                     "ovn-nbctl",
                     "add",
@@ -567,7 +556,7 @@ class Workload:
                     {
                         self._socket(self.vip(service, family), 80, family): [
                             self._socket(
-                                _address(endpoint, family),
+                                endpoint[f"ipv{family}"],
                                 8080,
                                 family,
                             )
@@ -591,7 +580,7 @@ class Workload:
         ):
             if not enabled:
                 continue
-            destination = _address(target, family)
+            destination = target[f"ipv{family}"]
             self.runner.wait(
                 "ip",
                 "netns",
@@ -610,7 +599,7 @@ class Workload:
             )
         self.record_metric(index, "connectivity", start)
 
-    def _remove_endpoint(self, endpoint: Endpoint) -> None:
+    def _remove_endpoint(self, endpoint: dict[str, Any]) -> None:
         self.runner.run(
             "ovn-nbctl",
             "--if-exists",
@@ -633,7 +622,7 @@ class Workload:
         )
         endpoint["removed"] = True
 
-    def remove_endpoint(self, endpoint: Endpoint) -> None:
+    def remove_endpoint(self, endpoint: dict[str, Any]) -> None:
         self._remove_endpoint(endpoint)
 
     def _named_uuid(self, table: str, name: str) -> str:
@@ -656,10 +645,13 @@ class Workload:
         start = time.time_ns()
         first_error = None
 
-        def attempt(action: Callable[[], object]) -> None:
+        def attempt(*command: object, **kwargs: Any) -> None:
             nonlocal first_error
             try:
-                action()
+                if command:
+                    self.runner.run(*command, **kwargs)
+                else:
+                    kwargs["action"]()
             except Exception as error:
                 if first_error is None:
                     first_error = error
@@ -667,29 +659,20 @@ class Workload:
         for endpoint in self.endpoints:
             if endpoint.get("removed"):
                 continue
-            attempt(lambda endpoint=endpoint: self._remove_endpoint(endpoint))
+            attempt(action=lambda endpoint=endpoint: self._remove_endpoint(endpoint))
         for load_balancer in self.load_balancers:
-            attempt(
-                lambda name=load_balancer: self.runner.run(
-                    "ovn-nbctl", "--if-exists", "lb-del", name
-                )
-            )
+            attempt("ovn-nbctl", "--if-exists", "lb-del", load_balancer)
         if not self.workers:
-            attempt(
-                lambda: self.runner.run("ovn-nbctl", "--if-exists", "ls-del", self.name)
-            )
+            attempt("ovn-nbctl", "--if-exists", "ls-del", self.name)
         for port_group in self.port_groups:
-            attempt(lambda name=port_group: self._destroy_named("Port_Group", name))
-        for address_set in self.address_sets:
-            attempt(lambda name=address_set: self._destroy_named("Address_Set", name))
-        attempt(
-            lambda: self.runner.run(
-                "ovn-nbctl",
-                "--wait=hv",
-                f"--timeout={self.sync_timeout}",
-                "sync",
+            attempt(
+                action=lambda name=port_group: self._destroy_named("Port_Group", name)
             )
-        )
+        for address_set in self.address_sets:
+            attempt(
+                action=lambda name=address_set: self._destroy_named("Address_Set", name)
+            )
+        attempt("ovn-nbctl", "--wait=hv", f"--timeout={self.sync_timeout}", "sync")
         self.cleaned = first_error is None
         self.record_metric("cleanup", "cleanup", start)
         if first_error is not None:

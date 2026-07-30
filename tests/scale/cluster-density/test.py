@@ -2,12 +2,11 @@ import os
 from collections.abc import Iterator
 from functools import partial
 from pathlib import Path
-from typing import Callable, TypedDict
+from typing import Any, Callable
 
 import pytest
 from ovn_test.command import Runner
 from ovn_test.config import read_bool, read_int, read_list
-from ovn_test.models import Endpoint
 from ovn_test.namespace import OvnNamespace, validate_cluster_density
 from ovn_test.ovsdb import Ovsdb
 from ovn_test.scale import ScaleBaseline, verify_scale_environment
@@ -15,27 +14,8 @@ from ovn_test.topology import Topology
 from ovn_test.workload import Workload, load_scale_topology
 
 
-class ClusterConfig(TypedDict):
-    startup: int
-    total: int
-    build_pods: int
-    test_pods: int
-    protocols: list[str]
-    timeout: int
-    ipv4: bool
-    ipv6: bool
-    mtu: int
-    chassis: int
-    workers: int
-    base_pods: int
-    sync_timeout: int
-
-
-WorkloadFixture = tuple[Workload, list[OvnNamespace], ClusterConfig, str, ScaleBaseline]
-
-
 @pytest.fixture
-def workload() -> Iterator[WorkloadFixture]:
+def workload() -> Iterator[Any]:
     topology = Topology.from_environment()
     runner = Runner(topology)
     computes = verify_scale_environment(runner, topology)
@@ -43,7 +23,7 @@ def workload() -> Iterator[WorkloadFixture]:
         os.environ["OTT_SCALE_TOPOLOGY_PATH"],
         computes,
     )
-    config: ClusterConfig = {
+    config: dict[str, Any] = {
         "startup": read_int(os.environ, "OTT_SCALE_INITIAL_NAMESPACES", 3800),
         "total": read_int(os.environ, "OTT_SCALE_TOTAL_NAMESPACES", 4000),
         "build_pods": read_int(
@@ -79,18 +59,7 @@ def workload() -> Iterator[WorkloadFixture]:
         ),
     }
     validate_cluster_density(
-        startup=config["startup"],
-        total=config["total"],
-        build_pods=config["build_pods"],
-        test_pods=config["test_pods"],
-        protocols=config["protocols"],
-        timeout=config["timeout"],
-        ipv4=config["ipv4"],
-        ipv6=config["ipv6"],
-        mtu=config["mtu"],
-        chassis=config["chassis"],
-        workers=config["workers"],
-        base_pods=config["base_pods"],
+        **{key: value for key, value in config.items() if key != "sync_timeout"}
     )
     if config["sync_timeout"] < 1:
         raise ValueError("scale sync timeout must be positive")
@@ -124,14 +93,12 @@ def workload() -> Iterator[WorkloadFixture]:
         scale_topology=scale_topology,
         base_ports_per_worker=config["base_pods"],
     )
-    group = str(
-        Ovsdb(runner, "ovn-nbctl").by_name(
-            "Load_Balancer_Group",
-            scale_topology["load_balancer_group"],
-            "_uuid",
-        )["_uuid"]
-    )
-    namespaces: list[OvnNamespace] = []
+    group = Ovsdb(runner, "ovn-nbctl").by_name(
+        "Load_Balancer_Group",
+        scale_topology["load_balancer_group"],
+        "_uuid",
+    )["_uuid"]
+    namespaces = []
 
     try:
         baseline.create()
@@ -139,7 +106,7 @@ def workload() -> Iterator[WorkloadFixture]:
     finally:
         first_error = None
 
-        def attempt(action: Callable[[], object]) -> None:
+        def attempt(action: Callable[..., Any]) -> None:
             nonlocal first_error
             try:
                 action()
@@ -159,11 +126,11 @@ def workload() -> Iterator[WorkloadFixture]:
         baseline.verify_cleanup()
 
 
-def test_cluster_density(workload: WorkloadFixture) -> None:
+def test_cluster_density(workload: Any) -> None:
     instance, namespaces, config, group, baseline = workload
     next_endpoint = 0
 
-    def add_pods(count: int, phase: str, passive: bool) -> list[Endpoint]:
+    def add_pods(count: int, phase: str, passive: bool) -> list[dict[str, Any]]:
         nonlocal next_endpoint
         endpoints = []
         for _ in range(count):

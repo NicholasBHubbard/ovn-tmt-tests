@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Any, Callable
 
 import pytest
 from ovn_test.command import Runner
@@ -46,7 +46,7 @@ def test_nat_without_localnet_port(
         ):
             network(guest).wait_for_ping(namespace, destination)
 
-    def wait_for_redirects(expected: int) -> None:
+    def wait_for_redirects(expected: Any) -> None:
         runner.wait(
             "ovn-sbctl",
             "--bare",

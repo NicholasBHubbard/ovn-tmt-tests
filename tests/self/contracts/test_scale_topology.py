@@ -2,6 +2,7 @@ import importlib.util
 import time
 from pathlib import Path
 from types import ModuleType
+from typing import Any
 
 import pytest
 
@@ -15,7 +16,7 @@ def load(tree: Path, name: str, path: str) -> ModuleType:
     return module
 
 
-def configuration(**overrides: object) -> dict[str, object]:
+def configuration(**overrides: Any) -> dict[str, Any]:
     return {
         "id": "contract",
         "worker_count": 500,
@@ -42,7 +43,7 @@ def configuration(**overrides: object) -> dict[str, object]:
     }
 
 
-def port_configuration(**overrides: object) -> dict[str, object]:
+def port_configuration(**overrides: Any) -> dict[str, Any]:
     return {
         "id": "contract-ports",
         "port_count": 3,

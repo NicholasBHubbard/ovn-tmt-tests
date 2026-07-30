@@ -6,7 +6,12 @@ import sys
 import time
 from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
-from typing import Callable, Optional, Union
+from typing import (
+    Any,
+    Callable,
+    Optional,
+    Union,
+)
 
 from ovn_test.config import database_environment, driver_connection
 from ovn_test.topology import Topology
@@ -43,7 +48,7 @@ class Runner:
     def __init__(
         self,
         topology: Optional[Topology] = None,
-        execute: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
+        execute: Callable[..., Any] = subprocess.run,
         key: Optional[str] = None,
         sleep: Callable[[float], object] = time.sleep,
         user: Optional[str] = None,
@@ -116,52 +121,14 @@ class Runner:
         self._print_output(result)
         return result
 
-    def output(
-        self,
-        *command: object,
-        strip: bool = True,
-        guest: Optional[str] = None,
-        input: Optional[str] = None,
-        check: bool = True,
-        cwd: Optional[Union[str, Path]] = None,
-        env: Optional[Mapping[str, str]] = None,
-        announce: bool = True,
-    ) -> str:
-        output = self.run(
-            *command,
-            guest=guest,
-            input=input,
-            check=check,
-            cwd=cwd,
-            env=env,
-            announce=announce,
-        ).stdout
+    def output(self, *command: object, strip: bool = True, **options: Any) -> str:
+        output = self.run(*command, **options).stdout
         return output.strip() if strip else output
 
     def namespace(
-        self,
-        namespace: str,
-        *command: object,
-        guest: Optional[str] = None,
-        input: Optional[str] = None,
-        check: bool = True,
-        cwd: Optional[Union[str, Path]] = None,
-        env: Optional[Mapping[str, str]] = None,
-        announce: bool = True,
+        self, namespace: str, *command: object, **options: Any
     ) -> subprocess.CompletedProcess[str]:
-        return self.run(
-            "ip",
-            "netns",
-            "exec",
-            namespace,
-            *command,
-            guest=guest,
-            input=input,
-            check=check,
-            cwd=cwd,
-            env=env,
-            announce=announce,
-        )
+        return self.run("ip", "netns", "exec", namespace, *command, **options)
 
     def run_many(
         self,
@@ -192,28 +159,9 @@ class Runner:
         print(f"{label}: command batch completed successfully", flush=True)
         return result
 
-    def succeeds(
-        self,
-        *command: object,
-        guest: Optional[str] = None,
-        input: Optional[str] = None,
-        cwd: Optional[Union[str, Path]] = None,
-        env: Optional[Mapping[str, str]] = None,
-        announce: bool = True,
-    ) -> bool:
+    def succeeds(self, *command: object, **options: Any) -> bool:
         try:
-            return (
-                self.run(
-                    *command,
-                    guest=guest,
-                    input=input,
-                    check=False,
-                    cwd=cwd,
-                    env=env,
-                    announce=announce,
-                ).returncode
-                == 0
-            )
+            return self.run(*command, check=False, **options).returncode == 0
         except FileNotFoundError:
             return False
 
@@ -252,12 +200,7 @@ class Runner:
         )
 
     @staticmethod
-    def _print_output(
-        result: Union[
-            subprocess.CompletedProcess[str],
-            subprocess.CalledProcessError,
-        ],
-    ) -> None:
+    def _print_output(result: Any) -> None:
         if result.stdout:
             print(result.stdout, end="", flush=True)
         if result.stderr:

@@ -1,5 +1,6 @@
 import hashlib
 from pathlib import Path
+from typing import Any
 
 import pytest
 from ovn_test.command import Runner
@@ -43,11 +44,7 @@ def process_arguments(runner: Runner, pid: str) -> str:
 
 
 def assert_logical_port(
-    nb: Ovsdb,
-    name: str,
-    switch: str,
-    mac: str,
-    addresses: tuple[str, ...],
+    nb: Ovsdb, name: str, switch: Any, mac: str, addresses: Any
 ) -> None:
     port = nb.by_name("Logical_Switch_Port", name, "_uuid", "addresses")
     assert nb.referring_names("Logical_Switch", "ports", port["_uuid"]) == [switch]
@@ -56,7 +53,7 @@ def assert_logical_port(
 
 class TestPreconditions:
     @pytest.mark.parametrize("endpoint", ENDPOINTS)
-    def test_endpoint_is_absent(self, network: Network, endpoint: str) -> None:
+    def test_endpoint_is_absent(self, network: Network, endpoint: Any) -> None:
         assert not network.namespace_exists(endpoint)
         assert network.link(f"{endpoint}-p") is None
 
@@ -83,14 +80,11 @@ class TestInitial:
             "self-port3",
             "_uuid",
         )
-        dynamic = nb.text(
-            nb.by_name(
-                "Logical_Switch_Port",
-                "self-port2",
-                "dynamic_addresses",
-            ),
+        dynamic = nb.by_name(
+            "Logical_Switch_Port",
+            "self-port2",
             "dynamic_addresses",
-        )
+        )["dynamic_addresses"]
         snapshots.save("ovn-endpoint-port", port["_uuid"])
         snapshots.save("ovn-endpoint-dynamic-address", dynamic.split()[1])
 
@@ -98,13 +92,9 @@ class TestInitial:
         ("endpoint", "mtu"),
         (("self-vm1", 1400), ("self-vm2", 1450)),
     )
-    def test_mtu(self, network: Network, endpoint: str, mtu: int) -> None:
-        host = network.link(f"{endpoint}-p")
-        namespace = network.link(endpoint, endpoint)
-        assert host is not None
-        assert namespace is not None
-        assert host["mtu"] == mtu
-        assert namespace["mtu"] == mtu
+    def test_mtu(self, network: Network, endpoint: Any, mtu: int) -> None:
+        assert network.link(f"{endpoint}-p")["mtu"] == mtu
+        assert network.link(endpoint, endpoint)["mtu"] == mtu
 
     def test_identity_is_recorded(self, runner: Runner, snapshots: Snapshots) -> None:
         snapshots.save(
@@ -121,10 +111,7 @@ class TestInitial:
             nb.by_name("Logical_Switch_Port", "self-port3", "addresses")["addresses"]
             == "02:00:00:00:03:01 dynamic"
         )
-        options = nb.row_mapping(
-            nb.by_name("Logical_Switch_Port", "self-port1", "options"),
-            "options",
-        )
+        options = nb.by_name("Logical_Switch_Port", "self-port1", "options")["options"]
         assert options["requested-chassis"] == "default-0"
         assert options["mcast_flood"] == "false"
 
@@ -196,15 +183,15 @@ class TestResult:
         assert network.link("self-vm1-p") is not None
         assert ovs.value("Port", "name", "name=self-vm1-p") == "self-vm1-p"
         assert runner.output("ovs-vsctl", "port-to-br", "self-vm1-p") == "self-br"
-        external_ids = ovs.mapping(
-            "Interface",
-            "external_ids",
-            "name=self-vm1-p",
+        assert (
+            ovs.value(
+                "Interface",
+                "external_ids",
+                "name=self-vm1-p",
+            )["iface-id"]
+            == "self-port1"
         )
-        assert external_ids["iface-id"] == "self-port1"
-        link = network.link("self-vm1", "self-vm1")
-        assert link is not None
-        assert link["address"] == "02:00:00:00:01:02"
+        assert network.link("self-vm1", "self-vm1")["address"] == "02:00:00:00:01:02"
         assert sorted(network.addresses("self-vm1", "self-vm1", scope="global")) == [
             "192.0.2.10/24",
             "2001:db8:2::1/64",
@@ -236,28 +223,26 @@ class TestResult:
         assert network.namespace_exists("self-remote")
         assert network.link("self-remote-p") is not None
         assert runner.output("ovs-vsctl", "port-to-br", "self-remote-p") == "self-br"
-        external_ids = ovs.mapping(
-            "Interface",
-            "external_ids",
-            "name=self-remote-p",
+        assert (
+            ovs.value(
+                "Interface",
+                "external_ids",
+                "name=self-remote-p",
+            )["iface-id"]
+            == "self-port3"
         )
-        assert external_ids["iface-id"] == "self-port3"
-        link = network.link("self-remote", "self-remote")
-        assert link is not None
-        assert link["address"] == "02:00:00:00:03:02"
+        assert (
+            network.link("self-remote", "self-remote")["address"] == "02:00:00:00:03:02"
+        )
         assert network.addresses("self-remote", "self-remote", scope="global") == []
 
     @pytest.mark.parametrize(
         ("endpoint", "mtu"),
         (("self-vm1", 1500), ("self-remote", 1300)),
     )
-    def test_mtu(self, network: Network, endpoint: str, mtu: int) -> None:
-        host = network.link(f"{endpoint}-p")
-        namespace = network.link(endpoint, endpoint)
-        assert host is not None
-        assert namespace is not None
-        assert host["mtu"] == mtu
-        assert namespace["mtu"] == mtu
+    def test_mtu(self, network: Network, endpoint: Any, mtu: int) -> None:
+        assert network.link(f"{endpoint}-p")["mtu"] == mtu
+        assert network.link(endpoint, endpoint)["mtu"] == mtu
 
     def test_deleted_port_and_dhcp_links(self, nb: Ovsdb) -> None:
         assert not nb.exists("Logical_Switch_Port", "name=self-port4")
@@ -302,7 +287,7 @@ class TestResult:
 
     @pytest.mark.parametrize("endpoint", ("self-vm2", "self-delete"))
     def test_removed_endpoints_are_absent(
-        self, network: Network, endpoint: str
+        self, network: Network, endpoint: Any
     ) -> None:
         assert not network.namespace_exists(endpoint)
         assert network.link(f"{endpoint}-p") is None

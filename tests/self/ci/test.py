@@ -1,11 +1,12 @@
 import os
 from pathlib import Path
+from typing import Any
 
 import pytest
 from ovn_test.command import Runner
 
 
-def selected(script: Path, *paths: str) -> str:
+def selected(script: Any, *paths: Any) -> str:
     return Runner().output(
         script,
         input="".join(f"{path}\n" for path in paths),
@@ -53,7 +54,7 @@ class TestResult:
             ("false", ()),
         ),
     )
-    def test_change_selection(self, expected: str, paths: tuple[str, ...]) -> None:
+    def test_change_selection(self, expected: Any, paths: Any) -> None:
         assert selected(self.selector, *paths) == expected
 
     def test_runner_and_checkout_versions(self) -> None:

@@ -10,7 +10,7 @@ pytestmark = pytest.mark.usefixtures("setup_scenario")
 def test_redirect_bridged_traffic(
     nb: Ovsdb, sb: Ovsdb, network: Callable[[str], Network]
 ) -> None:
-    options = nb.mapping("Logical_Router_Port", "options", "name=rr-public")
+    options = nb.value("Logical_Router_Port", "options", "name=rr-public")
     assert options["redirect-type"] == "bridged"
 
     gateway = sb.value("Chassis", "_uuid", "name=gateway-1")

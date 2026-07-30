@@ -3,7 +3,7 @@ import subprocess
 from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Callable, Optional, Union
+from typing import Any, Callable, Optional, Union
 
 from ovn_test.config import driver_connection, read_bool
 from ovn_test.topology import Topology
@@ -36,9 +36,7 @@ class Ansible:
         cls,
         topology: Optional[Topology] = None,
         environment: Optional[Mapping[str, str]] = None,
-        execute: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
-        key: Optional[str] = None,
-        user: Optional[str] = None,
+        **options: Any,
     ) -> "Ansible":
         environment = os.environ if environment is None else environment
         if topology is None:
@@ -48,9 +46,7 @@ class Ansible:
             tree=environment["TMT_TREE"],
             data=environment["TMT_TEST_DATA"],
             environment=environment,
-            execute=execute,
-            key=key,
-            user=user,
+            **options,
         )
 
     def inventory(self, path: Optional[Union[str, os.PathLike[str]]] = None) -> Path:

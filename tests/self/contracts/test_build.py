@@ -1,7 +1,7 @@
 import stat
 import subprocess
 from pathlib import Path
-from typing import NoReturn
+from typing import Any, NoReturn
 
 import ovn_test.build
 import pytest
@@ -77,7 +77,7 @@ def test_make_failure_wins_over_artifact_copy_failure(
     source.mkdir()
     (source / "Makefile").write_text("check:\n\tfalse\n")
 
-    def fail_copy(*_: object) -> NoReturn:
+    def fail_copy(*_: Any) -> NoReturn:
         raise PermissionError("cannot copy artifacts")
 
     monkeypatch.setattr(ovn_test.build, "_collect_artifacts", fail_copy)

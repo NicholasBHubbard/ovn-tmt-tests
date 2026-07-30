@@ -9,6 +9,7 @@
 import sys
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -19,16 +20,16 @@ if not (root / "roles").is_dir():
     sys.exit(f"{root}: roles directory not found")
 
 
-def load(path: Path) -> dict[str, object]:
+def load(path: Path) -> dict[str, Any]:
     with path.open() as source:
         return yaml.safe_load(source) or {}
 
 
-def environments(data: object) -> Iterator[dict[str, object]]:
+def environments(data: Any) -> Iterator[dict[str, Any]]:
     if isinstance(data, dict):
         for key, value in data.items():
             if key in ("environment", "environment+") and isinstance(value, dict):
-                yield {str(name): item for name, item in value.items()}
+                yield value
             yield from environments(value)
     elif isinstance(data, list):
         for value in data:

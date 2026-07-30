@@ -2,66 +2,9 @@ import ipaddress
 import json
 import os
 from pathlib import Path
-from typing import TypedDict, Union, cast
+from typing import Any, Union
 
 Network = Union[ipaddress.IPv4Network, ipaddress.IPv6Network]
-
-
-class PortOverride(TypedDict, total=False):
-    name: str
-    interface: str
-    switch: str
-    bridge: str
-    mac: str
-    addresses: str
-    mtu: int
-
-
-class Config(TypedDict):
-    id: str
-    port_count: int
-    start_index: int
-    port_prefix: str
-    interface_prefix: str
-    chassis: str
-    network_index: int
-    switch_prefix: str
-    switch: str
-    bridge: str
-    ports: list[PortOverride]
-    ipv4: bool
-    ipv6: bool
-    internal_ipv4: str
-    internal_ipv6: str
-    mtu: int
-    nbctl: list[str]
-    ovs_vsctl: list[str]
-
-
-class Port(TypedDict):
-    name: str
-    interface: str
-    switch: str
-    chassis: str
-    bridge: str
-    mac: str
-    addresses: str
-    mtu: int
-
-
-class Southbound(TypedDict):
-    datapaths: list[str]
-    ports: list[str]
-    absent_datapaths: list[str]
-    absent_ports: list[str]
-
-
-class State(TypedDict):
-    owner: str
-    nbctl: list[str]
-    ovs_vsctl: list[str]
-    ports: list[Port]
-    southbound: Southbound
 
 
 def _network(value: str, index: int) -> Network:
@@ -78,7 +21,7 @@ def _mac(index: int) -> str:
     )
 
 
-def generate(config: Config) -> State:
+def generate(config: dict[str, Any]) -> dict[str, Any]:
     if config["port_count"] < 0 or config["start_index"] < 0:
         raise ValueError("port count and start index must be non-negative")
     if config["network_index"] < 0:
@@ -101,7 +44,7 @@ def generate(config: Config) -> State:
         ):
             raise ValueError(f"{name} must be a non-empty command list")
 
-    result: State = {
+    result = {
         "owner": f"{config['id']}:{config['chassis']}",
         "nbctl": config["nbctl"],
         "ovs_vsctl": config["ovs_vsctl"],
@@ -114,17 +57,11 @@ def generate(config: Config) -> State:
         },
     }
 
-    networks = {}
-    if config["ipv4"]:
-        networks[4] = _network(
-            config["internal_ipv4"],
-            config["network_index"],
-        )
-    if config["ipv6"]:
-        networks[6] = _network(
-            config["internal_ipv6"],
-            config["network_index"],
-        )
+    networks = {
+        version: _network(config[f"internal_ipv{version}"], config["network_index"])
+        for version in (4, 6)
+        if config[f"ipv{version}"]
+    }
     ports = config["ports"] or [{} for _ in range(config["port_count"])]
     switch = config["switch"] or f"{config['switch_prefix']}-{config['chassis']}"
     for local_index, overrides in enumerate(ports):
@@ -146,7 +83,7 @@ def generate(config: Config) -> State:
                 ]
             ),
         )
-        port: Port = {
+        port = {
             "name": overrides.get("name", f"{config['port_prefix']}-{index}"),
             "interface": overrides.get(
                 "interface",
@@ -175,9 +112,7 @@ def generate(config: Config) -> State:
 
 
 def main() -> None:
-    output = json.dumps(
-        generate(cast(Config, json.loads(os.environ["OVN_SCALE_PORTS_CONFIG"])))
-    )
+    output = json.dumps(generate(json.loads(os.environ["OVN_SCALE_PORTS_CONFIG"])))
     path = os.environ.get("OVN_SCALE_PORTS_OUTPUT")
     if path:
         Path(path).write_text(output)
