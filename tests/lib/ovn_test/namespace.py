@@ -80,17 +80,23 @@ class OvnNamespace:
         self.index = index
         self.ipv4 = ipv4
         self.ipv6 = ipv6
+        self.port_group = f"pg_{name}"
+        self.ingress_deny_group = f"pg_deny_igr_{name}"
+        self.egress_deny_group = f"pg_deny_egr_{name}"
         self.port_groups = [
-            f"pg_{name}",
-            f"pg_deny_igr_{name}",
-            f"pg_deny_egr_{name}",
+            self.port_group,
+            self.ingress_deny_group,
+            self.egress_deny_group,
         ]
         self.address_sets = {
             4: f"as_{name}",
             6: f"as6_{name}",
         }
-        self.address_set_ids = {}
-        self.load_balancers = []
+        self.address_set_ids: dict[int, str] = {}
+        self.load_balancers: list[str] = []
+        self.endpoints: list[dict[str, Any]] = []
+        self.acls: dict[str, tuple[str, str, int, str, str]] = {}
+        self.enforcing = False
         self.cleaned = False
 
     def _destroy_named(self, table: str, name: str) -> None:
@@ -143,6 +149,138 @@ class OvnNamespace:
                 "addresses",
                 *(json.dumps(endpoint[f"ipv{family}"]) for endpoint in endpoints),
             )
+        self.endpoints.extend(endpoints)
+        if self.enforcing:
+            self._set_policy_ports()
+
+    def _set_policy_ports(self) -> None:
+        ports = list(dict.fromkeys(endpoint["port"] for endpoint in self.endpoints))
+        for port_group in self.port_groups:
+            self.runner.run(
+                "ovn-nbctl",
+                "pg-set-ports",
+                port_group,
+                *ports,
+            )
+
+    def enforce(self) -> None:
+        if self.enforcing:
+            return
+        self._set_policy_ports()
+        self.enforcing = True
+
+    def _ip_family(self, family: int) -> str:
+        if family not in (4, 6):
+            raise ValueError("IP family must be 4 or 6")
+        if not (self.ipv4 if family == 4 else self.ipv6):
+            raise ValueError(f"IPv{family} is disabled for namespace {self.name}")
+        return f"ip{family}"
+
+    def _set_acl(
+        self,
+        name: str,
+        target: str,
+        direction: str,
+        priority: int,
+        match: str,
+        action: str,
+    ) -> None:
+        acl = (target, direction, priority, match, action)
+        previous = self.acls.get(name)
+        if previous is not None and previous != acl:
+            self.runner.run(
+                "ovn-nbctl",
+                "--type=port-group",
+                "acl-del",
+                *previous[:-1],
+            )
+        self.runner.run(
+            "ovn-nbctl",
+            "--type=port-group",
+            "--may-exist",
+            "acl-add",
+            target,
+            direction,
+            priority,
+            match,
+            action,
+        )
+        self.acls[name] = acl
+
+    def default_deny(
+        self,
+        family: int,
+        priority: int = 1,
+        control_priority: int = 2,
+    ) -> None:
+        network = self._ip_family(family)
+        self.enforce()
+        address_set = self.address_sets[family]
+        for name, target, address, port in (
+            ("ingress", self.ingress_deny_group, "src", "outport"),
+            ("egress", self.egress_deny_group, "dst", "inport"),
+        ):
+            self._set_acl(
+                f"deny-{family}-{name}",
+                target,
+                "to-lport",
+                priority,
+                f"{network}.{address} == ${address_set} && {port} == @{target}",
+                "drop",
+            )
+            self._set_acl(
+                f"allow-control-{family}-{name}",
+                target,
+                "to-lport",
+                control_priority,
+                f"{port} == @{target} && {'arp' if family == 4 else 'nd'}",
+                "allow",
+            )
+
+    def allow_within(self, family: int, priority: int = 3) -> None:
+        network = self._ip_family(family)
+        self.enforce()
+        address_set = self.address_sets[family]
+        for name, address, port in (
+            ("ingress", "src", "outport"),
+            ("egress", "dst", "inport"),
+        ):
+            self._set_acl(
+                f"allow-within-{family}-{name}",
+                self.port_group,
+                "to-lport",
+                priority,
+                f"{network}.{address} == ${address_set} && "
+                f"{port} == @{self.port_group}",
+                "allow-related",
+            )
+
+    def allow_external(
+        self,
+        addresses: Sequence[str],
+        family: int = 4,
+        name: str = "external",
+        priority: int = 3,
+    ) -> None:
+        network = self._ip_family(family)
+        if not name:
+            raise ValueError("external policy name cannot be empty")
+        parsed = [ipaddress.ip_address(value) for value in addresses]
+        if any(address.version != family for address in parsed):
+            raise ValueError(f"external addresses must be IPv{family}")
+        normalized = list(dict.fromkeys(str(address) for address in parsed))
+        if not normalized:
+            raise ValueError("external policy needs at least one address")
+        self.enforce()
+        self._set_acl(
+            f"allow-{name}-{family}",
+            self.port_group,
+            "to-lport",
+            priority,
+            f"{network}.src == {{{','.join(normalized)}}} && "
+            f"outport == @{self.port_group}",
+            "allow-related",
+        )
 
     def _vip(self, family: int, position: int) -> str:
         network = ipaddress.ip_network("30.0.0.0/16" if family == 4 else "30::/32")

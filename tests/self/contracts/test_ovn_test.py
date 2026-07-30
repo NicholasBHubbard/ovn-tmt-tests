@@ -484,6 +484,24 @@ def test_external_peers_exercise_worker_gateway_paths() -> None:
             "namespace": "pod-0",
         }
     )
+    peers.verify_inbound(
+        {
+            "worker": "worker-0",
+            "guest": "compute-1",
+            "ipv4": "10.0.0.1",
+            "ipv6": "fd10::1",
+        }
+    )
+    assert (
+        peers.address(
+            {
+                "worker": "worker-0",
+                "guest": "compute-1",
+            },
+            4,
+        )
+        == "172.16.0.253"
+    )
     peers.cleanup()
 
     create_guest, create = runner.batches[0]
@@ -525,7 +543,10 @@ def test_external_peers_exercise_worker_gateway_paths() -> None:
     assert [wait[0][-1] for wait in runner.waits] == [
         "172.16.0.253",
         "fd20::ffff:ffff:fffd",
+        "10.0.0.1",
+        "fd10::1",
     ]
+    assert runner.waits[-1][0][3] == "dhe00000"
 
     runner.returncodes[("ip", "netns", "exec", "dhe00000", "true")] = 1
     runner.returncodes[("ovs-vsctl", "port-to-br", "dhe00000-p")] = 1
@@ -858,6 +879,109 @@ def test_ovn_namespace_reproduces_cluster_density_state() -> None:
     namespace.cleanup()
     namespace.verify_cleanup()
     assert namespace.cleaned
+
+
+def test_ovn_namespace_manages_network_policy_state() -> None:
+    runner = FakeRunner()
+    namespace = OvnNamespace(
+        runner,
+        "network-policy",
+        "NS_policy_0",
+        0,
+        ipv6=False,
+    )
+    endpoints = [
+        {
+            "port": f"pod-{index}",
+            "ipv4": f"10.0.0.{index}",
+        }
+        for index in range(1, 3)
+    ]
+
+    namespace.create()
+    namespace.add_endpoints(endpoints)
+    assert not [call for call in runner.calls if "pg-set-ports" in call[1]]
+
+    namespace.default_deny(4)
+    namespace.allow_within(4)
+    namespace.allow_external(
+        ["42.42.42.1", "42.42.42.2"],
+        name="trusted",
+    )
+
+    commands = [call[1] for call in runner.calls]
+    for port_group in namespace.port_groups:
+        assert (
+            "ovn-nbctl",
+            "pg-set-ports",
+            port_group,
+            "pod-1",
+            "pod-2",
+        ) in commands
+    created_acls = [command for command in commands if "acl-add" in command]
+    assert len(created_acls) == 7
+    assert any(
+        "ip4.src == $as_NS_policy_0 && outport == @pg_deny_igr_NS_policy_0" in command
+        and "drop" in command
+        for command in created_acls
+    )
+    assert any(
+        "ip4.src == $as_NS_policy_0 && outport == @pg_NS_policy_0" in command
+        and "allow-related" in command
+        for command in created_acls
+    )
+
+    namespace.allow_external(["42.42.42.3"], name="trusted")
+    assert (
+        "ovn-nbctl",
+        "--type=port-group",
+        "acl-del",
+        "pg_NS_policy_0",
+        "to-lport",
+        3,
+        "ip4.src == {42.42.42.1,42.42.42.2} && outport == @pg_NS_policy_0",
+    ) in [call[1] for call in runner.calls]
+    assert (
+        "ovn-nbctl",
+        "--type=port-group",
+        "--may-exist",
+        "acl-add",
+        "pg_NS_policy_0",
+        "to-lport",
+        3,
+        "ip4.src == {42.42.42.3} && outport == @pg_NS_policy_0",
+        "allow-related",
+    ) in [call[1] for call in runner.calls]
+
+    namespace.add_endpoints([{"port": "pod-3", "ipv4": "10.0.0.3"}])
+    assert (
+        "ovn-nbctl",
+        "pg-set-ports",
+        "pg_NS_policy_0",
+        "pod-1",
+        "pod-2",
+        "pod-3",
+    ) in [call[1] for call in runner.calls]
+
+    namespace.cleanup()
+    namespace.verify_cleanup()
+
+
+def test_ovn_namespace_rejects_invalid_policy_addresses() -> None:
+    namespace = OvnNamespace(
+        FakeRunner(),
+        "network-policy",
+        "NS_policy_0",
+        0,
+        ipv6=False,
+    )
+
+    with pytest.raises(ValueError, match="IPv6 is disabled"):
+        namespace.default_deny(6)
+    with pytest.raises(ValueError, match="at least one address"):
+        namespace.allow_external([])
+    with pytest.raises(ValueError, match="must be IPv4"):
+        namespace.allow_external(["2001:db8::1"])
 
 
 def test_ovn_namespace_cleans_partially_created_address_sets() -> None:

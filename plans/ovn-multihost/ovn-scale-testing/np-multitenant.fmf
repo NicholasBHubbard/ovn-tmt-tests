@@ -1,0 +1,63 @@
+# Populate an OpenShift-like OVN cluster with namespaces of increasing pod
+# density, apply per-namespace default-deny and allow policies, and verify
+# permitted namespace and external-gateway traffic.
+summary: Measure multitenant OVN network-policy convergence
+enabled: true
+
+environment+:
+  OTT_CLUSTERED: "true"
+  OTT_COMPUTE_PHYSICAL_BRIDGE: br-ex
+  OTT_COMPUTE_PHYSICAL_NETWORK: physnet
+  OTT_MONITOR_ALL: "true"
+  OTT_SCALE_BASE_PODS_PER_WORKER: "10"
+  OTT_SCALE_DURATION: 6h
+  OTT_SCALE_EXTERNAL_IPV4_LARGE_START: 43.43.43.1
+  OTT_SCALE_EXTERNAL_IPV4_SMALL_START: 42.42.42.1
+  OTT_SCALE_EXTERNAL_IPV6_LARGE_START: "43:43:43::1"
+  OTT_SCALE_EXTERNAL_IPV6_SMALL_START: "42:42:42::1"
+  OTT_SCALE_EXTERNAL_LARGE_COUNT: "20"
+  OTT_SCALE_EXTERNAL_SMALL_COUNT: "3"
+  OTT_SCALE_IPV6: "false"
+  OTT_SCALE_LB_PROTOCOLS: tcp,udp,sctp
+  OTT_SCALE_NAMESPACES: "500"
+  OTT_SCALE_NAMESPACE_RANGES: 200:5,480:20,495:100
+  OTT_SCALE_POLICY_ALLOW_PRIORITY: "3"
+  OTT_SCALE_POLICY_CONTROL_PRIORITY: "2"
+  OTT_SCALE_POLICY_DENY_PRIORITY: "1"
+  OTT_SCALE_TOPOLOGY_PATH: /run/ovn-tmt-tests/scale-topology.json
+  OTT_SCALE_WORKERS: "250"
+
+provision+:
+  - name: central-2
+    role: central-follower
+    how: virtual
+    image: fedora
+    connection: system
+  - name: central-3
+    role: central-follower
+    how: virtual
+    image: fedora
+    connection: system
+
+prepare+:
+  - name: Prepare np-multitenant scale topology
+    how: ansible
+    order: 70
+    where: [central]
+    playbook: playbooks/ovn-scale-topology.yml
+    extra-args: >-
+      -e ovn_scale_topology_worker_count=$OTT_SCALE_WORKERS
+      -e ovn_scale_topology_ipv4=$OTT_SCALE_IPV4
+      -e ovn_scale_topology_ipv6=$OTT_SCALE_IPV6
+      -e ovn_scale_topology_physical_bridge=$OTT_COMPUTE_PHYSICAL_BRIDGE
+      -e ovn_scale_topology_physical_network=$OTT_COMPUTE_PHYSICAL_NETWORK
+      -e 'ovn_scale_topology_snat_ct_zone=$OTT_SCALE_SNAT_CT_ZONE'
+      -e 'ovn_scale_topology_manifest_path=$OTT_SCALE_TOPOLOGY_PATH'
+
+discover:
+  how: fmf
+  where: [central]
+  adjust-tests:
+    - duration: $OTT_SCALE_DURATION
+  test:
+    - /tests/scale/np-multitenant

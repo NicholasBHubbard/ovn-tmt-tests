@@ -1,0 +1,2 @@
+summary: Measure multitenant network-policy convergence
+test: python3 -m pytest ./test.py

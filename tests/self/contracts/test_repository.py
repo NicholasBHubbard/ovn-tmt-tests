@@ -468,6 +468,29 @@ def test_artifact_role_contract(tree: Path) -> None:
                 "OTT_SCALE_WORKERS:",
             ),
         ),
+        (
+            "np-multitenant.fmf",
+            "np-multitenant",
+            (
+                "OTT_SCALE_BASE_PODS_PER_WORKER:",
+                "OTT_CLUSTERED:",
+                "OTT_COMPUTE_PHYSICAL_BRIDGE:",
+                "OTT_COMPUTE_PHYSICAL_NETWORK:",
+                "OTT_MONITOR_ALL:",
+                "OTT_SCALE_EXTERNAL_IPV4_LARGE_START:",
+                "OTT_SCALE_EXTERNAL_IPV4_SMALL_START:",
+                "OTT_SCALE_EXTERNAL_IPV6_LARGE_START:",
+                "OTT_SCALE_EXTERNAL_IPV6_SMALL_START:",
+                "OTT_SCALE_EXTERNAL_LARGE_COUNT:",
+                "OTT_SCALE_EXTERNAL_SMALL_COUNT:",
+                "OTT_SCALE_NAMESPACES:",
+                "OTT_SCALE_NAMESPACE_RANGES:",
+                "OTT_SCALE_POLICY_ALLOW_PRIORITY:",
+                "OTT_SCALE_POLICY_CONTROL_PRIORITY:",
+                "OTT_SCALE_POLICY_DENY_PRIORITY:",
+                "OTT_SCALE_WORKERS:",
+            ),
+        ),
     ),
 )
 def test_scale_workload_contract(
@@ -484,7 +507,7 @@ def test_scale_workload_contract(
     assert "duration: $OTT_SCALE_DURATION" in plan_path.read_text()
     assert "python3 -m pytest" in (test_dir / "main.fmf").read_text()
     assert "duration:" not in (test_dir / "main.fmf").read_text()
-    if test in {"density-heavy", "cluster-density"}:
+    if test in {"density-heavy", "cluster-density", "np-multitenant"}:
         metadata = yaml.safe_load(plan_path.read_text())
         assert metadata["environment+"]["OTT_SCALE_IPV6"] == "false"
         assert [guest["role"] for guest in metadata["provision+"]] == [

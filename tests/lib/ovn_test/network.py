@@ -267,16 +267,38 @@ class ExternalPeers:
             )
             self.runner.run_many(commands, guest=peer["guest"])
 
-    def verify(self, endpoint: dict[str, Any]) -> None:
+    def _peer(self, endpoint: dict[str, Any]) -> dict[str, Any]:
         peer = self.peers[endpoint["worker"]]
         if peer["guest"] != endpoint["guest"]:
             raise ValueError("endpoint and external peer use different chassis")
+        return peer
+
+    def address(self, endpoint: dict[str, Any], family: int) -> str:
+        if family not in (4, 6):
+            raise ValueError("IP family must be 4 or 6")
+        if not (self.ipv4 if family == 4 else self.ipv6):
+            raise ValueError(f"IPv{family} external peers are disabled")
+        return self._peer(endpoint)[f"ipv{family}"]
+
+    def verify(self, endpoint: dict[str, Any]) -> None:
+        peer = self._peer(endpoint)
         network = Network(self.runner, endpoint["guest"])
         for family, enabled in ((4, self.ipv4), (6, self.ipv6)):
             if enabled:
                 network.wait_for_ping(
                     endpoint["namespace"],
                     peer[f"ipv{family}"],
+                    attempts=self.timeout,
+                )
+
+    def verify_inbound(self, endpoint: dict[str, Any]) -> None:
+        peer = self._peer(endpoint)
+        network = Network(self.runner, peer["guest"])
+        for family, enabled in ((4, self.ipv4), (6, self.ipv6)):
+            if enabled:
+                network.wait_for_ping(
+                    peer["namespace"],
+                    endpoint[f"ipv{family}"],
                     attempts=self.timeout,
                 )
 
