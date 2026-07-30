@@ -3,13 +3,15 @@ import json
 import subprocess
 from typing import Any, Optional, Union
 
+from ovn_test.command import Runner
+
 
 def _command(*parts: object, check: bool = True) -> tuple[tuple[object, ...], bool]:
     return parts, check
 
 
 class Network:
-    def __init__(self, runner: Any, guest: Optional[str] = None) -> None:
+    def __init__(self, runner: Runner, guest: Optional[str] = None) -> None:
         self.runner = runner
         self.guest = guest
 
@@ -112,7 +114,7 @@ class Network:
 class ExternalPeers:
     def __init__(
         self,
-        runner: Any,
+        runner: Runner,
         topology: dict[str, Any],
         ipv4: bool = True,
         ipv6: bool = True,

@@ -3,7 +3,9 @@ import shutil
 import stat
 import subprocess
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Optional, Union
+
+from ovn_test.command import Runner
 
 
 def _copy(source: Path, destination: Path) -> None:
@@ -46,7 +48,7 @@ def _collect_artifacts(source: Path, destination: Path) -> None:
 
 
 def run_make(
-    runner: Any,
+    runner: Runner,
     source: Union[str, os.PathLike[str]],
     data: Union[str, os.PathLike[str]],
     *,

@@ -18,7 +18,7 @@ from ovn_test.workload import (
 )
 
 
-class FakeRunner:
+class FakeRunner(Runner):
     def __init__(self) -> None:
         self.calls = []
         self.batches = []
@@ -33,6 +33,9 @@ class FakeRunner:
         guest: Optional[str] = None,
         input: Any = None,
         check: bool = True,
+        cwd: Any = None,
+        env: Any = None,
+        announce: bool = True,
     ) -> subprocess.CompletedProcess[str]:
         self.calls.append((guest, command, input))
         if command in self.fail:

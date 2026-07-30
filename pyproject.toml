@@ -16,13 +16,30 @@ extend-select = [
     "ANN204",
     "ANN205",
     "ANN206",
+    "ANN401",
     "B",
     "I",
     "PT",
     "RUF",
     "SIM",
+    "TID251",
     "UP",
 ]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"typing.Any".msg = "Use a precise type, or limit Any to a documented dynamic boundary."
+"typing_extensions.Any".msg = "Use a precise type, or limit Any to a documented dynamic boundary."
+
+[tool.ruff.lint.per-file-ignores]
+# Standalone role scripts and tests consume intentionally dynamic external data.
+"roles/**/files/*.py" = ["ANN401", "TID251"]
+"tests/**/test.py" = ["ANN401", "TID251"]
+"tests/self/contracts/*.py" = ["ANN401", "TID251"]
+"tools/*.py" = ["ANN401", "TID251"]
+# These reusable modules are the narrow JSON, YAML and OVSDB boundaries.
+"tests/lib/ovn_test/{namespace,scale,topology,workload}.py" = ["TID251"]
+"tests/lib/ovn_test/network.py" = ["ANN401", "TID251"]
+"tests/lib/ovn_test/ovsdb.py" = ["ANN401", "TID251"]
 
 [tool.ruff.lint.flake8-pytest-style]
 parametrize-values-row-type = "tuple"

@@ -7,6 +7,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import Any, Callable, Optional, TypeVar, Union
 
+from ovn_test.command import Runner
 from ovn_test.load_balancer import replace, socket
 
 T = TypeVar("T")
@@ -126,7 +127,7 @@ def load_scale_topology(
 class Workload:
     def __init__(
         self,
-        runner: Any,
+        runner: Runner,
         computes: Sequence[str],
         name: str,
         prefix: str,
@@ -645,13 +646,10 @@ class Workload:
         start = time.time_ns()
         first_error = None
 
-        def attempt(*command: object, **kwargs: Any) -> None:
+        def attempt(action: Callable[[], object]) -> None:
             nonlocal first_error
             try:
-                if command:
-                    self.runner.run(*command, **kwargs)
-                else:
-                    kwargs["action"]()
+                action()
             except Exception as error:
                 if first_error is None:
                     first_error = error
@@ -659,20 +657,29 @@ class Workload:
         for endpoint in self.endpoints:
             if endpoint.get("removed"):
                 continue
-            attempt(action=lambda endpoint=endpoint: self._remove_endpoint(endpoint))
+            attempt(lambda endpoint=endpoint: self._remove_endpoint(endpoint))
         for load_balancer in self.load_balancers:
-            attempt("ovn-nbctl", "--if-exists", "lb-del", load_balancer)
+            attempt(
+                lambda name=load_balancer: self.runner.run(
+                    "ovn-nbctl", "--if-exists", "lb-del", name
+                )
+            )
         if not self.workers:
-            attempt("ovn-nbctl", "--if-exists", "ls-del", self.name)
+            attempt(
+                lambda: self.runner.run("ovn-nbctl", "--if-exists", "ls-del", self.name)
+            )
         for port_group in self.port_groups:
-            attempt(
-                action=lambda name=port_group: self._destroy_named("Port_Group", name)
-            )
+            attempt(lambda name=port_group: self._destroy_named("Port_Group", name))
         for address_set in self.address_sets:
-            attempt(
-                action=lambda name=address_set: self._destroy_named("Address_Set", name)
+            attempt(lambda name=address_set: self._destroy_named("Address_Set", name))
+        attempt(
+            lambda: self.runner.run(
+                "ovn-nbctl",
+                "--wait=hv",
+                f"--timeout={self.sync_timeout}",
+                "sync",
             )
-        attempt("ovn-nbctl", "--wait=hv", f"--timeout={self.sync_timeout}", "sync")
+        )
         self.cleaned = first_error is None
         self.record_metric("cleanup", "cleanup", start)
         if first_error is not None:

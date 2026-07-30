@@ -3,6 +3,7 @@ import json
 from collections.abc import Sequence
 from typing import Any, Callable
 
+from ovn_test.command import Runner
 from ovn_test.load_balancer import replace, socket
 
 VALID_PROTOCOLS = {"tcp", "udp", "sctp"}
@@ -66,7 +67,7 @@ def validate_cluster_density(
 class OvnNamespace:
     def __init__(
         self,
-        runner: Any,
+        runner: Runner,
         owner: str,
         name: str,
         index: int,
