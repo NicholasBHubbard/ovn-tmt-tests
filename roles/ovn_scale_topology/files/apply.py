@@ -2,8 +2,9 @@ import json
 import os
 import subprocess
 import time
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 OWNER = "ovn-tmt-tests-owner"
 IDENTIFIER = "ovn-tmt-tests-id"
@@ -63,10 +64,11 @@ def _references(rows: Sequence[dict[str, Any]], column: str) -> dict[str, str]:
 def _batch(groups: Sequence[Any], size: int = 50) -> None:
     for offset in range(0, len(groups), size):
         arguments = []
-        for command in sum(groups[offset : offset + size], []):
-            if arguments:
-                arguments.append("--")
-            arguments.extend(command)
+        for group in groups[offset : offset + size]:
+            for command in group:
+                if arguments:
+                    arguments.append("--")
+                arguments.extend(command)
         if arguments:
             _run(*arguments)
 

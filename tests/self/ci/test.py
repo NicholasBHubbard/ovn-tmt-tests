@@ -33,7 +33,7 @@ class TestResult:
 
     @pytest.mark.parametrize(
         ("expected", "paths"),
-        [
+        (
             ("true", ("plans/ovn-ci/main.fmf",)),
             ("true", ("tests/build/make-check/test.py",)),
             ("true", ("components/new/config.yml",)),
@@ -52,7 +52,7 @@ class TestResult:
                 ),
             ),
             ("false", ()),
-        ],
+        ),
     )
     def test_change_selection(self, expected: Any, paths: Any) -> None:
         assert selected(self.selector, *paths) == expected

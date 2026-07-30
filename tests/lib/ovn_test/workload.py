@@ -3,8 +3,9 @@ import json
 import math
 import os
 import time
+from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
-from typing import Any, Callable, Iterable, Mapping, Optional, Sequence, TypeVar, Union
+from typing import Any, Callable, Optional, TypeVar, Union
 
 from ovn_test.load_balancer import replace, socket
 
@@ -182,11 +183,9 @@ class Workload:
             "namespace": f"{self.prefix}{index:05d}",
             "interface": f"{self.prefix}{index:05d}-p",
             "port": f"{self.name}-{index:05d}",
-            "mac": "02:00:{:02x}:{:02x}:{:02x}:{:02x}".format(
-                value >> 24 & 255,
-                value >> 16 & 255,
-                value >> 8 & 255,
-                value & 255,
+            "mac": (
+                f"02:00:{value >> 24 & 255:02x}:{value >> 16 & 255:02x}:"
+                f"{value >> 8 & 255:02x}:{value & 255:02x}"
             ),
             "ipv4": f"10.240.{value >> 8 & 255}.{value & 255}",
             "ipv6": f"fd00:240::{value:x}",
@@ -196,11 +195,9 @@ class Workload:
 
         worker = self.workers[index % len(self.workers)]
         value += self.base_ports_per_worker * len(self.workers)
-        endpoint["mac"] = "02:00:{:02x}:{:02x}:{:02x}:{:02x}".format(
-            value >> 24 & 255,
-            value >> 16 & 255,
-            value >> 8 & 255,
-            value & 255,
+        endpoint["mac"] = (
+            f"02:00:{value >> 24 & 255:02x}:{value >> 16 & 255:02x}:"
+            f"{value >> 8 & 255:02x}:{value & 255:02x}"
         )
         local_index = self.base_ports_per_worker + index // len(self.workers) + 1
         endpoint.update(

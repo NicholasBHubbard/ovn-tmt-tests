@@ -191,10 +191,10 @@ def test_plan_role_configuration_is_top_down(tree: Path) -> None:
 
 @pytest.mark.parametrize(
     ("path", "phase"),
-    [
+    (
         ("plans/ovn-ci/main.fmf", None),
         ("plans/ovn-multihost/main.fmf", "Set up OVN topology"),
-    ],
+    ),
 )
 def test_install_configuration_is_complete(tree: Path, path: Path, phase: str) -> None:
     variables = extra_variables(prepare_phase(tree, path, phase))
@@ -426,7 +426,7 @@ def test_artifact_role_contract(tree: Path) -> None:
 
 @pytest.mark.parametrize(
     ("plan", "test", "settings"),
-    [
+    (
         (
             "density-light.fmf",
             "density-light",
@@ -468,7 +468,7 @@ def test_artifact_role_contract(tree: Path) -> None:
                 "OTT_SCALE_WORKERS:",
             ),
         ),
-    ],
+    ),
 )
 def test_scale_workload_contract(
     tree: Path, plan: Any, test: Any, settings: Any

@@ -1,6 +1,7 @@
 import os
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Mapping, Optional, Union
+from typing import Optional, Union
 
 
 class Snapshots:

@@ -122,11 +122,11 @@ def assert_rejected(result: Any, message: str) -> None:
 
 @pytest.mark.parametrize(
     ("distribution", "version", "architecture"),
-    [
+    (
         ("wrong", "2", "test"),
         ("test", "1", "test"),
         ("test", "2", "wrong"),
-    ],
+    ),
 )
 def test_incompatible_host_is_rejected(
     tree: Path,

@@ -7,8 +7,9 @@
 # tmt keys such as name, role, how and where are external and remain unchanged.
 
 import sys
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 import yaml
 

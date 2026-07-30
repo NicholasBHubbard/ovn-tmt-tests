@@ -2,8 +2,9 @@ import base64
 import json
 import os
 import subprocess
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 
 def _decode(value: Any) -> Any:

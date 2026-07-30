@@ -1,6 +1,7 @@
 import json
 import subprocess
-from typing import Any, Iterable, Mapping, Optional, Sequence
+from collections.abc import Iterable, Mapping, Sequence
+from typing import Any, Optional
 
 OPTIONS = {
     "event": "false",

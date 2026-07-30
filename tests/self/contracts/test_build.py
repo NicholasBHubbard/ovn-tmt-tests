@@ -47,7 +47,8 @@ check:
             continue
         mode = path.stat().st_mode
         if path.is_dir():
-            assert mode & stat.S_IROTH and mode & stat.S_IXOTH
+            assert mode & stat.S_IROTH
+            assert mode & stat.S_IXOTH
         else:
             assert mode & stat.S_IROTH
 

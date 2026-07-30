@@ -3,8 +3,9 @@ import json
 import os
 import subprocess
 import time
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 
 def _decode(value: Any) -> Any:

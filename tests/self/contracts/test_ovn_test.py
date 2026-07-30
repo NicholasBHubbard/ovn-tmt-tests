@@ -700,12 +700,12 @@ def test_workload_adds_every_service_load_balancer(tmp_path: Path) -> None:
         for command in load_balancers
         if 'name="density-heavy-00003-tcp-v4"' in command
     )
-    assert (
+    assert command[:4] == (
         "ovn-nbctl",
         "--if-exists",
         "lb-del",
         "density-heavy-00003-tcp-v4",
-    ) == command[:4]
+    )
     assert 'vips:"100.0.0.4:80"="10.240.0.8:8080"' in command
     assert 'options:hairpin_snat_ip="169.254.169.5 fd69::5"' in command
     assert contains(
@@ -1094,7 +1094,7 @@ def test_cleanup_verification_checks_remote_endpoint_state(tmp_path: Path) -> No
 
 @pytest.mark.parametrize(
     "values",
-    [
+    (
         {"startup": -1},
         {"startup": 3, "total": 2},
         {"total": 0},
@@ -1112,7 +1112,7 @@ def test_cleanup_verification_checks_remote_endpoint_state(tmp_path: Path) -> No
         {"workers": 0},
         {"base_pods": -1},
         {"startup": 0, "total": 65535, "build_pods": 0},
-    ],
+    ),
 )
 def test_cluster_density_validation_rejects_invalid_values(values: Any) -> None:
     config = {
@@ -1131,7 +1131,7 @@ def test_cluster_density_validation_rejects_invalid_values(values: Any) -> None:
     }
     config.update(values)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r".+"):
         validate_cluster_density(**config)
 
 
@@ -1154,7 +1154,7 @@ def test_cluster_density_validation_accepts_original_defaults() -> None:
 
 @pytest.mark.parametrize(
     "values",
-    [
+    (
         {"initial": 0},
         {"initial": 1},
         {"iterations": 0},
@@ -1166,7 +1166,7 @@ def test_cluster_density_validation_accepts_original_defaults() -> None:
         {"mtu": 65536},
         {"chassis": 1},
         {"initial": 65534},
-    ],
+    ),
 )
 def test_light_validation_rejects_invalid_values(values: Any) -> None:
     config = {
@@ -1180,7 +1180,7 @@ def test_light_validation_rejects_invalid_values(values: Any) -> None:
     }
     config.update(values)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r".+"):
         validate_light(**config)
 
 
@@ -1198,13 +1198,13 @@ def test_light_validation_accepts_address_boundary() -> None:
 
 @pytest.mark.parametrize(
     "values",
-    [
+    (
         {"initial": 3},
         {"pods_per_service": 0},
         {"protocols": ["tcp", "http"]},
         {"protocols": ["tcp", "tcp"]},
         {"initial": 65534},
-    ],
+    ),
 )
 def test_heavy_validation_rejects_invalid_values(values: Any) -> None:
     config = {
@@ -1220,7 +1220,7 @@ def test_heavy_validation_rejects_invalid_values(values: Any) -> None:
     }
     config.update(values)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r".+"):
         validate_heavy(**config)
 
 
@@ -1238,11 +1238,11 @@ def test_environment_configuration_is_parsed() -> None:
 
 
 def test_environment_integer_rejects_invalid_values() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="COUNT must be an integer"):
         read_int({"COUNT": "many"}, "COUNT", 1)
 
 
-@pytest.mark.parametrize("value", ["maybe", "", "2"])
+@pytest.mark.parametrize("value", ("maybe", "", "2"))
 def test_environment_boolean_rejects_invalid_values(value: Any) -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="ENABLED must be a boolean"):
         read_bool({"ENABLED": value}, "ENABLED", True)

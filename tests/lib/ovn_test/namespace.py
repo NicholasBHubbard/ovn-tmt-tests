@@ -1,6 +1,7 @@
 import ipaddress
 import json
-from typing import Any, Callable, Sequence
+from collections.abc import Sequence
+from typing import Any, Callable
 
 from ovn_test.load_balancer import replace, socket
 

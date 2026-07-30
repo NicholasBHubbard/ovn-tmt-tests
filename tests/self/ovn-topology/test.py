@@ -581,10 +581,10 @@ class TestInitial:
 class TestReconfigured:
     @pytest.mark.parametrize(
         ("table", "identifier", "snapshot"),
-        [
+        (
             ("Logical_Switch_Port", "self-localnet", "localnet-moved"),
             ("Gateway_Chassis", "self-gateway", "gateway-moved"),
-        ],
+        ),
     )
     def test_named_identity_is_recorded(
         self,
@@ -601,7 +601,7 @@ class TestReconfigured:
 
     @pytest.mark.parametrize(
         ("table", "identifier", "snapshot"),
-        [
+        (
             (
                 "Logical_Router_Static_Route",
                 "self-route",
@@ -610,7 +610,7 @@ class TestReconfigured:
             ("NAT", "self-nat", "nat-moved"),
             ("DHCP_Options", "self-dhcp", "dhcp-moved"),
             ("ACL", "self-acl", "acl-moved"),
-        ],
+        ),
     )
     def test_managed_identity_is_recorded(
         self,
@@ -681,7 +681,7 @@ class TestScaleInitial:
 
     @pytest.mark.parametrize(
         ("table", "name", "snapshot"),
-        [
+        (
             ("Logical_Switch", "ls-join1", "scale-join"),
             ("Logical_Router", "lr-cluster1", "scale-cluster"),
             (
@@ -689,7 +689,7 @@ class TestScaleInitial:
                 "rtr-to-node-ovn-scale-0",
                 "scale-worker-port",
             ),
-        ],
+        ),
     )
     def test_stable_identity_is_recorded(
         self, nb: Ovsdb, snapshots: Snapshots, table: str, name: str, snapshot: str
@@ -1105,7 +1105,7 @@ class TestScaleResult:
 
     @pytest.mark.parametrize(
         "name",
-        ["ovn-scale-2", "ovn-scale-3", "ovn-scale-4"],
+        ("ovn-scale-2", "ovn-scale-3", "ovn-scale-4"),
     )
     def test_removed_workers_leave_no_topology(self, nb: Ovsdb, name: str) -> None:
         assert not nb.exists("Logical_Switch", f"name=lswitch-{name}")

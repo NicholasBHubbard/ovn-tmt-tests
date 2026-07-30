@@ -1,6 +1,8 @@
 import os
+from collections.abc import Iterator
+from functools import partial
 from pathlib import Path
-from typing import Any, Callable, Iterator
+from typing import Any, Callable
 
 import pytest
 from ovn_test.command import Runner
@@ -143,6 +145,28 @@ def test_cluster_density(workload: Any) -> None:
             next_endpoint += 1
         return endpoints
 
+    def create_namespace(
+        namespace: OvnNamespace,
+        phase: str,
+        passive: bool,
+    ) -> None:
+        namespace.create()
+        build = (
+            add_pods(config["build_pods"], phase, passive=False) if not passive else []
+        )
+        if build:
+            namespace.add_endpoints(build)
+
+        service = add_pods(config["test_pods"], phase, passive)
+        namespace.add_endpoints(service)
+        namespace.add_services(service, config["protocols"], group)
+
+        if not passive:
+            for endpoint in [*build, *service]:
+                baseline.external.verify(endpoint)
+            for endpoint in build:
+                instance.remove_endpoint(endpoint)
+
     for namespace_index in range(config["total"]):
         phase = "startup" if namespace_index < config["startup"] else "iteration"
         passive = phase == "startup"
@@ -156,27 +180,11 @@ def test_cluster_density(workload: Any) -> None:
         )
         namespaces.append(namespace)
 
-        def create_namespace() -> None:
-            namespace.create()
-            build = (
-                add_pods(config["build_pods"], phase, passive=False)
-                if not passive
-                else []
-            )
-            if build:
-                namespace.add_endpoints(build)
-
-            service = add_pods(config["test_pods"], phase, passive)
-            namespace.add_endpoints(service)
-            namespace.add_services(service, config["protocols"], group)
-
-            if not passive:
-                for endpoint in [*build, *service]:
-                    baseline.external.verify(endpoint)
-                for endpoint in build:
-                    instance.remove_endpoint(endpoint)
-
-        instance.measure(namespace_index, phase, create_namespace)
+        instance.measure(
+            namespace_index,
+            phase,
+            partial(create_namespace, namespace, phase, passive),
+        )
         if namespace_index + 1 == config["startup"]:
             instance.sync()
 

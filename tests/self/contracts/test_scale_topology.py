@@ -349,7 +349,7 @@ def test_southbound_checker_rejects_missing_and_stale_objects(tree: Path) -> Non
         "absent_ports": [],
     }
 
-    with pytest.raises(RuntimeError, match="missing_datapaths.*stale_datapaths"):
+    with pytest.raises(RuntimeError, match=r"missing_datapaths.*stale_datapaths"):
         checker.verify(
             expected,
             {"datapaths": {"present", "stale"}, "ports": {"present-port"}},

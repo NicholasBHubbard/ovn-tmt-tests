@@ -1,6 +1,7 @@
 import os
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, Mapping, Optional, Sequence, Union
+from typing import Any, Optional, Union
 
 from ovn_test.config import read_bool
 from ovn_test.network import ExternalPeers

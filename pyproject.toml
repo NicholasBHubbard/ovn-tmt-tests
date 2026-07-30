@@ -2,6 +2,7 @@
 addopts = "-q -s --import-mode=importlib"
 
 [tool.ruff]
+line-length = 88
 show-fixes = true
 target-version = "py39"
 
@@ -15,7 +16,23 @@ extend-select = [
     "ANN204",
     "ANN205",
     "ANN206",
+    "B",
+    "I",
+    "PT",
+    "RUF",
+    "SIM",
+    "UP",
 ]
+
+[tool.ruff.lint.flake8-pytest-style]
+parametrize-values-row-type = "tuple"
+parametrize-values-type = "tuple"
+
+[tool.ruff.format]
+indent-style = "space"
+line-ending = "auto"
+quote-style = "double"
+skip-magic-trailing-comma = false
 
 [tool.ty.environment]
 python-version = "3.9"

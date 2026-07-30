@@ -75,12 +75,12 @@ class TestReconfigured:
 class TestInvalid:
     @pytest.mark.parametrize(
         ("case", "message"),
-        [
+        (
             (
                 "invalid_name",
                 "OVN chassis configuration is invalid.",
             ),
-        ],
+        ),
     )
     def test_configuration_is_rejected(
         self, runner: Runner, tree: Path, case: Any, message: str

@@ -1,8 +1,9 @@
 import os
 import subprocess
+from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Callable, Mapping, Optional, Union
+from typing import Any, Callable, Optional, Union
 
 from ovn_test.config import driver_connection, read_bool
 from ovn_test.topology import Topology
