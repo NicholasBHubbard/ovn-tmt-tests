@@ -61,12 +61,12 @@ class TestResult:
 
         assert "actions/checkout@v5" in text
         assert "actions/setup-python@v6" in text
-        assert 'python-version: ["3.9", "3.x"]' in text
+        assert 'python-version: "3.9"\n            runner: ubuntu-24.04' in text
+        assert 'python-version: "3.x"\n            runner: ubuntu-26.04' in text
         assert "if: matrix.python-version == '3.x'" in text
         assert "run: python3 -m pytest tests/self/contracts" in text
         assert "ubuntu-26.04" in text
         assert "ubuntu-latest" not in text
-        assert "ubuntu-24.04" not in text
 
     def test_change_detection_contract(self):
         text = self.ci.read_text()

@@ -19,11 +19,15 @@ permissions:
 jobs:
   python:
     name: Python checks (${{ matrix.python-version }})
-    runs-on: ubuntu-26.04
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.9", "3.x"]
+        include:
+          - python-version: "3.9"
+            runner: ubuntu-24.04
+          - python-version: "3.x"
+            runner: ubuntu-26.04
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
