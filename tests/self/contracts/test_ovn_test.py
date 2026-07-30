@@ -967,6 +967,68 @@ def test_ovn_namespace_manages_network_policy_state() -> None:
     namespace.verify_cleanup()
 
 
+def test_ovn_namespace_manages_ipv6_network_policy_state() -> None:
+    runner = FakeRunner()
+    namespace = OvnNamespace(
+        runner,
+        "network-policy",
+        "NS_policy_6",
+        6,
+        ipv4=False,
+    )
+
+    namespace.create()
+    namespace.add_endpoints([{"port": "pod-v6", "ipv6": "fd00::10"}])
+    namespace.default_deny(6)
+    namespace.allow_within(6)
+    namespace.allow_external(
+        ["2001:db8::1", "2001:db8::2"],
+        family=6,
+        name="trusted",
+    )
+
+    commands = [call[1] for call in runner.calls]
+    assert any(
+        command[:3] == ("ovn-nbctl", "add", "Address_Set")
+        and command[-1] == '"fd00::10"'
+        for command in commands
+    )
+    acls = {(command[-2], command[-1]) for command in commands if "acl-add" in command}
+    assert acls == {
+        (
+            "ip6.src == $as6_NS_policy_6 && outport == @pg_deny_igr_NS_policy_6",
+            "drop",
+        ),
+        (
+            "outport == @pg_deny_igr_NS_policy_6 && nd",
+            "allow",
+        ),
+        (
+            "ip6.dst == $as6_NS_policy_6 && inport == @pg_deny_egr_NS_policy_6",
+            "drop",
+        ),
+        (
+            "inport == @pg_deny_egr_NS_policy_6 && nd",
+            "allow",
+        ),
+        (
+            "ip6.src == $as6_NS_policy_6 && outport == @pg_NS_policy_6",
+            "allow-related",
+        ),
+        (
+            "ip6.dst == $as6_NS_policy_6 && inport == @pg_NS_policy_6",
+            "allow-related",
+        ),
+        (
+            "ip6.src == {2001:db8::1,2001:db8::2} && outport == @pg_NS_policy_6",
+            "allow-related",
+        ),
+    }
+
+    namespace.cleanup()
+    namespace.verify_cleanup()
+
+
 def test_ovn_namespace_rejects_invalid_policy_addresses() -> None:
     namespace = OvnNamespace(
         FakeRunner(),
