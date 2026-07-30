@@ -1,5 +1,4 @@
 import hashlib
-from typing import Any
 
 import pytest
 from ovn_test.command import Runner
@@ -50,7 +49,7 @@ class TestPreconditions:
         assert not runner.succeeds("ovs-vsctl", "br-exists", bridge_name)
 
     @pytest.mark.parametrize("endpoint", ENDPOINTS)
-    def test_endpoint_is_absent(self, network: Network, endpoint: Any) -> None:
+    def test_endpoint_is_absent(self, network: Network, endpoint: str) -> None:
         assert not network.namespace_exists(endpoint)
         assert network.link(f"{endpoint}-p") is None
 
@@ -66,18 +65,24 @@ class TestInitial:
 
     def test_long_endpoint(self, network: Network) -> None:
         link = network.link("inside0", "self-long-endpoint-name")
+        assert link is not None
         assert link["address"] == "02:00:00:00:20:07"
 
     @pytest.mark.parametrize(
         ("endpoint", "mtu"),
         (("self-direct", 1400), ("self-peer", 1450)),
     )
-    def test_mtu(self, network: Network, endpoint: Any, mtu: int) -> None:
-        assert network.link(f"{endpoint}-p")["mtu"] == mtu
-        assert network.link(endpoint, endpoint)["mtu"] == mtu
+    def test_mtu(self, network: Network, endpoint: str, mtu: int) -> None:
+        host = network.link(f"{endpoint}-p")
+        namespace = network.link(endpoint, endpoint)
+        assert host is not None
+        assert namespace is not None
+        assert host["mtu"] == mtu
+        assert namespace["mtu"] == mtu
 
     def test_direct_endpoint(self, runner: Runner, network: Network) -> None:
         link = network.link("self-direct", "self-direct")
+        assert link is not None
         assert link["address"] == "02:00:00:00:20:01"
         assert sorted(
             network.addresses("self-direct", "self-direct", scope="global")
@@ -129,7 +134,7 @@ class TestReconfigured:
 class TestResult:
     @pytest.mark.parametrize("endpoint", ("self-direct", "self-peer"))
     def test_endpoints_moved_bridges(
-        self, runner: Runner, network: Network, endpoint: Any
+        self, runner: Runner, network: Network, endpoint: str
     ) -> None:
         assert network.namespace_exists(endpoint)
         assert network.link(f"{endpoint}-p") is not None
@@ -140,6 +145,7 @@ class TestResult:
     ) -> None:
         assert bridge(runner, long_host_interface()) == "self-br-b"
         link = network.link("endpoint0", "self-long-endpoint-name")
+        assert link is not None
         assert link["address"] == "02:00:00:00:20:17"
         runner.namespace(
             "self-long-endpoint-name",
@@ -155,14 +161,19 @@ class TestResult:
         ("endpoint", "mtu"),
         (("self-direct", 1500), ("self-peer", 1300)),
     )
-    def test_mtu(self, network: Network, endpoint: Any, mtu: int) -> None:
-        assert network.link(f"{endpoint}-p")["mtu"] == mtu
-        assert network.link(endpoint, endpoint)["mtu"] == mtu
+    def test_mtu(self, network: Network, endpoint: str, mtu: int) -> None:
+        host = network.link(f"{endpoint}-p")
+        namespace = network.link(endpoint, endpoint)
+        assert host is not None
+        assert namespace is not None
+        assert host["mtu"] == mtu
+        assert namespace["mtu"] == mtu
 
     def test_direct_endpoint_reconfigured(
         self, runner: Runner, network: Network
     ) -> None:
         link = network.link("self-direct", "self-direct")
+        assert link is not None
         assert link["address"] == "02:00:00:00:20:11"
         assert network.addresses("self-direct", "self-direct", scope="global") == [
             "203.0.113.10/24"
@@ -190,7 +201,7 @@ class TestResult:
 
     @pytest.mark.parametrize("endpoint", ("self-delete", "self-away", "self-stale"))
     def test_removed_endpoints_are_absent(
-        self, runner: Runner, network: Network, endpoint: Any
+        self, runner: Runner, network: Network, endpoint: str
     ) -> None:
         interface = f"{endpoint}-p"
         assert not network.namespace_exists(endpoint)
@@ -201,4 +212,6 @@ class TestResult:
         self, runner: Runner, network: Network
     ) -> None:
         assert bridge(runner, "self-keep-p") == "self-br-a"
-        assert network.link("self-keep", "self-keep")["mtu"] == 1450
+        link = network.link("self-keep", "self-keep")
+        assert link is not None
+        assert link["mtu"] == 1450

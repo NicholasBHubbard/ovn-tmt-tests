@@ -1,11 +1,17 @@
 import ipaddress
 import json
 from collections.abc import Sequence
-from typing import Any, Callable
+from typing import Callable
 
+from ovn_test.command import Runner
 from ovn_test.load_balancer import replace, socket
+from ovn_test.models import Endpoint
 
 VALID_PROTOCOLS = {"tcp", "udp", "sctp"}
+
+
+def _address(endpoint: Endpoint, family: int) -> str:
+    return endpoint["ipv4"] if family == 4 else endpoint["ipv6"]
 
 
 def validate_cluster_density(
@@ -66,7 +72,7 @@ def validate_cluster_density(
 class OvnNamespace:
     def __init__(
         self,
-        runner: Any,
+        runner: Runner,
         owner: str,
         name: str,
         index: int,
@@ -130,7 +136,7 @@ class OvnNamespace:
                 f"external_ids:ovn-tmt-tests-owner={json.dumps(self.owner)}",
             )
 
-    def add_endpoints(self, endpoints: Sequence[dict[str, Any]]) -> None:
+    def add_endpoints(self, endpoints: Sequence[Endpoint]) -> None:
         for family, enabled in ((4, self.ipv4), (6, self.ipv6)):
             if not enabled:
                 continue
@@ -140,7 +146,7 @@ class OvnNamespace:
                 "Address_Set",
                 self.address_set_ids[family],
                 "addresses",
-                *(json.dumps(endpoint[f"ipv{family}"]) for endpoint in endpoints),
+                *(json.dumps(_address(endpoint, family)) for endpoint in endpoints),
             )
 
     def _vip(self, family: int, position: int) -> str:
@@ -155,7 +161,7 @@ class OvnNamespace:
 
     def add_services(
         self,
-        endpoints: Sequence[dict[str, Any]],
+        endpoints: Sequence[Endpoint],
         protocols: Sequence[str],
         group: str,
     ) -> None:
@@ -168,7 +174,7 @@ class OvnNamespace:
                 continue
             for position, backends in enumerate(backend_groups):
                 vips[socket(self._vip(family, position), 80, family)] = [
-                    socket(endpoint[f"ipv{family}"], 8080, family)
+                    socket(_address(endpoint, family), 8080, family)
                     for endpoint in backends
                 ]
         for protocol in protocols:

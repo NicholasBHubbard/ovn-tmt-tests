@@ -1,7 +1,7 @@
 import shlex
 import subprocess
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Optional, Union
 
 import pytest
 import yaml
@@ -32,7 +32,7 @@ def content(tree: Path, path: Union[str, Path]) -> str:
     return (tree / path).read_text()
 
 
-def assert_contains(tree: Path, path: Union[str, Path], expected: Any) -> None:
+def assert_contains(tree: Path, path: Union[str, Path], expected: str) -> None:
     assert expected in content(tree, path), path
 
 
@@ -41,7 +41,7 @@ def prepare_phase(
     path: Union[str, Path],
     name: Optional[str] = None,
     playbook: Optional[str] = None,
-) -> dict[str, Any]:
+) -> dict[str, object]:
     metadata = yaml.safe_load(content(tree, path)) or {}
     phases = []
     for key in ("prepare", "prepare+", "prepare+<"):
@@ -58,8 +58,10 @@ def prepare_phase(
     )
 
 
-def extra_variables(phase: dict[str, Any]) -> dict[str, str]:
-    arguments = shlex.split(phase.get("extra-args", ""))
+def extra_variables(phase: dict[str, object]) -> dict[str, str]:
+    extra_args = phase.get("extra-args", "")
+    assert isinstance(extra_args, str)
+    arguments = shlex.split(extra_args)
     return {
         assignment.split("=", 1)[0]: assignment.split("=", 1)[1]
         for option, assignment in zip(arguments, arguments[1:])
@@ -471,7 +473,10 @@ def test_artifact_role_contract(tree: Path) -> None:
     ),
 )
 def test_scale_workload_contract(
-    tree: Path, plan: Any, test: Any, settings: Any
+    tree: Path,
+    plan: str,
+    test: str,
+    settings: tuple[str, ...],
 ) -> None:
     plan_path = tree / "plans/ovn-multihost/ovn-scale-testing" / plan
     test_dir = tree / "tests/scale" / test

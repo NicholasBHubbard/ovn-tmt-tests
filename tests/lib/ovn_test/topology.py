@@ -1,19 +1,31 @@
 import os
 from pathlib import Path
-from typing import Any, Union
+from typing import TypedDict, Union, cast
 
 import yaml
 
 
+class Guest(TypedDict):
+    name: str
+    hostname: str
+    role: str
+
+
+class TopologyData(TypedDict):
+    guest: Guest
+    guests: dict[str, Guest]
+    roles: dict[str, list[str]]
+
+
 class Topology:
-    def __init__(self, data: dict[str, Any]) -> None:
+    def __init__(self, data: TopologyData) -> None:
         self.data = data
         self.current = data["guest"]["name"]
 
     @classmethod
     def from_file(cls, path: Union[str, os.PathLike[str]]) -> "Topology":
         with Path(path).open() as source:
-            return cls(yaml.safe_load(source))
+            return cls(cast(TopologyData, yaml.safe_load(source)))
 
     @classmethod
     def from_environment(cls) -> "Topology":

@@ -1,12 +1,12 @@
 import json
 import tarfile
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
 
 from ovn_test.command import Runner
 
 
-def run_playbook(tree: Path, playbook: str, variables: Any) -> None:
+def run_playbook(tree: Path, playbook: str, variables: Mapping[str, object]) -> None:
     Runner().run(
         "ansible-playbook",
         "-i",

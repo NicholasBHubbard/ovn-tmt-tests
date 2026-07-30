@@ -16,13 +16,19 @@ extend-select = [
     "ANN204",
     "ANN205",
     "ANN206",
+    "ANN401",
     "B",
     "I",
     "PT",
     "RUF",
     "SIM",
+    "TID251",
     "UP",
 ]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"typing.Any".msg = "Use a precise type or object instead."
+"typing_extensions.Any".msg = "Use a precise type or object instead."
 
 [tool.ruff.lint.flake8-pytest-style]
 parametrize-values-row-type = "tuple"

@@ -2,7 +2,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, NoReturn
+from typing import NoReturn
 
 import pytest
 from ovn_test.ansible import Ansible
@@ -27,7 +27,9 @@ def test_runner_conveniences(capsys: pytest.CaptureFixture[str]) -> None:
         ]
     )
 
-    def execute(command: Any, **kwargs: Any) -> Any:
+    def execute(
+        command: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
         calls.append((command, kwargs))
         return next(responses)
 
@@ -64,7 +66,7 @@ def test_runner_reports_command_success() -> None:
 
 
 def test_runner_reports_missing_commands_as_unsuccessful() -> None:
-    def execute(command: Any, **kwargs: Any) -> NoReturn:
+    def execute(command: list[str], **kwargs: object) -> NoReturn:
         raise FileNotFoundError(command[0])
 
     assert not Runner(execute=execute).succeeds("missing")
@@ -101,7 +103,9 @@ def test_runner_does_not_require_topology_for_local_commands() -> None:
 def test_runner_normalizes_arguments_and_wait_options() -> None:
     calls = []
 
-    def execute(command: Any, **kwargs: Any) -> Any:
+    def execute(
+        command: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
         calls.append((command, kwargs))
         return subprocess.CompletedProcess(command, 0, "", "")
 
@@ -125,7 +129,9 @@ def test_runner_serializes_remote_command_batches(
 ) -> None:
     calls = []
 
-    def execute(command: Any, **kwargs: Any) -> Any:
+    def execute(
+        command: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
         calls.append((command, kwargs))
         return subprocess.CompletedProcess(command, 0, "", "")
 
@@ -228,7 +234,9 @@ def test_runner_waits_for_a_result() -> None:
 def test_runner_wait_reports_timeout() -> None:
     calls = 0
 
-    def execute(command: Any, **kwargs: Any) -> Any:
+    def execute(
+        command: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
         nonlocal calls
         calls += 1
         return subprocess.CompletedProcess(command, 1, "", "still unavailable\n")
@@ -318,12 +326,13 @@ def test_ovsdb_decodes_json_rows() -> None:
     }
     calls = []
 
-    class FakeRunner:
-        def output(self, *command: Any, **kwargs: Any) -> str:
-            calls.append((command, kwargs))
-            return json.dumps(payload)
+    def execute(
+        command: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        calls.append((command, kwargs))
+        return subprocess.CompletedProcess(command, 0, json.dumps(payload), "")
 
-    database = Ovsdb(FakeRunner(), "ovn-nbctl")
+    database = Ovsdb(Runner(execute=execute), "ovn-nbctl")
 
     rows = database.find(
         "Logical_Switch",
@@ -353,7 +362,7 @@ def test_ovsdb_decodes_json_rows() -> None:
     assert database.managed("Logical_Switch", "managed:0", "name")["name"] == "sw0"
     assert database.referring_names("Logical_Switch", "ports", "port-1") == ["sw0"]
     assert database.exists("Logical_Switch", "name=sw0")
-    assert calls[0][0] == (
+    assert calls[0][0] == [
         "ovn-nbctl",
         "--format=json",
         "--data=json",
@@ -361,7 +370,7 @@ def test_ovsdb_decodes_json_rows() -> None:
         "find",
         "Logical_Switch",
         "name=sw0",
-    )
+    ]
     assert calls[4][0][-1] == 'name="sw\\"0"'
     assert calls[5][0][-1] == 'external_ids:ovn-tmt-tests-id="managed:0"'
     assert calls[6][0][-1] == "ports{>=}port-1"
@@ -372,28 +381,26 @@ def test_ovsdb_decodes_json_rows() -> None:
 
 
 def test_ovsdb_one_requires_exactly_one_row() -> None:
-    class FakeRunner:
-        def __init__(self, rows: Any) -> None:
-            self.rows = rows
+    def database(rows: list[list[str]]) -> Ovsdb:
+        def execute(
+            command: list[str], **kwargs: object
+        ) -> subprocess.CompletedProcess[str]:
+            output = json.dumps({"headings": ["name"], "data": rows})
+            return subprocess.CompletedProcess(command, 0, output, "")
 
-        def output(self, *command: Any, **kwargs: Any) -> str:
-            return json.dumps({"headings": ["name"], "data": self.rows})
+        return Ovsdb(Runner(execute=execute), "ovn-nbctl")
 
     with pytest.raises(LookupError, match="found 0"):
-        Ovsdb(FakeRunner([]), "ovn-nbctl").one(
-            "Logical_Switch", "name=missing", columns=("name",)
-        )
-    assert not Ovsdb(FakeRunner([]), "ovn-nbctl").exists(
-        "Logical_Switch", "name=missing"
-    )
+        database([]).one("Logical_Switch", "name=missing", columns=("name",))
+    assert not database([]).exists("Logical_Switch", "name=missing")
     with pytest.raises(LookupError, match="found 2"):
-        Ovsdb(FakeRunner([["one"], ["two"]]), "ovn-nbctl").one(
-            "Logical_Switch", columns=("name",)
-        )
+        database([["one"], ["two"]]).one("Logical_Switch", columns=("name",))
 
 
 def test_network_observes_namespaces_links_addresses_and_routes() -> None:
-    def execute(command: Any, **kwargs: Any) -> Any:
+    def execute(
+        command: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
         if command == ["ip", "netns", "exec", "vm1", "true"]:
             return subprocess.CompletedProcess(command, 0, "", "")
         if command == ["ip", "netns", "exec", "missing", "true"]:
@@ -503,7 +510,9 @@ def test_network_observes_namespaces_links_addresses_and_routes() -> None:
 
 
 def test_network_treats_a_missing_route_table_as_empty() -> None:
-    def execute(command: Any, **kwargs: Any) -> Any:
+    def execute(
+        command: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
         result = subprocess.CompletedProcess(
             command,
             2,
@@ -556,7 +565,9 @@ def test_network_waits_for_ping_and_reports_failure() -> None:
 def test_system_observes_exact_processes_and_tcp_ports() -> None:
     calls = []
 
-    def execute(command: Any, **kwargs: Any) -> Any:
+    def execute(
+        command: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
         calls.append(command)
         if command[0] == "pgrep":
             return subprocess.CompletedProcess(command, 0, "10 ovn-controller\n", "")
@@ -577,7 +588,9 @@ def test_system_observes_exact_processes_and_tcp_ports() -> None:
 def test_process_observation_distinguishes_absence_from_error() -> None:
     status = 1
 
-    def execute(command: Any, **kwargs: Any) -> Any:
+    def execute(
+        command: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
         return subprocess.CompletedProcess(command, status, "", "error")
 
     runner = Runner(Topology(topology_data()), execute=execute)
@@ -591,7 +604,9 @@ def test_process_observation_distinguishes_absence_from_error() -> None:
 def test_ansible_writes_inventory_and_keeps_per_guest_logs(tmp_path: Path) -> None:
     calls = []
 
-    def execute(command: Any, **kwargs: Any) -> Any:
+    def execute(
+        command: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
         calls.append((command, kwargs))
         guest = command[command.index("--limit") + 1]
         status = 7 if guest == "compute-1" else 0

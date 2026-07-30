@@ -1,7 +1,7 @@
 import json
 import os
 import subprocess
-from typing import Any, Callable
+from typing import Callable
 
 import pytest
 from ovn_test.command import Runner
@@ -86,7 +86,7 @@ def test_path_mtu_across_encapsulation(
             guest="compute-1",
         )
 
-    def set_encapsulation(value: Any, check: bool = True) -> None:
+    def set_encapsulation(value: str, check: bool = True) -> None:
         for guest in ("compute-1", "compute-2", "gateway-1"):
             runner.run(
                 "ovs-vsctl",

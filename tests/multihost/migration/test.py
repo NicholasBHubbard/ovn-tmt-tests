@@ -1,4 +1,4 @@
-from typing import Any, Callable
+from typing import Callable
 
 import pytest
 from ovn_test.command import Runner
@@ -11,7 +11,7 @@ def test_live_migration(runner: Runner, network: Callable[[str], Network]) -> No
     source = network("compute-1")
     destination = network("compute-3")
 
-    def request_chassis(value: Any, check: bool = True) -> None:
+    def request_chassis(value: str, check: bool = True) -> None:
         runner.run(
             "ovn-nbctl",
             "--wait=hv",

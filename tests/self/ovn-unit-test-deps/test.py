@@ -1,5 +1,4 @@
 import shutil
-from typing import Any
 
 import pytest
 from ovn_test.command import Runner
@@ -15,7 +14,7 @@ class TestPreconditions:
 
 class TestResult:
     @pytest.mark.parametrize("command", COMMANDS)
-    def test_command_is_available(self, command: Any) -> None:
+    def test_command_is_available(self, command: str) -> None:
         assert shutil.which(command)
 
     @pytest.mark.parametrize("package", PACKAGES)

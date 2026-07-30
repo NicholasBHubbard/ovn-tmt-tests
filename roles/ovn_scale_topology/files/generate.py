@@ -3,7 +3,7 @@ import json
 import os
 from collections import Counter
 from pathlib import Path
-from typing import Any, TypedDict, Union
+from typing import TypedDict, Union, cast
 
 Network = Union[ipaddress.IPv4Network, ipaddress.IPv6Network]
 
@@ -15,6 +15,135 @@ class Family(TypedDict):
     join: Network
     cluster: str
     default: str
+
+
+class Config(TypedDict):
+    id: str
+    worker_count: int
+    worker_prefix: str
+    workers: list[str]
+    chassis: list[str]
+    ipv4: bool
+    ipv6: bool
+    internal_ipv4: str
+    internal_ipv6: str
+    external_ipv4: str
+    external_ipv6: str
+    join_ipv4: str
+    join_ipv6: str
+    cluster_ipv4: str
+    cluster_ipv6: str
+    cluster_router: str
+    join_switch: str
+    load_balancer_group: str
+    snat_ct_zone: str
+    physical_network: str
+    physical_bridge: str
+
+
+class NamedObject(TypedDict):
+    name: str
+
+
+class Router(NamedObject):
+    options: dict[str, Union[str, int]]
+
+
+class RouterPort(NamedObject):
+    router: str
+    switch: str
+    switch_port: str
+    mac: str
+    networks: list[str]
+
+
+class GatewayChassis(TypedDict):
+    id: str
+    router_port: str
+    chassis: str
+    priority: int
+
+
+class LocalnetRequired(TypedDict):
+    name: str
+    switch: str
+    network: str
+
+
+class Localnet(LocalnetRequired, total=False):
+    tag: int
+
+
+class StaticRouteRequired(TypedDict):
+    id: str
+    router: str
+    prefix: str
+    nexthop: str
+
+
+class StaticRoute(StaticRouteRequired, total=False):
+    policy: str
+
+
+class NatRule(TypedDict):
+    id: str
+    router: str
+    type: str
+    external_ip: str
+    logical_ip: str
+
+
+class WorkerRequired(TypedDict):
+    name: str
+    chassis: str
+    switch: str
+    gateway_router: str
+    external_switch: str
+    internal: dict[str, str]
+    external: dict[str, str]
+    join: dict[str, str]
+
+
+class Worker(WorkerRequired, total=False):
+    external_vlan: int
+
+
+class LoadBalancerGroup(TypedDict):
+    id: str
+    name: str
+    switches: list[str]
+    routers: list[str]
+
+
+class Managed(TypedDict):
+    switches: list[str]
+    routers: list[str]
+    router_ports: list[str]
+
+
+class Southbound(TypedDict):
+    datapaths: list[str]
+    ports: list[str]
+    absent_datapaths: list[str]
+    absent_ports: list[str]
+
+
+class State(TypedDict, total=False):
+    owner: str
+    physical_bridge: str
+    physical_network: str
+    switches: list[NamedObject]
+    routers: list[Router]
+    router_ports: list[RouterPort]
+    gateway_chassis: list[GatewayChassis]
+    localnet_ports: list[Localnet]
+    static_routes: list[StaticRoute]
+    nat_rules: list[NatRule]
+    workers: list[Worker]
+    load_balancer_groups: list[LoadBalancerGroup]
+    load_balancer_group: str
+    managed: Managed
+    southbound: Southbound
 
 
 def _next(network: str, index: int) -> Network:
@@ -33,7 +162,7 @@ def _mac(kind: int, index: int) -> str:
     return "02:00:" + ":".join(f"{octet:02x}" for octet in octets)
 
 
-def generate(config: dict[str, Any]) -> dict[str, Any]:
+def generate(config: Config) -> State:
     count = config["worker_count"]
     names = config["workers"] or [
         f"{config['worker_prefix']}-{index}" for index in range(count)
@@ -64,15 +193,20 @@ def generate(config: dict[str, Any]) -> dict[str, Any]:
 
     families: list[Family] = []
     for version in (4, 6):
-        if not config[f"ipv{version}"]:
+        enabled = config["ipv4"] if version == 4 else config["ipv6"]
+        if not enabled:
             continue
+        internal = config["internal_ipv4"] if version == 4 else config["internal_ipv6"]
+        external = config["external_ipv4"] if version == 4 else config["external_ipv6"]
+        join = config["join_ipv4"] if version == 4 else config["join_ipv6"]
+        cluster = config["cluster_ipv4"] if version == 4 else config["cluster_ipv6"]
         families.append(
             {
                 "version": version,
-                "internal": config[f"internal_ipv{version}"],
-                "external": config[f"external_ipv{version}"],
-                "join": ipaddress.ip_network(config[f"join_ipv{version}"]),
-                "cluster": config[f"cluster_ipv{version}"],
+                "internal": internal,
+                "external": external,
+                "join": ipaddress.ip_network(join),
+                "cluster": cluster,
                 "default": "0.0.0.0/0" if version == 4 else "::/0",
             }
         )
@@ -80,13 +214,13 @@ def generate(config: dict[str, Any]) -> dict[str, Any]:
     owner = config["id"]
     cluster_router = config["cluster_router"]
     join_switch = config["join_switch"]
-    snat_ct_zone = config.get("snat_ct_zone", "")
+    snat_ct_zone: Union[str, int] = config.get("snat_ct_zone", "")
     if snat_ct_zone != "":
         snat_ct_zone = int(snat_ct_zone)
         if not 0 <= snat_ct_zone <= 65535:
             raise ValueError("snat_ct_zone must be between 0 and 65535")
     cluster_join_port = f"rtr-to-{join_switch}"
-    result = {
+    result: State = {
         "owner": owner,
         "physical_bridge": config["physical_bridge"],
         "physical_network": config["physical_network"],
@@ -125,7 +259,7 @@ def generate(config: dict[str, Any]) -> dict[str, Any]:
         if workers_per_chassis[chassis_name] > 1:
             next_vlan[chassis_name] += 1
             external_vlan = next_vlan[chassis_name]
-        worker = {
+        worker: Worker = {
             "name": name,
             "chassis": chassis_name,
             "switch": worker_switch,
@@ -139,7 +273,7 @@ def generate(config: dict[str, Any]) -> dict[str, Any]:
             worker["external_vlan"] = external_vlan
 
         result["switches"].extend([{"name": worker_switch}, {"name": external_switch}])
-        gateway_options = {
+        gateway_options: dict[str, Union[str, int]] = {
             "always_learn_from_arp_request": "false",
             "dynamic_neigh_routers": "true",
             "chassis": chassis_name,
@@ -244,7 +378,7 @@ def generate(config: dict[str, Any]) -> dict[str, Any]:
                 "priority": 10,
             }
         )
-        localnet = {
+        localnet: Localnet = {
             "name": f"provnet-{name}",
             "switch": external_switch,
             "network": config["physical_network"],
@@ -279,7 +413,9 @@ def generate(config: dict[str, Any]) -> dict[str, Any]:
 
 
 def main() -> None:
-    output = json.dumps(generate(json.loads(os.environ["OVN_SCALE_TOPOLOGY_CONFIG"])))
+    output = json.dumps(
+        generate(cast(Config, json.loads(os.environ["OVN_SCALE_TOPOLOGY_CONFIG"])))
+    )
     path = os.environ.get("OVN_SCALE_TOPOLOGY_OUTPUT")
     if path:
         Path(path).write_text(output)

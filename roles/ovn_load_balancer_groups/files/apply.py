@@ -4,16 +4,29 @@ import os
 import subprocess
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
+from typing import TypedDict, cast
 
 
-def _decode(value: Any) -> Any:
+class GroupRequired(TypedDict):
+    id: str
+
+
+class Group(GroupRequired, total=False):
+    name: str
+    state: str
+    switches: list[str]
+    routers: list[str]
+
+
+def _decode(value: object) -> object:
     if not isinstance(value, list) or len(value) != 2:
         return value
     kind, contents = value
+    if not isinstance(kind, str):
+        return value
     if kind in {"uuid", "named-uuid"}:
         return contents
-    if kind == "set":
+    if kind == "set" and isinstance(contents, list):
         return [_decode(item) for item in contents]
     return value
 
@@ -27,7 +40,7 @@ def _run(*args: object) -> str:
     ).stdout.strip()
 
 
-def _rows(table: str, condition: str) -> list[dict[str, Any]]:
+def _rows(table: str, condition: str) -> list[dict[str, object]]:
     output = _run(
         "--format=json",
         "--data=json",
@@ -57,7 +70,7 @@ def _batch(commands: Sequence[Sequence[object]]) -> None:
             _run(*arguments)
 
 
-def apply(groups: Sequence[dict[str, Any]]) -> None:
+def apply(groups: Sequence[Group]) -> None:
     names = [group.get("name", group["id"]) for group in groups]
     if len(names) != len(set(names)):
         raise ValueError("load balancer group names must be unique")
@@ -122,7 +135,7 @@ def main() -> None:
         groups = data.get("load_balancer_groups", data)
     else:
         groups = json.loads(base64.b64decode(os.environ["OVN_LOAD_BALANCER_GROUPS"]))
-    apply(groups)
+    apply(cast(list[Group], groups))
 
 
 if __name__ == "__main__":

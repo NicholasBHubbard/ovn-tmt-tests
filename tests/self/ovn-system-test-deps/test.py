@@ -1,6 +1,5 @@
 import shutil
 from pathlib import Path
-from typing import Any
 
 import pytest
 
@@ -28,7 +27,7 @@ class TestPreconditions:
 
 class TestResult:
     @pytest.mark.parametrize("command", COMMANDS)
-    def test_command_is_available(self, command: Any) -> None:
+    def test_command_is_available(self, command: str) -> None:
         assert shutil.which(command)
 
     def test_fedora_nc_uses_ncat(self) -> None:

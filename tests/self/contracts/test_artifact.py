@@ -2,7 +2,7 @@ import hashlib
 import json
 import subprocess
 from pathlib import Path
-from typing import Any, Union
+from typing import Union
 
 import pytest
 from ovn_test.command import Runner
@@ -22,8 +22,8 @@ def manifest(tmp_path: Path) -> Path:
     return tmp_path / "manifest.json"
 
 
-def identity(**changes: Any) -> dict[str, Any]:
-    values = {
+def identity(**changes: object) -> dict[str, object]:
+    values: dict[str, object] = {
         "distribution": "test",
         "distribution_version": "2",
         "architecture": "test",
@@ -44,7 +44,7 @@ def identity(**changes: Any) -> dict[str, Any]:
     return values
 
 
-def write_manifest(path: Path, values: Any) -> None:
+def write_manifest(path: Path, values: object) -> None:
     path.write_text(json.dumps(values))
 
 
@@ -52,7 +52,7 @@ def playbook(
     runner: Runner,
     tree: Path,
     path: Union[str, Path],
-    variables: dict[str, Any],
+    variables: dict[str, object],
 ) -> subprocess.CompletedProcess[str]:
     command = [
         "ansible-playbook",
@@ -75,7 +75,7 @@ def install(
     tree: Path,
     artifact: Path,
     manifest: Path,
-    **variables: Any,
+    **variables: object,
 ) -> subprocess.CompletedProcess[str]:
     return playbook(
         runner,
@@ -98,7 +98,7 @@ def validate(
     tree: Path,
     artifact: Path,
     manifest: Path,
-    **variables: Any,
+    **variables: object,
 ) -> subprocess.CompletedProcess[str]:
     return playbook(
         runner,
@@ -115,7 +115,7 @@ def validate(
     )
 
 
-def assert_rejected(result: Any, message: str) -> None:
+def assert_rejected(result: subprocess.CompletedProcess[str], message: str) -> None:
     assert result.returncode
     assert message in result.stdout + result.stderr
 
@@ -130,8 +130,8 @@ def assert_rejected(result: Any, message: str) -> None:
 )
 def test_incompatible_host_is_rejected(
     tree: Path,
-    artifact: Any,
-    manifest: Any,
+    artifact: Path,
+    manifest: Path,
     distribution: str,
     version: str,
     architecture: str,
@@ -149,7 +149,7 @@ def test_incompatible_host_is_rejected(
 
 
 def test_build_configuration_mismatch_is_rejected(
-    tree: Path, artifact: Any, manifest: Any
+    tree: Path, artifact: Path, manifest: Path
 ) -> None:
     write_manifest(manifest, identity(ovn_git_repo="wrong"))
     result = install(Runner(), tree, artifact, manifest)
@@ -159,7 +159,7 @@ def test_build_configuration_mismatch_is_rejected(
     )
 
 
-def test_reuse_requires_revision(tree: Path, artifact: Any, manifest: Any) -> None:
+def test_reuse_requires_revision(tree: Path, artifact: Path, manifest: Path) -> None:
     write_manifest(manifest, identity(ovn_revision="old", sha256="wrong"))
     result = install(
         Runner(),
@@ -175,7 +175,7 @@ def test_reuse_requires_revision(tree: Path, artifact: Any, manifest: Any) -> No
 
 
 def test_revision_mismatch_is_rejected(
-    tree: Path, artifact: Any, manifest: Any
+    tree: Path, artifact: Path, manifest: Path
 ) -> None:
     write_manifest(manifest, identity(ovn_revision="old", sha256="wrong"))
     result = install(
@@ -192,7 +192,7 @@ def test_revision_mismatch_is_rejected(
 
 
 def test_dpdk_identity_mismatch_is_rejected(
-    tree: Path, artifact: Any, manifest: Any
+    tree: Path, artifact: Path, manifest: Path
 ) -> None:
     write_manifest(
         manifest,
@@ -220,7 +220,7 @@ def test_dpdk_identity_mismatch_is_rejected(
     )
 
 
-def test_bad_checksum_is_rejected(tree: Path, artifact: Any, manifest: Any) -> None:
+def test_bad_checksum_is_rejected(tree: Path, artifact: Path, manifest: Path) -> None:
     write_manifest(manifest, identity(sha256="wrong"))
     result = install(Runner(), tree, artifact, manifest)
     assert_rejected(
@@ -230,7 +230,7 @@ def test_bad_checksum_is_rejected(tree: Path, artifact: Any, manifest: Any) -> N
 
 
 def test_non_installing_consumer_can_validate(
-    tree: Path, artifact: Any, manifest: Any
+    tree: Path, artifact: Path, manifest: Path
 ) -> None:
     checksum = hashlib.sha256(artifact.read_bytes()).hexdigest()
     write_manifest(manifest, identity(sha256=checksum))
@@ -238,7 +238,7 @@ def test_non_installing_consumer_can_validate(
 
 
 def test_invalid_artifact_action_is_rejected(
-    tree: Path, artifact: Any, manifest: Any
+    tree: Path, artifact: Path, manifest: Path
 ) -> None:
     checksum = hashlib.sha256(artifact.read_bytes()).hexdigest()
     write_manifest(manifest, identity(sha256=checksum))
@@ -253,7 +253,7 @@ def test_invalid_artifact_action_is_rejected(
 
 
 def test_missing_reusable_artifact_is_rejected(
-    tree: Path, tmp_path: Path, manifest: Any
+    tree: Path, tmp_path: Path, manifest: Path
 ) -> None:
     result = playbook(
         Runner(),

@@ -1,7 +1,10 @@
 import ipaddress
 import json
 import subprocess
-from typing import Any, Optional, Union
+from typing import Optional, Union
+
+from ovn_test.command import Runner
+from ovn_test.models import Endpoint, ExternalPeer, ScaleTopology
 
 
 def _command(*parts: object, check: bool = True) -> tuple[tuple[object, ...], bool]:
@@ -9,7 +12,7 @@ def _command(*parts: object, check: bool = True) -> tuple[tuple[object, ...], bo
 
 
 class Network:
-    def __init__(self, runner: Any, guest: Optional[str] = None) -> None:
+    def __init__(self, runner: Runner, guest: Optional[str] = None) -> None:
         self.runner = runner
         self.guest = guest
 
@@ -53,7 +56,9 @@ class Network:
             attempts=attempts,
         )
 
-    def link(self, interface: str, namespace: Optional[str] = None) -> Any:
+    def link(
+        self, interface: str, namespace: Optional[str] = None
+    ) -> Optional[dict[str, object]]:
         command = ["ip", "-j"]
         if namespace:
             command.extend(("-n", namespace))
@@ -88,7 +93,7 @@ class Network:
         family: Optional[int] = None,
         table: Optional[Union[int, str]] = None,
         destination: Optional[str] = None,
-    ) -> list[dict[str, Any]]:
+    ) -> list[dict[str, object]]:
         command = ["ip", "-j"]
         if namespace:
             command.extend(("-n", namespace))
@@ -112,8 +117,8 @@ class Network:
 class ExternalPeers:
     def __init__(
         self,
-        runner: Any,
-        topology: dict[str, Any],
+        runner: Runner,
+        topology: ScaleTopology,
         ipv4: bool = True,
         ipv6: bool = True,
         mtu: int = 1500,
@@ -129,9 +134,9 @@ class ExternalPeers:
         if not self.bridge:
             raise ValueError("scale topology does not contain a physical bridge")
 
-        self.peers = {}
+        self.peers: dict[str, ExternalPeer] = {}
         for index, worker in enumerate(topology["workers"]):
-            peer = {
+            peer: ExternalPeer = {
                 "guest": worker["chassis"],
                 "namespace": f"{prefix}{index:05d}",
                 "interface": f"{prefix}{index:05d}-p",
@@ -155,13 +160,18 @@ class ExternalPeers:
                     raise ValueError(
                         f"worker {worker['name']} external subnet is too small"
                     )
-                peer[f"ipv{family}"] = str(network[-3])
-                peer[f"gateway{family}"] = str(network[-2])
-                peer[f"prefix{family}"] = network.prefixlen
+                if family == 4:
+                    peer["ipv4"] = str(network[-3])
+                    peer["gateway4"] = str(network[-2])
+                    peer["prefix4"] = network.prefixlen
+                else:
+                    peer["ipv6"] = str(network[-3])
+                    peer["gateway6"] = str(network[-2])
+                    peer["prefix6"] = network.prefixlen
             self.peers[worker["name"]] = peer
 
     def _remove_commands(
-        self, peer: dict[str, Any]
+        self, peer: ExternalPeer
     ) -> list[tuple[tuple[object, ...], bool]]:
         return [
             _command(
@@ -226,6 +236,9 @@ class ExternalPeers:
             for family, enabled in ((4, self.ipv4), (6, self.ipv6)):
                 if not enabled:
                     continue
+                address = peer["ipv4"] if family == 4 else peer["ipv6"]
+                prefix = peer["prefix4"] if family == 4 else peer["prefix6"]
+                gateway = peer["gateway4"] if family == 4 else peer["gateway6"]
                 commands.extend(
                     [
                         _command(
@@ -233,7 +246,7 @@ class ExternalPeers:
                             *(("-6",) if family == 6 else ()),
                             "address",
                             "replace",
-                            f"{peer[f'ipv{family}']}/{peer[f'prefix{family}']}",
+                            f"{address}/{prefix}",
                             "dev",
                             "eth0",
                             *(("nodad",) if family == 6 else ()),
@@ -245,7 +258,7 @@ class ExternalPeers:
                             "replace",
                             "default",
                             "via",
-                            peer[f"gateway{family}"],
+                            gateway,
                         ),
                     ]
                 )
@@ -265,16 +278,17 @@ class ExternalPeers:
             )
             self.runner.run_many(commands, guest=peer["guest"])
 
-    def verify(self, endpoint: dict[str, Any]) -> None:
+    def verify(self, endpoint: Endpoint) -> None:
         peer = self.peers[endpoint["worker"]]
         if peer["guest"] != endpoint["guest"]:
             raise ValueError("endpoint and external peer use different chassis")
         network = Network(self.runner, endpoint["guest"])
         for family, enabled in ((4, self.ipv4), (6, self.ipv6)):
             if enabled:
+                address = peer["ipv4"] if family == 4 else peer["ipv6"]
                 network.wait_for_ping(
                     endpoint["namespace"],
-                    peer[f"ipv{family}"],
+                    address,
                     attempts=self.timeout,
                 )
 

@@ -1,7 +1,9 @@
 import json
 import subprocess
 from collections.abc import Iterable, Mapping, Sequence
-from typing import Any, Optional
+from typing import Optional
+
+from ovn_test.command import Runner
 
 OPTIONS = {
     "event": "false",
@@ -17,7 +19,7 @@ def socket(address: str, port: int, family: int) -> str:
 
 
 def replace(
-    runner: Any,
+    runner: Runner,
     owner: str,
     name: str,
     protocol: str,

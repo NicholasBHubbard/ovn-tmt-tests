@@ -1,7 +1,7 @@
 import os
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Any
+from typing import TypedDict
 
 import pytest
 from ovn_test.command import Runner
@@ -13,11 +13,24 @@ from ovn_test.workload import (
 )
 
 
+class LightConfig(TypedDict):
+    initial: int
+    iterations: int
+    timeout: int
+    ipv4: bool
+    ipv6: bool
+    mtu: int
+    chassis: int
+
+
+WorkloadFixture = tuple[Workload, LightConfig]
+
+
 @pytest.fixture
-def workload() -> Iterator[Any]:
+def workload() -> Iterator[WorkloadFixture]:
     topology = Topology.from_environment()
     computes = topology.role("compute")
-    config = {
+    config: LightConfig = {
         "initial": read_int(os.environ, "OTT_SCALE_INITIAL_PORTS", 2),
         "iterations": read_int(os.environ, "OTT_SCALE_ITERATIONS", 3),
         "timeout": read_int(os.environ, "OTT_SCALE_TIMEOUT", 60),
@@ -43,7 +56,7 @@ def workload() -> Iterator[Any]:
     instance.verify_cleanup()
 
 
-def test_density_light(workload: Any) -> None:
+def test_density_light(workload: WorkloadFixture) -> None:
     instance, config = workload
     instance.measure("startup", "topology", instance.create_topology)
 
