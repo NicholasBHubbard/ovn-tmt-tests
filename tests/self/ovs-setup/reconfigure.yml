@@ -4,8 +4,8 @@
   roles:
     - role: ovs_bridges
       ovs_bridges:
-        - self-bridge-keep
-        - name: self-bridge-delete
+        - self-br-keep
+        - name: self-br-delete
           state: absent
         - name: self-bridge-new
           state: present

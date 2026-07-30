@@ -30,8 +30,8 @@ class TestInitial:
         runner = Runner()
         ovs = Ovsdb(runner, "ovs-vsctl")
 
-        assert runner.succeeds("ovs-vsctl", "br-exists", "self-bridge-keep")
-        assert runner.succeeds("ovs-vsctl", "br-exists", "self-bridge-delete")
+        assert runner.succeeds("ovs-vsctl", "br-exists", "self-br-keep")
+        assert runner.succeeds("ovs-vsctl", "br-exists", "self-br-delete")
         assert external_id(runner, "self-managed") == "initial"
         assert external_id(runner, "self-delete") == "remove-me"
         assert external_id(runner, "self-unmanaged") == "preserve"
@@ -39,7 +39,7 @@ class TestInitial:
             "ovs-bridge",
             ovs.by_name(
                 "Bridge",
-                "self-bridge-keep",
+                "self-br-keep",
                 "_uuid",
             )["_uuid"],
         )
@@ -53,7 +53,7 @@ class TestReconfigured:
             "ovs-bridge-reconfigured",
             ovs.by_name(
                 "Bridge",
-                "self-bridge-keep",
+                "self-br-keep",
                 "_uuid",
             )["_uuid"],
         )
@@ -82,14 +82,14 @@ class TestResult:
         ovs = Ovsdb(runner, "ovs-vsctl")
         bridge_uuid = ovs.by_name(
             "Bridge",
-            "self-bridge-keep",
+            "self-br-keep",
             "_uuid",
         )["_uuid"]
 
         assert bridge_uuid == snapshots.load("ovs-bridge")
         assert bridge_uuid == snapshots.load("ovs-bridge-reconfigured")
-        assert runner.succeeds("ovs-vsctl", "br-exists", "self-bridge-keep")
-        assert not runner.succeeds("ovs-vsctl", "br-exists", "self-bridge-delete")
+        assert runner.succeeds("ovs-vsctl", "br-exists", "self-br-keep")
+        assert not runner.succeeds("ovs-vsctl", "br-exists", "self-br-delete")
         assert runner.succeeds("ovs-vsctl", "br-exists", "self-bridge-new")
         assert external_id(runner, "self-managed") == "updated"
         assert external_id(runner, "self-delete") == ""
