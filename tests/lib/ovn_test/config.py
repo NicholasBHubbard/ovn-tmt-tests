@@ -1,11 +1,13 @@
 import shlex
 from pathlib import Path
+from typing import Mapping, Optional, Union
 
+from ovn_test.topology import Topology
 
 DEFAULT_DRIVER_RUNTIME_DIR = "/run/ovn-tmt-tests/multihost-driver"
 
 
-def driver_connection(environment):
+def driver_connection(environment: Mapping[str, str]) -> tuple[str, str]:
     runtime_dir = environment.get("OTT_DRIVER_RUNTIME_DIR", DEFAULT_DRIVER_RUNTIME_DIR)
     return (
         environment.get("OTT_DRIVER_USER", "root"),
@@ -13,14 +15,18 @@ def driver_connection(environment):
     )
 
 
-def read_int(environment, name, default):
+def read_int(
+    environment: Mapping[str, str], name: str, default: Union[int, str]
+) -> int:
     try:
         return int(environment.get(name, default))
     except (TypeError, ValueError) as error:
         raise ValueError(f"{name} must be an integer") from error
 
 
-def read_bool(environment, name, default):
+def read_bool(
+    environment: Mapping[str, str], name: str, default: Union[bool, str]
+) -> bool:
     value = str(environment.get(name, default)).lower()
     if value in {"true", "yes", "1"}:
         return True
@@ -29,11 +35,13 @@ def read_bool(environment, name, default):
     raise ValueError(f"{name} must be a boolean")
 
 
-def read_list(environment, name, default):
+def read_list(environment: Mapping[str, str], name: str, default: str) -> list[str]:
     return [value.strip() for value in environment.get(name, default).split(",")]
 
 
-def database_environment(topology, environment):
+def database_environment(
+    topology: Topology, environment: Mapping[str, str]
+) -> dict[str, str]:
     if not read_bool(environment, "OTT_CLUSTERED", False):
         return {}
 
@@ -45,7 +53,7 @@ def database_environment(topology, environment):
 
     protocol = "ssl" if read_bool(environment, "OTT_SSL_ENABLED", False) else "tcp"
 
-    def remotes(port):
+    def remotes(port: Optional[str]) -> str:
         return ",".join(
             f"{protocol}:{topology.hostname(member)}:{port}" for member in members
         )

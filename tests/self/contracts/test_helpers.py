@@ -2,9 +2,9 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any, NoReturn
 
 import pytest
-
 from ovn_test.ansible import Ansible
 from ovn_test.command import Runner
 from ovn_test.files import find_text
@@ -17,7 +17,7 @@ from ovn_test.topology import Topology
 from .test_ovn_test import topology_data
 
 
-def test_runner_conveniences(capsys):
+def test_runner_conveniences(capsys: pytest.CaptureFixture[str]) -> None:
     calls = []
     responses = iter(
         [
@@ -27,7 +27,7 @@ def test_runner_conveniences(capsys):
         ]
     )
 
-    def execute(command, **kwargs):
+    def execute(command: Any, **kwargs: Any) -> Any:
         calls.append((command, kwargs))
         return next(responses)
 
@@ -51,7 +51,7 @@ def test_runner_conveniences(capsys):
     assert "+ ip netns exec sandbox ip link show" in capsys.readouterr().out
 
 
-def test_runner_reports_command_success():
+def test_runner_reports_command_success() -> None:
     runner = Runner(
         Topology(topology_data()),
         execute=lambda command, **kwargs: subprocess.CompletedProcess(
@@ -63,14 +63,14 @@ def test_runner_reports_command_success():
     assert not runner.succeeds("false")
 
 
-def test_runner_reports_missing_commands_as_unsuccessful():
-    def execute(command, **kwargs):
+def test_runner_reports_missing_commands_as_unsuccessful() -> None:
+    def execute(command: Any, **kwargs: Any) -> NoReturn:
         raise FileNotFoundError(command[0])
 
     assert not Runner(execute=execute).succeeds("missing")
 
 
-def test_ovsdb_control_socket_uses_process_configuration():
+def test_ovsdb_control_socket_uses_process_configuration() -> None:
     output = (
         "10 ovsdb-server --unixctl=/custom/run/ovn/ovnnb_db.ctl nb.db\n"
         "11 ovsdb-server --unixctl=/custom/run/ovn/ovnsb_db.ctl sb.db\n"
@@ -86,7 +86,7 @@ def test_ovsdb_control_socket_uses_process_configuration():
         ovsdb_control_socket(runner, "missing")
 
 
-def test_runner_does_not_require_topology_for_local_commands():
+def test_runner_does_not_require_topology_for_local_commands() -> None:
     runner = Runner(
         execute=lambda command, **kwargs: subprocess.CompletedProcess(
             command, 0, "local\n", ""
@@ -98,10 +98,10 @@ def test_runner_does_not_require_topology_for_local_commands():
         runner.run("hostname", guest="compute-1")
 
 
-def test_runner_normalizes_arguments_and_wait_options():
+def test_runner_normalizes_arguments_and_wait_options() -> None:
     calls = []
 
-    def execute(command, **kwargs):
+    def execute(command: Any, **kwargs: Any) -> Any:
         calls.append((command, kwargs))
         return subprocess.CompletedProcess(command, 0, "", "")
 
@@ -120,10 +120,12 @@ def test_runner_normalizes_arguments_and_wait_options():
     assert calls[1][1]["env"] == {"EXAMPLE": "value"}
 
 
-def test_runner_serializes_remote_command_batches(capsys):
+def test_runner_serializes_remote_command_batches(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     calls = []
 
-    def execute(command, **kwargs):
+    def execute(command: Any, **kwargs: Any) -> Any:
         calls.append((command, kwargs))
         return subprocess.CompletedProcess(command, 0, "", "")
 
@@ -147,7 +149,9 @@ def test_runner_serializes_remote_command_batches(capsys):
     ]
 
 
-def test_runner_command_batches_honor_error_handling(capsys):
+def test_runner_command_batches_honor_error_handling(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     python = sys.executable
     result = Runner().run_many(
         [
@@ -168,7 +172,9 @@ def test_runner_command_batches_honor_error_handling(capsys):
     assert "local: command batch failed (exit status 1)" in capsys.readouterr().out
 
 
-def test_runner_command_batches_keep_errors_with_commands(capsys):
+def test_runner_command_batches_keep_errors_with_commands(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     python = sys.executable
     Runner().run_many(
         [
@@ -192,7 +198,7 @@ def test_runner_command_batches_keep_errors_with_commands(capsys):
     assert marker < error < next_command
 
 
-def test_runner_waits_for_a_result():
+def test_runner_waits_for_a_result() -> None:
     results = iter(
         [
             subprocess.CompletedProcess([], 1, "", "not yet\n"),
@@ -219,10 +225,10 @@ def test_runner_waits_for_a_result():
     assert sleeps == [0.25, 0.25]
 
 
-def test_runner_wait_reports_timeout():
+def test_runner_wait_reports_timeout() -> None:
     calls = 0
 
-    def execute(command, **kwargs):
+    def execute(command: Any, **kwargs: Any) -> Any:
         nonlocal calls
         calls += 1
         return subprocess.CompletedProcess(command, 1, "", "still unavailable\n")
@@ -241,7 +247,7 @@ def test_runner_wait_reports_timeout():
         runner.wait("probe", attempts=0)
 
 
-def test_find_text_recurses_and_reports_matching_files(tmp_path):
+def test_find_text_recurses_and_reports_matching_files(tmp_path: Path) -> None:
     nested = tmp_path / "nested"
     nested.mkdir()
     match = nested / "match.fmf"
@@ -255,7 +261,7 @@ def test_find_text_recurses_and_reports_matching_files(tmp_path):
         find_text(tmp_path / "missing", "anything")
 
 
-def test_snapshots_preserve_values(tmp_path):
+def test_snapshots_preserve_values(tmp_path: Path) -> None:
     snapshots = Snapshots(tmp_path)
 
     assert snapshots.save("port-id", "uuid-1") == "uuid-1"
@@ -266,7 +272,7 @@ def test_snapshots_preserve_values(tmp_path):
         snapshots.save("../outside", "bad")
 
 
-def test_snapshots_use_tmt_test_data(tmp_path):
+def test_snapshots_use_tmt_test_data(tmp_path: Path) -> None:
     snapshots = Snapshots.from_environment({"TMT_TEST_DATA": str(tmp_path)})
 
     snapshots.save("switch-id", "uuid-2")
@@ -274,7 +280,7 @@ def test_snapshots_use_tmt_test_data(tmp_path):
     assert (tmp_path / "snapshots" / "switch-id").read_text() == "uuid-2"
 
 
-def test_snapshots_prefer_stable_tmt_plan_data(tmp_path):
+def test_snapshots_prefer_stable_tmt_plan_data(tmp_path: Path) -> None:
     plan_data = tmp_path / "plan"
     test_data = tmp_path / "test"
     snapshots = Snapshots.from_environment(
@@ -290,7 +296,7 @@ def test_snapshots_prefer_stable_tmt_plan_data(tmp_path):
     assert not test_data.exists()
 
 
-def test_snapshots_accept_tmt_plan_data_without_test_data(tmp_path):
+def test_snapshots_accept_tmt_plan_data_without_test_data(tmp_path: Path) -> None:
     snapshots = Snapshots.from_environment({"TMT_PLAN_DATA": str(tmp_path)})
 
     snapshots.save("switch-id", "uuid-4")
@@ -298,7 +304,7 @@ def test_snapshots_accept_tmt_plan_data_without_test_data(tmp_path):
     assert (tmp_path / "snapshots" / "switch-id").read_text() == "uuid-4"
 
 
-def test_ovsdb_decodes_json_rows():
+def test_ovsdb_decodes_json_rows() -> None:
     payload = {
         "headings": ["name", "ports", "external_ids", "_uuid"],
         "data": [
@@ -313,7 +319,7 @@ def test_ovsdb_decodes_json_rows():
     calls = []
 
     class FakeRunner:
-        def output(self, *command, **kwargs):
+        def output(self, *command: Any, **kwargs: Any) -> str:
             calls.append((command, kwargs))
             return json.dumps(payload)
 
@@ -365,12 +371,12 @@ def test_ovsdb_decodes_json_rows():
         database.find("Logical_Switch", columns=("name",))
 
 
-def test_ovsdb_one_requires_exactly_one_row():
+def test_ovsdb_one_requires_exactly_one_row() -> None:
     class FakeRunner:
-        def __init__(self, rows):
+        def __init__(self, rows: Any) -> None:
             self.rows = rows
 
-        def output(self, *command, **kwargs):
+        def output(self, *command: Any, **kwargs: Any) -> str:
             return json.dumps({"headings": ["name"], "data": self.rows})
 
     with pytest.raises(LookupError, match="found 0"):
@@ -386,8 +392,8 @@ def test_ovsdb_one_requires_exactly_one_row():
         )
 
 
-def test_network_observes_namespaces_links_addresses_and_routes():
-    def execute(command, **kwargs):
+def test_network_observes_namespaces_links_addresses_and_routes() -> None:
+    def execute(command: Any, **kwargs: Any) -> Any:
         if command == ["ip", "netns", "exec", "vm1", "true"]:
             return subprocess.CompletedProcess(command, 0, "", "")
         if command == ["ip", "netns", "exec", "missing", "true"]:
@@ -496,8 +502,8 @@ def test_network_observes_namespaces_links_addresses_and_routes():
     ]
 
 
-def test_network_treats_a_missing_route_table_as_empty():
-    def execute(command, **kwargs):
+def test_network_treats_a_missing_route_table_as_empty() -> None:
+    def execute(command: Any, **kwargs: Any) -> Any:
         result = subprocess.CompletedProcess(
             command,
             2,
@@ -525,7 +531,7 @@ def test_network_treats_a_missing_route_table_as_empty():
     )
 
 
-def test_network_waits_for_ping_and_reports_failure():
+def test_network_waits_for_ping_and_reports_failure() -> None:
     results = iter(
         [
             subprocess.CompletedProcess([], 1, "", "unreachable"),
@@ -547,10 +553,10 @@ def test_network_waits_for_ping_and_reports_failure():
     assert sleeps == [1]
 
 
-def test_system_observes_exact_processes_and_tcp_ports():
+def test_system_observes_exact_processes_and_tcp_ports() -> None:
     calls = []
 
-    def execute(command, **kwargs):
+    def execute(command: Any, **kwargs: Any) -> Any:
         calls.append(command)
         if command[0] == "pgrep":
             return subprocess.CompletedProcess(command, 0, "10 ovn-controller\n", "")
@@ -568,10 +574,10 @@ def test_system_observes_exact_processes_and_tcp_ports():
     ]
 
 
-def test_process_observation_distinguishes_absence_from_error():
+def test_process_observation_distinguishes_absence_from_error() -> None:
     status = 1
 
-    def execute(command, **kwargs):
+    def execute(command: Any, **kwargs: Any) -> Any:
         return subprocess.CompletedProcess(command, status, "", "error")
 
     runner = Runner(Topology(topology_data()), execute=execute)
@@ -582,10 +588,10 @@ def test_process_observation_distinguishes_absence_from_error():
         processes(runner, "ovn-controller")
 
 
-def test_ansible_writes_inventory_and_keeps_per_guest_logs(tmp_path):
+def test_ansible_writes_inventory_and_keeps_per_guest_logs(tmp_path: Path) -> None:
     calls = []
 
-    def execute(command, **kwargs):
+    def execute(command: Any, **kwargs: Any) -> Any:
         calls.append((command, kwargs))
         guest = command[command.index("--limit") + 1]
         status = 7 if guest == "compute-1" else 0
@@ -632,7 +638,7 @@ def test_ansible_writes_inventory_and_keeps_per_guest_logs(tmp_path):
     assert "===== compute-1 =====" in combined
 
 
-def test_ansible_uses_tmt_environment_paths(tmp_path):
+def test_ansible_uses_tmt_environment_paths(tmp_path: Path) -> None:
     environment = {
         "TMT_TREE": str(tmp_path / "tree"),
         "TMT_TEST_DATA": str(tmp_path / "data"),

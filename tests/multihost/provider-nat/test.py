@@ -1,11 +1,16 @@
-import pytest
+from typing import Any, Callable
 
+import pytest
+from ovn_test.command import Runner
+from ovn_test.network import Network
 
 pytestmark = pytest.mark.usefixtures("setup_scenario")
 
 
-def test_nat_without_localnet_port(runner, network):
-    def restore_localnet():
+def test_nat_without_localnet_port(
+    runner: Runner, network: Callable[[str], Network]
+) -> None:
+    def restore_localnet() -> None:
         runner.run(
             "ovn-nbctl",
             "--may-exist",
@@ -27,7 +32,7 @@ def test_nat_without_localnet_port(runner, network):
             check=False,
         )
 
-    def assert_traffic():
+    def assert_traffic() -> None:
         for guest, namespace, destination in (
             ("compute-1", "npl-private-a1", "172.30.0.100"),
             ("compute-1", "npl-private-a1", "172.30.0.110"),
@@ -41,7 +46,7 @@ def test_nat_without_localnet_port(runner, network):
         ):
             network(guest).wait_for_ping(namespace, destination)
 
-    def wait_for_redirects(expected):
+    def wait_for_redirects(expected: Any) -> None:
         runner.wait(
             "ovn-sbctl",
             "--bare",

@@ -3,8 +3,7 @@ import json
 import os
 from collections import Counter
 from pathlib import Path
-from typing import TypedDict, Union
-
+from typing import Any, TypedDict, Union
 
 Network = Union[ipaddress.IPv4Network, ipaddress.IPv6Network]
 
@@ -18,23 +17,23 @@ class Family(TypedDict):
     default: str
 
 
-def _next(network, index):
-    network = ipaddress.ip_network(network)
-    address = int(network.network_address) + index * network.num_addresses
-    return ipaddress.ip_network((address, network.prefixlen))
+def _next(network: str, index: int) -> Network:
+    parsed = ipaddress.ip_network(network)
+    address = int(parsed.network_address) + index * parsed.num_addresses
+    return ipaddress.ip_network((address, parsed.prefixlen))
 
 
-def _address(network, index):
+def _address(network: Network, index: int) -> str:
     address = network[index]
     return f"{address}/{network.prefixlen}"
 
 
-def _mac(kind, index):
+def _mac(kind: int, index: int) -> str:
     octets = (kind, index >> 16 & 255, index >> 8 & 255, index & 255)
     return "02:00:" + ":".join(f"{octet:02x}" for octet in octets)
 
 
-def generate(config):
+def generate(config: dict[str, Any]) -> dict[str, Any]:
     count = config["worker_count"]
     names = config["workers"] or [
         f"{config['worker_prefix']}-{index}" for index in range(count)
@@ -279,7 +278,7 @@ def generate(config):
     return result
 
 
-def main():
+def main() -> None:
     output = json.dumps(generate(json.loads(os.environ["OVN_SCALE_TOPOLOGY_CONFIG"])))
     path = os.environ.get("OVN_SCALE_TOPOLOGY_OUTPUT")
     if path:

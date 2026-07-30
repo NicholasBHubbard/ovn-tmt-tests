@@ -1,8 +1,8 @@
 import os
 from pathlib import Path
+from typing import Any, Callable, Iterator
 
 import pytest
-
 from ovn_test.command import Runner
 from ovn_test.config import read_bool, read_int, read_list
 from ovn_test.namespace import OvnNamespace, validate_cluster_density
@@ -13,7 +13,7 @@ from ovn_test.workload import Workload, load_scale_topology
 
 
 @pytest.fixture
-def workload():
+def workload() -> Iterator[Any]:
     topology = Topology.from_environment()
     runner = Runner(topology)
     computes = verify_scale_environment(runner, topology)
@@ -21,7 +21,7 @@ def workload():
         os.environ["OTT_SCALE_TOPOLOGY_PATH"],
         computes,
     )
-    config = {
+    config: dict[str, Any] = {
         "startup": read_int(os.environ, "OTT_SCALE_INITIAL_NAMESPACES", 3800),
         "total": read_int(os.environ, "OTT_SCALE_TOTAL_NAMESPACES", 4000),
         "build_pods": read_int(
@@ -104,7 +104,7 @@ def workload():
     finally:
         first_error = None
 
-        def attempt(action):
+        def attempt(action: Callable[..., Any]) -> None:
             nonlocal first_error
             try:
                 action()
@@ -124,11 +124,11 @@ def workload():
         baseline.verify_cleanup()
 
 
-def test_cluster_density(workload):
+def test_cluster_density(workload: Any) -> None:
     instance, namespaces, config, group, baseline = workload
     next_endpoint = 0
 
-    def add_pods(count, phase, passive):
+    def add_pods(count: int, phase: str, passive: bool) -> list[dict[str, Any]]:
         nonlocal next_endpoint
         endpoints = []
         for _ in range(count):
@@ -156,7 +156,7 @@ def test_cluster_density(workload):
         )
         namespaces.append(namespace)
 
-        def create_namespace():
+        def create_namespace() -> None:
             namespace.create()
             build = (
                 add_pods(config["build_pods"], phase, passive=False)

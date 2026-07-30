@@ -1,9 +1,11 @@
+from pathlib import Path
+
 from ovn_test.command import Runner
 from ovn_test.system import ovsdb_control_socket, processes, tcp_listeners
 
 
 class TestPreconditions:
-    def test_services_are_absent(self):
+    def test_services_are_absent(self) -> None:
         runner = Runner()
 
         assert not processes(runner, "ovn-northd")
@@ -12,7 +14,7 @@ class TestPreconditions:
 
 
 class TestNorthdConnections:
-    def test_both_databases_are_connected(self):
+    def test_both_databases_are_connected(self) -> None:
         runner = Runner()
 
         for database in ("nb", "sb"):
@@ -28,7 +30,7 @@ class TestNorthdConnections:
 
 
 class TestResult:
-    def test_services_and_databases(self):
+    def test_services_and_databases(self) -> None:
         runner = Runner()
 
         assert processes(runner, "ovsdb-server")
@@ -38,7 +40,7 @@ class TestResult:
         assert tcp_listeners(runner, 6641)
         assert tcp_listeners(runner, 6642)
 
-    def test_databases_are_clustered(self):
+    def test_databases_are_clustered(self) -> None:
         runner = Runner()
         databases = (
             ("ovnnb_db", "OVN_Northbound"),
@@ -55,7 +57,7 @@ class TestResult:
             )
             assert "Role:" in output
 
-    def test_inventory_name_fallback(self, tree, tmp_path):
+    def test_inventory_name_fallback(self, tree: Path, tmp_path: Path) -> None:
         inventory = tmp_path / "inventory.ini"
         inventory.write_text(
             """\

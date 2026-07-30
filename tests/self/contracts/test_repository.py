@@ -1,11 +1,12 @@
 import shlex
+import subprocess
+from pathlib import Path
+from typing import Any, Optional, Union
 
 import pytest
 import yaml
-
 from ovn_test.command import Runner
 from ovn_test.files import find_text
-
 
 INHERITED_SELF_PLANS = (
     "brew-packages",
@@ -27,15 +28,20 @@ INHERITED_SELF_PLANS = (
 )
 
 
-def content(tree, path):
+def content(tree: Path, path: Union[str, Path]) -> str:
     return (tree / path).read_text()
 
 
-def assert_contains(tree, path, expected):
+def assert_contains(tree: Path, path: Union[str, Path], expected: Any) -> None:
     assert expected in content(tree, path), path
 
 
-def prepare_phase(tree, path, name=None, playbook=None):
+def prepare_phase(
+    tree: Path,
+    path: Union[str, Path],
+    name: Optional[str] = None,
+    playbook: Optional[str] = None,
+) -> dict[str, Any]:
     metadata = yaml.safe_load(content(tree, path)) or {}
     phases = []
     for key in ("prepare", "prepare+", "prepare+<"):
@@ -52,7 +58,7 @@ def prepare_phase(tree, path, name=None, playbook=None):
     )
 
 
-def extra_variables(phase):
+def extra_variables(phase: dict[str, Any]) -> dict[str, str]:
     arguments = shlex.split(phase.get("extra-args", ""))
     return {
         assignment.split("=", 1)[0]: assignment.split("=", 1)[1]
@@ -61,7 +67,7 @@ def extra_variables(phase):
     }
 
 
-def run_naming(tree, root):
+def run_naming(tree: Path, root: Path) -> subprocess.CompletedProcess[str]:
     return Runner().run(
         "python3",
         tree / "tools/check-naming.py",
@@ -71,12 +77,12 @@ def run_naming(tree, root):
 
 
 class TestPreconditions:
-    def test_self_test_directory_exists(self, tree):
+    def test_self_test_directory_exists(self, tree: Path) -> None:
         assert (tree / "tests/self").is_dir()
 
 
 class TestNaming:
-    def test_valid_names(self, tree, tmp_path):
+    def test_valid_names(self, tree: Path, tmp_path: Path) -> None:
         defaults = tmp_path / "roles/example/defaults"
         plans = tmp_path / "plans"
         defaults.mkdir(parents=True)
@@ -86,7 +92,7 @@ class TestNaming:
 
         assert run_naming(tree, tmp_path).returncode == 0
 
-    def test_invalid_role_variable(self, tree, tmp_path):
+    def test_invalid_role_variable(self, tree: Path, tmp_path: Path) -> None:
         defaults = tmp_path / "roles/example/defaults"
         defaults.mkdir(parents=True)
         (tmp_path / "plans").mkdir()
@@ -94,7 +100,7 @@ class TestNaming:
 
         assert run_naming(tree, tmp_path).returncode != 0
 
-    def test_invalid_environment_variable(self, tree, tmp_path):
+    def test_invalid_environment_variable(self, tree: Path, tmp_path: Path) -> None:
         defaults = tmp_path / "roles/example/defaults"
         plans = tmp_path / "plans"
         defaults.mkdir(parents=True)
@@ -104,14 +110,14 @@ class TestNaming:
 
         assert run_naming(tree, tmp_path).returncode != 0
 
-    def test_missing_root(self, tree, tmp_path):
+    def test_missing_root(self, tree: Path, tmp_path: Path) -> None:
         assert run_naming(tree, tmp_path / "missing").returncode != 0
 
-    def test_repository_names(self, tree):
+    def test_repository_names(self, tree: Path) -> None:
         assert run_naming(tree, tree).returncode == 0
 
 
-def test_every_self_test_is_referenced_by_a_plan(tree):
+def test_every_self_test_is_referenced_by_a_plan(tree: Path) -> None:
     plans = tree / "plans/self"
     for test_dir in (tree / "tests/self").iterdir():
         if not test_dir.is_dir() or test_dir.name.startswith((".", "__")):
@@ -121,7 +127,7 @@ def test_every_self_test_is_referenced_by_a_plan(tree):
         assert find_text(plans, f"/tests/self/{test_dir.name}")
 
 
-def test_pytest_prepare_phases_run_after_test_dependencies(tree):
+def test_pytest_prepare_phases_run_after_test_dependencies(tree: Path) -> None:
     for path in (tree / "plans/self").rglob("*.fmf"):
         prepare = (yaml.safe_load(path.read_text()) or {}).get("prepare", [])
         previous = None
@@ -135,7 +141,7 @@ def test_pytest_prepare_phases_run_after_test_dependencies(tree):
 
 
 @pytest.mark.parametrize("plan_dir", INHERITED_SELF_PLANS)
-def test_self_test_children_inherit_common_steps(tree, plan_dir):
+def test_self_test_children_inherit_common_steps(tree: Path, plan_dir: Path) -> None:
     directory = tree / "plans/self" / plan_dir
     parent = directory / "main.fmf"
     assert parent.is_file()
@@ -148,19 +154,19 @@ def test_self_test_children_inherit_common_steps(tree, plan_dir):
             assert "\ndiscover:" not in f"\n{text}"
 
 
-def test_disabled_self_test_parents_use_main_metadata(tree):
+def test_disabled_self_test_parents_use_main_metadata(tree: Path) -> None:
     for path in (tree / "plans/self").rglob("base.fmf"):
         assert "\nenabled: false\n" not in f"\n{path.read_text()}\n"
 
 
-def test_ovn_ci_children_inherit_execution(tree):
+def test_ovn_ci_children_inherit_execution(tree: Path) -> None:
     directory = tree / "plans/ovn-ci"
     for plan in directory.glob("*.fmf"):
         if plan.name != "main.fmf":
             assert "\nexecute:" not in f"\n{plan.read_text()}"
 
 
-def test_plan_role_configuration_is_top_down(tree):
+def test_plan_role_configuration_is_top_down(tree: Path) -> None:
     for path, default in (
         ("plans/ovn-ci/main.fmf", "git"),
         ("plans/ovn-multihost/main.fmf", "artifact"),
@@ -190,7 +196,7 @@ def test_plan_role_configuration_is_top_down(tree):
         ("plans/ovn-multihost/main.fmf", "Set up OVN topology"),
     ],
 )
-def test_install_configuration_is_complete(tree, path, phase):
+def test_install_configuration_is_complete(tree: Path, path: Path, phase: str) -> None:
     variables = extra_variables(prepare_phase(tree, path, phase))
     expected = {
         "ovn_install_method": "$OTT_INSTALL_METHOD",
@@ -217,7 +223,7 @@ def test_install_configuration_is_complete(tree, path, phase):
     assert variables.items() >= expected.items()
 
 
-def test_multihost_parent_propagates_configuration(tree):
+def test_multihost_parent_propagates_configuration(tree: Path) -> None:
     path = "plans/ovn-multihost/main.fmf"
     expected = (
         "playbook: playbooks/ovn-build-artifact.yml",
@@ -253,7 +259,7 @@ def test_multihost_parent_propagates_configuration(tree):
     assert_contains(tree, path, "enabled: false")
 
 
-def test_multihost_diagnostics_are_general_and_top_down(tree):
+def test_multihost_diagnostics_are_general_and_top_down(tree: Path) -> None:
     path = "plans/ovn-multihost/main.fmf"
     metadata = yaml.safe_load(content(tree, path))
     start = prepare_phase(tree, path, "Start guest diagnostics")
@@ -273,7 +279,7 @@ def test_multihost_diagnostics_are_general_and_top_down(tree):
     }
 
 
-def test_multihost_tls_contract(tree):
+def test_multihost_tls_contract(tree: Path) -> None:
     paths = (
         "playbooks/ovn-test-pki-create.yml",
         "playbooks/ovn-test-pki-install.yml",
@@ -297,7 +303,7 @@ def test_multihost_tls_contract(tree):
     )
 
 
-def test_multihost_runtime_configuration_is_complete(tree):
+def test_multihost_runtime_configuration_is_complete(tree: Path) -> None:
     path = "plans/ovn-multihost/main.fmf"
     driver = extra_variables(
         prepare_phase(tree, path, "Set up cross-guest test driver")
@@ -339,7 +345,7 @@ def test_multihost_runtime_configuration_is_complete(tree):
     assert "ovn_gateway_cms_options | from_yaml" in playbook
 
 
-def test_package_file_configuration_accepts_cli_list(tree):
+def test_package_file_configuration_accepts_cli_list(tree: Path) -> None:
     assert_contains(
         tree,
         "roles/ovn_install/tasks/package.yml",
@@ -347,7 +353,7 @@ def test_package_file_configuration_accepts_cli_list(tree):
     )
 
 
-def test_dpdk_plan_configuration_is_complete(tree):
+def test_dpdk_plan_configuration_is_complete(tree: Path) -> None:
     path = "plans/ovn-ci/system-dpdk-gcc.fmf"
     build = extra_variables(
         prepare_phase(tree, path, playbook="playbooks/dpdk-build.yml")
@@ -373,7 +379,7 @@ def test_dpdk_plan_configuration_is_complete(tree):
     )
 
 
-def test_multihost_children_inherit_base(tree):
+def test_multihost_children_inherit_base(tree: Path) -> None:
     parent = tree / "plans/ovn-multihost/main.fmf"
     for plan in parent.parent.rglob("*.fmf"):
         if plan.name == "main.fmf":
@@ -382,7 +388,7 @@ def test_multihost_children_inherit_base(tree):
         assert "enabled: true" in plan.read_text()
 
 
-def test_multihost_setup_is_test_scoped(tree):
+def test_multihost_setup_is_test_scoped(tree: Path) -> None:
     plans = "\n".join(
         path.read_text() for path in (tree / "plans/ovn-multihost").rglob("*.fmf")
     )
@@ -395,7 +401,7 @@ def test_multihost_setup_is_test_scoped(tree):
         assert str(setup).removeprefix(f"{tree}/") not in plans
 
 
-def test_artifact_role_contract(tree):
+def test_artifact_role_contract(tree: Path) -> None:
     paths = (
         "roles/ovn_artifact/defaults/main.yml",
         "roles/ovn_artifact/tasks/main.yml",
@@ -464,7 +470,9 @@ def test_artifact_role_contract(tree):
         ),
     ],
 )
-def test_scale_workload_contract(tree, plan, test, settings):
+def test_scale_workload_contract(
+    tree: Path, plan: Any, test: Any, settings: Any
+) -> None:
     plan_path = tree / "plans/ovn-multihost/ovn-scale-testing" / plan
     test_dir = tree / "tests/scale" / test
     assert plan_path.is_file()
@@ -485,7 +493,7 @@ def test_scale_workload_contract(tree, plan, test, settings):
         ]
 
 
-def test_scale_workloads_inherit_common_configuration(tree):
+def test_scale_workloads_inherit_common_configuration(tree: Path) -> None:
     parent = content(tree, "plans/ovn-multihost/ovn-scale-testing/main.fmf")
     for setting in (
         "OTT_SCALE_DURATION:",

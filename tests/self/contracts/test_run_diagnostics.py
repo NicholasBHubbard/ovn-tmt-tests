@@ -1,10 +1,12 @@
 import json
 import tarfile
+from pathlib import Path
+from typing import Any
 
 from ovn_test.command import Runner
 
 
-def run_playbook(tree, playbook, variables):
+def run_playbook(tree: Path, playbook: str, variables: Any) -> None:
     Runner().run(
         "ansible-playbook",
         "-i",
@@ -20,7 +22,7 @@ def run_playbook(tree, playbook, variables):
     )
 
 
-def test_run_diagnostics_preserves_guest_state(tree, tmp_path):
+def test_run_diagnostics_preserves_guest_state(tree: Path, tmp_path: Path) -> None:
     runtime = tmp_path / "runtime"
     output = tmp_path / "output"
     logs = tmp_path / "logs"

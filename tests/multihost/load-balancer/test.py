@@ -1,5 +1,5 @@
 import pytest
-
+from ovn_test.command import Runner
 
 pytestmark = pytest.mark.usefixtures("setup_scenario")
 
@@ -25,13 +25,13 @@ print(client.recv(64).decode().strip())
 """
 
 
-def test_load_balancing_across_chassis(runner):
+def test_load_balancing_across_chassis(runner: Runner) -> None:
     backends = (
         ("compute-1", "lb-backend-a", "backend-a", "ott-lb-backend-a"),
         ("compute-2", "lb-backend-b", "backend-b", "ott-lb-backend-b"),
     )
 
-    def stop_backends():
+    def stop_backends() -> None:
         for guest, _, _, unit in backends:
             runner.run("systemctl", "stop", unit, guest=guest, check=False)
             runner.run("systemctl", "reset-failed", unit, guest=guest, check=False)

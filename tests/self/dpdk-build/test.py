@@ -2,12 +2,12 @@ from pathlib import Path
 
 
 class TestPreconditions:
-    def test_install_directory_is_absent(self):
+    def test_install_directory_is_absent(self) -> None:
         assert not Path("/usr/local/dpdk").exists()
 
 
 class TestResult:
-    def test_dpdk_is_installed(self):
+    def test_dpdk_is_installed(self) -> None:
         root = Path("/usr/local/dpdk")
 
         assert root.is_dir()

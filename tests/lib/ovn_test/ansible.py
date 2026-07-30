@@ -2,6 +2,7 @@ import os
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import Any, Callable, Mapping, Optional, Union
 
 from ovn_test.config import driver_connection, read_bool
 from ovn_test.topology import Topology
@@ -10,14 +11,14 @@ from ovn_test.topology import Topology
 class Ansible:
     def __init__(
         self,
-        topology,
-        tree,
-        data,
-        execute=subprocess.run,
-        environment=None,
-        key=None,
-        user=None,
-    ):
+        topology: Topology,
+        tree: Union[str, os.PathLike[str]],
+        data: Union[str, os.PathLike[str]],
+        execute: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
+        environment: Optional[Mapping[str, str]] = None,
+        key: Optional[str] = None,
+        user: Optional[str] = None,
+    ) -> None:
         self.topology = topology
         self.tree = Path(tree)
         self.data = Path(data)
@@ -32,10 +33,10 @@ class Ansible:
     @classmethod
     def from_environment(
         cls,
-        topology=None,
-        environment=None,
-        **options,
-    ):
+        topology: Optional[Topology] = None,
+        environment: Optional[Mapping[str, str]] = None,
+        **options: Any,
+    ) -> "Ansible":
         environment = os.environ if environment is None else environment
         if topology is None:
             topology = Topology.from_file(environment["TMT_TOPOLOGY_YAML"])
@@ -47,7 +48,7 @@ class Ansible:
             **options,
         )
 
-    def inventory(self, path=None):
+    def inventory(self, path: Optional[Union[str, os.PathLike[str]]] = None) -> Path:
         path = Path(path or self.data / "ansible-inventory.ini")
         path.parent.mkdir(parents=True, exist_ok=True)
         ssh_options = (
@@ -67,7 +68,13 @@ class Ansible:
         path.write_text("\n".join(lines) + "\n")
         return path
 
-    def run(self, playbook, *arguments, debug=None, log="setup.log"):
+    def run(
+        self,
+        playbook: Union[str, os.PathLike[str]],
+        *arguments: object,
+        debug: Optional[bool] = None,
+        log: Union[str, os.PathLike[str]] = "setup.log",
+    ) -> dict[str, subprocess.CompletedProcess[str]]:
         inventory = self.inventory()
         if debug is None:
             debug = read_bool(self.environment, "OTT_TEST_DEBUG", False)
@@ -79,7 +86,7 @@ class Ansible:
             "ANSIBLE_ROLES_PATH": str(self.tree / "roles"),
         }
 
-        def run_guest(guest):
+        def run_guest(guest: str) -> subprocess.CompletedProcess[str]:
             command = [
                 "ansible-playbook",
                 *verbosity,

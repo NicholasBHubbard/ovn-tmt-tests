@@ -1,7 +1,9 @@
 import shutil
 
+from ovn_test.command import Runner
 
-def test_ovn_binaries_are_installed(runner):
+
+def test_ovn_binaries_are_installed(runner: Runner) -> None:
     binaries = (
         "ovs-vswitchd",
         "ovsdb-server",

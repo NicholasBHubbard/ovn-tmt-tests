@@ -1,7 +1,8 @@
 from pathlib import Path
+from typing import Union
 
 
-def find_text(root, text):
+def find_text(root: Union[str, Path], text: str) -> list[Path]:
     root = Path(root)
     if not root.exists():
         raise FileNotFoundError(root)

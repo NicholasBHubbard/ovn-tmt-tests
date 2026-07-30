@@ -1,10 +1,15 @@
-import pytest
+from typing import Callable
 
+import pytest
+from ovn_test.command import Runner
+from ovn_test.network import Network
 
 pytestmark = pytest.mark.usefixtures("setup_scenario")
 
 
-def test_stateless_nat_preserves_pmtu(runner, network):
+def test_stateless_nat_preserves_pmtu(
+    runner: Runner, network: Callable[[str], Network]
+) -> None:
     network("compute-1").wait_for_ping("snat-internal", "172.19.1.2")
     runner.namespace(
         "snat-router",

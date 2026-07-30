@@ -5,7 +5,7 @@ from ovn_test.system import processes, tcp_listeners
 
 
 class TestPreconditions:
-    def test_services_are_absent(self):
+    def test_services_are_absent(self) -> None:
         runner = Runner()
 
         assert not processes(runner, "ovn-northd")
@@ -14,7 +14,7 @@ class TestPreconditions:
 
 
 class TestCredentials:
-    def test_credentials_exist(self):
+    def test_credentials_exist(self) -> None:
         root = Path("/run/ovn-test-pki")
 
         for name in ("private-key.pem", "certificate.pem", "ca-cert.pem"):
@@ -22,7 +22,7 @@ class TestCredentials:
 
 
 class TestResult:
-    def test_tls_services_and_databases(self):
+    def test_tls_services_and_databases(self) -> None:
         runner = Runner()
 
         assert processes(runner, "ovsdb-server")

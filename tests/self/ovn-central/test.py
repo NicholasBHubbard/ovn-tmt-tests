@@ -3,7 +3,7 @@ from ovn_test.system import processes, tcp_listeners
 
 
 class TestPreconditions:
-    def test_services_are_absent(self):
+    def test_services_are_absent(self) -> None:
         runner = Runner()
 
         assert not processes(runner, "ovn-northd")
@@ -12,7 +12,7 @@ class TestPreconditions:
 
 
 class TestResult:
-    def test_services_and_databases(self):
+    def test_services_and_databases(self) -> None:
         runner = Runner()
 
         assert processes(runner, "ovsdb-server")

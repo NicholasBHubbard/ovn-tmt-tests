@@ -1,5 +1,6 @@
 import json
-
+import subprocess
+from typing import Any, Iterable, Mapping, Optional, Sequence
 
 OPTIONS = {
     "event": "false",
@@ -10,20 +11,20 @@ OPTIONS = {
 }
 
 
-def socket(address, port, family):
+def socket(address: str, port: int, family: int) -> str:
     return f"[{address}]:{port}" if family == 6 else f"{address}:{port}"
 
 
 def replace(
-    runner,
-    owner,
-    name,
-    protocol,
-    vips=None,
-    switches=(),
-    routers=(),
-    group=None,
-):
+    runner: Any,
+    owner: str,
+    name: str,
+    protocol: str,
+    vips: Optional[Mapping[str, Sequence[str]]] = None,
+    switches: Iterable[str] = (),
+    routers: Iterable[str] = (),
+    group: Optional[str] = None,
+) -> subprocess.CompletedProcess[str]:
     command = [
         "ovn-nbctl",
         "--if-exists",

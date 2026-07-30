@@ -1,21 +1,25 @@
 import ipaddress
 import json
+import subprocess
+from typing import Any, Optional, Union
 
 
-def _command(*parts, check=True):
+def _command(*parts: object, check: bool = True) -> tuple[tuple[object, ...], bool]:
     return parts, check
 
 
 class Network:
-    def __init__(self, runner, guest=None):
+    def __init__(self, runner: Any, guest: Optional[str] = None) -> None:
         self.runner = runner
         self.guest = guest
 
-    def namespace_exists(self, namespace):
+    def namespace_exists(self, namespace: str) -> bool:
         result = self.runner.namespace(namespace, "true", guest=self.guest, check=False)
         return result.returncode == 0
 
-    def ping(self, namespace, destination, count=1, timeout=1):
+    def ping(
+        self, namespace: str, destination: str, count: int = 1, timeout: int = 1
+    ) -> bool:
         result = self.runner.namespace(
             namespace,
             "ping",
@@ -30,7 +34,9 @@ class Network:
         )
         return result.returncode == 0
 
-    def wait_for_ping(self, namespace, destination, attempts=30):
+    def wait_for_ping(
+        self, namespace: str, destination: str, attempts: int = 30
+    ) -> subprocess.CompletedProcess[str]:
         return self.runner.wait(
             "ip",
             "netns",
@@ -47,7 +53,7 @@ class Network:
             attempts=attempts,
         )
 
-    def link(self, interface, namespace=None):
+    def link(self, interface: str, namespace: Optional[str] = None) -> Any:
         command = ["ip", "-j"]
         if namespace:
             command.extend(("-n", namespace))
@@ -58,7 +64,12 @@ class Network:
         links = json.loads(result.stdout)
         return links[0] if links else None
 
-    def addresses(self, interface, namespace=None, scope=None):
+    def addresses(
+        self,
+        interface: str,
+        namespace: Optional[str] = None,
+        scope: Optional[str] = None,
+    ) -> list[str]:
         command = ["ip", "-j"]
         if namespace:
             command.extend(("-n", namespace))
@@ -73,11 +84,11 @@ class Network:
 
     def routes(
         self,
-        namespace=None,
-        family=None,
-        table=None,
-        destination=None,
-    ):
+        namespace: Optional[str] = None,
+        family: Optional[int] = None,
+        table: Optional[Union[int, str]] = None,
+        destination: Optional[str] = None,
+    ) -> list[dict[str, Any]]:
         command = ["ip", "-j"]
         if namespace:
             command.extend(("-n", namespace))
@@ -101,14 +112,14 @@ class Network:
 class ExternalPeers:
     def __init__(
         self,
-        runner,
-        topology,
-        ipv4=True,
-        ipv6=True,
-        mtu=1500,
-        timeout=60,
-        prefix="dhe",
-    ):
+        runner: Any,
+        topology: dict[str, Any],
+        ipv4: bool = True,
+        ipv6: bool = True,
+        mtu: int = 1500,
+        timeout: int = 60,
+        prefix: str = "dhe",
+    ) -> None:
         self.runner = runner
         self.bridge = topology.get("physical_bridge")
         self.ipv4 = ipv4
@@ -149,7 +160,9 @@ class ExternalPeers:
                 peer[f"prefix{family}"] = network.prefixlen
             self.peers[worker["name"]] = peer
 
-    def _remove_commands(self, peer):
+    def _remove_commands(
+        self, peer: dict[str, Any]
+    ) -> list[tuple[tuple[object, ...], bool]]:
         return [
             _command(
                 "ovs-vsctl",
@@ -162,7 +175,7 @@ class ExternalPeers:
             _command("ip", "netns", "delete", peer["namespace"], check=False),
         ]
 
-    def create(self):
+    def create(self) -> None:
         for peer in self.peers.values():
             namespace = peer["namespace"]
             interface = peer["interface"]
@@ -252,7 +265,7 @@ class ExternalPeers:
             )
             self.runner.run_many(commands, guest=peer["guest"])
 
-    def verify(self, endpoint):
+    def verify(self, endpoint: dict[str, Any]) -> None:
         peer = self.peers[endpoint["worker"]]
         if peer["guest"] != endpoint["guest"]:
             raise ValueError("endpoint and external peer use different chassis")
@@ -265,7 +278,7 @@ class ExternalPeers:
                     attempts=self.timeout,
                 )
 
-    def cleanup(self):
+    def cleanup(self) -> None:
         first_error = None
         for peer in self.peers.values():
             try:
@@ -279,7 +292,7 @@ class ExternalPeers:
         if first_error is not None:
             raise first_error
 
-    def verify_cleanup(self):
+    def verify_cleanup(self) -> None:
         for peer in self.peers.values():
             network = Network(self.runner, peer["guest"])
             if network.namespace_exists(peer["namespace"]):

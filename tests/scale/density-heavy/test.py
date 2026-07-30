@@ -1,8 +1,8 @@
 import os
 from pathlib import Path
+from typing import Any, Iterator
 
 import pytest
-
 from ovn_test.command import Runner
 from ovn_test.config import read_bool, read_int, read_list
 from ovn_test.scale import ScaleBaseline, verify_scale_environment
@@ -15,7 +15,7 @@ from ovn_test.workload import (
 
 
 @pytest.fixture
-def workload():
+def workload() -> Iterator[Any]:
     topology = Topology.from_environment()
     runner = Runner(topology)
     computes = verify_scale_environment(runner, topology)
@@ -94,12 +94,14 @@ def workload():
         baseline.verify_cleanup()
 
 
-def test_density_heavy(workload):
+def test_density_heavy(workload: Any) -> None:
     instance, config, external = workload
     instance.measure("startup", "namespace", instance.create_namespace)
 
-    def add_service_group(service, first_pod, phase, passive=False):
-        def create_group():
+    def add_service_group(
+        service: int, first_pod: int, phase: str, passive: bool = False
+    ) -> None:
+        def create_group() -> None:
             active = list(range(first_pod, first_pod + config["pods_per_service"]))
             for index in active:
                 instance.add_endpoint(

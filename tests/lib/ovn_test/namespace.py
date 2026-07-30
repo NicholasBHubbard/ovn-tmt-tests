@@ -1,26 +1,26 @@
 import ipaddress
 import json
+from typing import Any, Callable, Sequence
 
 from ovn_test.load_balancer import replace, socket
-
 
 VALID_PROTOCOLS = {"tcp", "udp", "sctp"}
 
 
 def validate_cluster_density(
-    startup,
-    total,
-    build_pods,
-    test_pods,
-    protocols,
-    timeout,
-    ipv4,
-    ipv6,
-    mtu,
-    chassis,
-    workers,
-    base_pods,
-):
+    startup: int,
+    total: int,
+    build_pods: int,
+    test_pods: int,
+    protocols: Sequence[str],
+    timeout: int,
+    ipv4: bool,
+    ipv6: bool,
+    mtu: int,
+    chassis: int,
+    workers: int,
+    base_pods: int,
+) -> None:
     positive = {
         "total namespaces": total,
         "test pods per namespace": test_pods,
@@ -63,7 +63,15 @@ def validate_cluster_density(
 
 
 class OvnNamespace:
-    def __init__(self, runner, owner, name, index, ipv4=True, ipv6=True):
+    def __init__(
+        self,
+        runner: Any,
+        owner: str,
+        name: str,
+        index: int,
+        ipv4: bool = True,
+        ipv6: bool = True,
+    ) -> None:
         self.runner = runner
         self.owner = owner
         self.name = name
@@ -83,7 +91,7 @@ class OvnNamespace:
         self.load_balancers = []
         self.cleaned = False
 
-    def _destroy_named(self, table, name):
+    def _destroy_named(self, table: str, name: str) -> None:
         output = self.runner.output(
             "ovn-nbctl",
             "--bare",
@@ -95,7 +103,7 @@ class OvnNamespace:
         for uuid in output.split():
             self.runner.run("ovn-nbctl", "destroy", table, uuid)
 
-    def create(self):
+    def create(self) -> None:
         for name in self.port_groups:
             self._destroy_named("Port_Group", name)
             self.runner.run(
@@ -121,7 +129,7 @@ class OvnNamespace:
                 f"external_ids:ovn-tmt-tests-owner={json.dumps(self.owner)}",
             )
 
-    def add_endpoints(self, endpoints):
+    def add_endpoints(self, endpoints: Sequence[dict[str, Any]]) -> None:
         for family, enabled in ((4, self.ipv4), (6, self.ipv6)):
             if not enabled:
                 continue
@@ -134,7 +142,7 @@ class OvnNamespace:
                 *(json.dumps(endpoint[f"ipv{family}"]) for endpoint in endpoints),
             )
 
-    def _vip(self, family, position):
+    def _vip(self, family: int, position: int) -> str:
         network = ipaddress.ip_network("30.0.0.0/16" if family == 4 else "30::/32")
         address = (
             int(network.network_address)
@@ -144,7 +152,12 @@ class OvnNamespace:
         )
         return str(ipaddress.ip_address(address))
 
-    def add_services(self, endpoints, protocols, group):
+    def add_services(
+        self,
+        endpoints: Sequence[dict[str, Any]],
+        protocols: Sequence[str],
+        group: str,
+    ) -> None:
         if len(endpoints) < 4:
             raise ValueError("namespace services require at least four endpoints")
         backend_groups = [endpoints[:2], endpoints[2:3], endpoints[3:]]
@@ -169,12 +182,12 @@ class OvnNamespace:
                 group=group,
             )
 
-    def cleanup(self):
+    def cleanup(self) -> None:
         if self.cleaned:
             return
         first_error = None
 
-        def attempt(action):
+        def attempt(action: Callable[[], object]) -> None:
             nonlocal first_error
             try:
                 action()
@@ -200,7 +213,7 @@ class OvnNamespace:
         if first_error is not None:
             raise first_error
 
-    def verify_cleanup(self):
+    def verify_cleanup(self) -> None:
         for table, names in (
             ("Load_Balancer", self.load_balancers),
             ("Port_Group", self.port_groups),

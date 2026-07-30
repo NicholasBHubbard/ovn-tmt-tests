@@ -1,7 +1,6 @@
 #!/usr/bin/python3
 import sys
 
-
 IGNORED = {
     ".gitignore",
     "COPYING",
@@ -11,7 +10,7 @@ IGNORED = {
 }
 
 
-def ignored(path):
+def ignored(path: str) -> bool:
     name = path.split("/", 1)[0]
     return (
         name in IGNORED

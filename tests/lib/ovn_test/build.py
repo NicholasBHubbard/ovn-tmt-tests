@@ -1,10 +1,12 @@
 import os
 import shutil
 import stat
+import subprocess
 from pathlib import Path
+from typing import Any, Optional, Union
 
 
-def _copy(source, destination):
+def _copy(source: Path, destination: Path) -> None:
     paths = [source, *source.rglob("*")] if source.is_dir() else [source]
     for path in paths:
         target = destination / path.relative_to(source.parent)
@@ -18,7 +20,7 @@ def _copy(source, destination):
             shutil.copy2(path, target)
 
 
-def _collect_artifacts(source, destination):
+def _collect_artifacts(source: Path, destination: Path) -> None:
     destination.mkdir(parents=True, exist_ok=True)
     directories = [path for path in source.rglob("*testsuite.dir") if path.is_dir()]
     artifacts = [
@@ -44,13 +46,13 @@ def _collect_artifacts(source, destination):
 
 
 def run_make(
-    runner,
-    source,
-    data,
+    runner: Any,
+    source: Union[str, os.PathLike[str]],
+    data: Union[str, os.PathLike[str]],
     *,
-    target="check",
-    testsuiteflags=None,
-):
+    target: str = "check",
+    testsuiteflags: Optional[str] = None,
+) -> subprocess.CompletedProcess[str]:
     source = Path(source)
     jobs = len(os.sched_getaffinity(0))
     command = ["make", "-j", jobs, target]

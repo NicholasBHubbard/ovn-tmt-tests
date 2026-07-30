@@ -1,11 +1,16 @@
-import pytest
+from typing import Callable
 
+import pytest
+from ovn_test.command import Runner
+from ovn_test.network import Network
 
 pytestmark = pytest.mark.usefixtures("setup_scenario")
 
 
-def test_neighbor_advertisements_on_nonresident_chassis(runner, network):
-    def wait_for_binding(address):
+def test_neighbor_advertisements_on_nonresident_chassis(
+    runner: Runner, network: Callable[[str], Network]
+) -> None:
+    def wait_for_binding(address: str) -> None:
         runner.wait(
             "ovn-sbctl",
             "--bare",

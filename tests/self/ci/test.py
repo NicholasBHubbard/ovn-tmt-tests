@@ -1,11 +1,12 @@
 import os
+from pathlib import Path
+from typing import Any
 
 import pytest
-
 from ovn_test.command import Runner
 
 
-def selected(script, *paths):
+def selected(script: Any, *paths: Any) -> str:
     return Runner().output(
         script,
         input="".join(f"{path}\n" for path in paths),
@@ -13,18 +14,18 @@ def selected(script, *paths):
 
 
 class TestPreconditions:
-    def test_github_directory_exists(self, tree):
+    def test_github_directory_exists(self, tree: Path) -> None:
         assert (tree / ".github").is_dir()
 
 
 class TestResult:
     @pytest.fixture(autouse=True)
-    def configure_paths(self, tree):
+    def configure_paths(self, tree: Path) -> None:
         self.ci = tree / ".github/workflows/ci.yml"
         self.self_tests = tree / ".github/workflows/self-tests.yml"
         self.selector = tree / ".github/scripts/self-test-changes.py"
 
-    def test_files_exist(self):
+    def test_files_exist(self) -> None:
         assert self.ci.is_file()
         assert self.self_tests.is_file()
         assert self.selector.is_file()
@@ -53,10 +54,10 @@ class TestResult:
             ("false", ()),
         ],
     )
-    def test_change_selection(self, expected, paths):
+    def test_change_selection(self, expected: Any, paths: Any) -> None:
         assert selected(self.selector, *paths) == expected
 
-    def test_runner_and_checkout_versions(self):
+    def test_runner_and_checkout_versions(self) -> None:
         text = self.ci.read_text()
 
         assert "actions/checkout@v5" in text
@@ -68,7 +69,7 @@ class TestResult:
         assert "ubuntu-26.04" in text
         assert "ubuntu-latest" not in text
 
-    def test_change_detection_contract(self):
+    def test_change_detection_contract(self) -> None:
         text = self.ci.read_text()
 
         assert "changed: ${{ steps.self_test_changes.outputs.changed }}" in text
@@ -87,7 +88,7 @@ class TestResult:
         ):
             assert output not in text
 
-    def test_static_checks(self, tree):
+    def test_static_checks(self, tree: Path) -> None:
         text = self.ci.read_text()
 
         for expected in (
@@ -125,7 +126,7 @@ class TestResult:
         assert (tree / ".yamllint").is_file()
         assert (tree / ".ansible-lint").is_file()
 
-    def test_self_test_dispatch(self):
+    def test_self_test_dispatch(self) -> None:
         ci = self.ci.read_text()
         self_tests = self.self_tests.read_text()
 
@@ -151,7 +152,7 @@ class TestResult:
         ):
             assert expected in self_tests
 
-    def test_plan_provisioning(self, tree):
+    def test_plan_provisioning(self, tree: Path) -> None:
         assert "how: container" in (tree / "plans/self/ci/container.fmf").read_text()
         assert (
             "image: fedora:latest" in (tree / "plans/self/ci/container.fmf").read_text()

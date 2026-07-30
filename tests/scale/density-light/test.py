@@ -1,8 +1,8 @@
 import os
 from pathlib import Path
+from typing import Any, Iterator
 
 import pytest
-
 from ovn_test.command import Runner
 from ovn_test.config import read_bool, read_int
 from ovn_test.topology import Topology
@@ -13,7 +13,7 @@ from ovn_test.workload import (
 
 
 @pytest.fixture
-def workload():
+def workload() -> Iterator[Any]:
     topology = Topology.from_environment()
     computes = topology.role("compute")
     config = {
@@ -42,7 +42,7 @@ def workload():
     instance.verify_cleanup()
 
 
-def test_density_light(workload):
+def test_density_light(workload: Any) -> None:
     instance, config = workload
     instance.measure("startup", "topology", instance.create_topology)
 

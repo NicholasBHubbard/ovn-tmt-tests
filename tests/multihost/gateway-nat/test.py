@@ -1,4 +1,10 @@
-def test_gateway_nat(topology, network):
+from typing import Callable
+
+from ovn_test.network import Network
+from ovn_test.topology import Topology
+
+
+def test_gateway_nat(topology: Topology, network: Callable[[str], Network]) -> None:
     cases = {
         "compute-1": (
             "nat-internal",

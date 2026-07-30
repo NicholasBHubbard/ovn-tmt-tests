@@ -2,15 +2,18 @@ import ipaddress
 import json
 import os
 from pathlib import Path
+from typing import Any, Union
+
+Network = Union[ipaddress.IPv4Network, ipaddress.IPv6Network]
 
 
-def _network(value, index):
+def _network(value: str, index: int) -> Network:
     network = ipaddress.ip_network(value)
     address = int(network.network_address) + index * network.num_addresses
     return ipaddress.ip_network((address, network.prefixlen))
 
 
-def _mac(index):
+def _mac(index: int) -> str:
     if not 0 <= index < 2**32:
         raise ValueError("port index exceeds deterministic MAC address range")
     return "02:0a:" + ":".join(
@@ -18,7 +21,7 @@ def _mac(index):
     )
 
 
-def generate(config):
+def generate(config: dict[str, Any]) -> dict[str, Any]:
     if config["port_count"] < 0 or config["start_index"] < 0:
         raise ValueError("port count and start index must be non-negative")
     if config["network_index"] < 0:
@@ -108,7 +111,7 @@ def generate(config):
     return result
 
 
-def main():
+def main() -> None:
     output = json.dumps(generate(json.loads(os.environ["OVN_SCALE_PORTS_CONFIG"])))
     path = os.environ.get("OVN_SCALE_PORTS_OUTPUT")
     if path:

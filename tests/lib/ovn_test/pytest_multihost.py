@@ -1,3 +1,5 @@
+from typing import Callable
+
 import pytest
 
 from ovn_test.ansible import Ansible
@@ -8,35 +10,35 @@ from ovn_test.topology import Topology
 
 
 @pytest.fixture(scope="session")
-def topology():
+def topology() -> Topology:
     return Topology.from_environment()
 
 
 @pytest.fixture(scope="session")
-def runner(topology):
+def runner(topology: Topology) -> Runner:
     return Runner(topology)
 
 
 @pytest.fixture(scope="session")
-def ansible(topology):
+def ansible(topology: Topology) -> Ansible:
     return Ansible.from_environment(topology)
 
 
 @pytest.fixture
-def setup_scenario(request, ansible):
+def setup_scenario(request: pytest.FixtureRequest, ansible: Ansible) -> None:
     ansible.run(request.node.path.parent / "setup.yml")
 
 
 @pytest.fixture
-def network(runner):
+def network(runner: Runner) -> Callable[[str], Network]:
     return lambda guest: Network(runner, guest)
 
 
 @pytest.fixture
-def nb(runner):
+def nb(runner: Runner) -> Ovsdb:
     return Ovsdb(runner, "ovn-nbctl")
 
 
 @pytest.fixture
-def sb(runner):
+def sb(runner: Runner) -> Ovsdb:
     return Ovsdb(runner, "ovn-sbctl")

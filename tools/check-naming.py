@@ -8,9 +8,9 @@
 
 import sys
 from pathlib import Path
+from typing import Any, Iterator
 
 import yaml
-
 
 root = Path(sys.argv[1] if len(sys.argv) > 1 else ".")
 errors = []
@@ -19,12 +19,12 @@ if not (root / "roles").is_dir():
     sys.exit(f"{root}: roles directory not found")
 
 
-def load(path):
+def load(path: Path) -> dict[str, Any]:
     with path.open() as source:
         return yaml.safe_load(source) or {}
 
 
-def environments(data):
+def environments(data: Any) -> Iterator[dict[str, Any]]:
     if isinstance(data, dict):
         for key, value in data.items():
             if key in ("environment", "environment+") and isinstance(value, dict):

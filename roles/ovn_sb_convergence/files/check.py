@@ -4,9 +4,10 @@ import os
 import subprocess
 import time
 from pathlib import Path
+from typing import Any, Sequence
 
 
-def _decode(value):
+def _decode(value: Any) -> Any:
     if not isinstance(value, list) or len(value) != 2:
         return value
     kind, contents = value
@@ -17,7 +18,7 @@ def _decode(value):
     return contents if kind in {"uuid", "named-uuid"} else value
 
 
-def _rows(command, table, *columns):
+def _rows(command: Sequence[str], table: str, *columns: str) -> list[dict[str, Any]]:
     output = subprocess.run(
         [
             *command,
@@ -41,7 +42,7 @@ def _rows(command, table, *columns):
     ]
 
 
-def verify(expected, actual):
+def verify(expected: dict[str, Any], actual: dict[str, Any]) -> None:
     problems = {}
     for kind in ("datapaths", "ports"):
         values = expected.get(kind, [])
@@ -66,7 +67,7 @@ def verify(expected, actual):
         raise RuntimeError(f"Southbound topology did not converge: {summary}")
 
 
-def check(config):
+def check(config: dict[str, Any]) -> dict[str, Any]:
     timeout = config["timeout"]
     if isinstance(timeout, bool) or not isinstance(timeout, int) or timeout < 1:
         raise ValueError("timeout must be a positive integer")
@@ -112,7 +113,7 @@ def check(config):
     }
 
 
-def main():
+def main() -> None:
     config = json.loads(
         base64.b64decode(os.environ["OVN_SB_CONVERGENCE_CONFIG"]).decode()
     )

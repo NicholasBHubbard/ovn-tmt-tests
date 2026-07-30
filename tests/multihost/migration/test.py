@@ -1,14 +1,17 @@
-import pytest
+from typing import Any, Callable
 
+import pytest
+from ovn_test.command import Runner
+from ovn_test.network import Network
 
 pytestmark = pytest.mark.usefixtures("setup_scenario")
 
 
-def test_live_migration(runner, network):
+def test_live_migration(runner: Runner, network: Callable[[str], Network]) -> None:
     source = network("compute-1")
     destination = network("compute-3")
 
-    def request_chassis(value, check=True):
+    def request_chassis(value: Any, check: bool = True) -> None:
         runner.run(
             "ovn-nbctl",
             "--wait=hv",

@@ -1,12 +1,13 @@
 import json
 import os
 import time
+from typing import Any, Optional
 
 import pytest
 from ovn_test.command import Runner
 from ovn_test.config import read_int
 from ovn_test.ovsdb import Ovsdb
-
+from ovn_test.state import Snapshots
 
 MANAGED = "external_ids:ovn-tmt-tests-id="
 OWNER = "external_ids:ovn-tmt-tests-owner="
@@ -14,25 +15,25 @@ SCOPE = "external_ids:ovn-tmt-tests-scope="
 
 
 @pytest.fixture
-def runner():
+def runner() -> Runner:
     return Runner()
 
 
 @pytest.fixture
-def nb(runner):
+def nb(runner: Runner) -> Ovsdb:
     return Ovsdb(runner, "ovn-nbctl")
 
 
 @pytest.fixture
-def sb(runner):
+def sb(runner: Runner) -> Ovsdb:
     return Ovsdb(runner, "ovn-sbctl")
 
 
-def scale_rows(nb, table):
+def scale_rows(nb: Ovsdb, table: str) -> list[dict[str, Any]]:
     return nb.find(table, f"{OWNER}self-scale", columns=("_uuid", "name"))
 
 
-def scale_managed_rows(nb, table):
+def scale_managed_rows(nb: Ovsdb, table: str) -> list[dict[str, Any]]:
     return [
         row
         for row in nb.find(table, columns=("_uuid", "external_ids"))
@@ -40,7 +41,7 @@ def scale_managed_rows(nb, table):
     ]
 
 
-def scale_gateway_rows(nb):
+def scale_gateway_rows(nb: Ovsdb) -> list[dict[str, Any]]:
     return [
         row
         for row in nb.find("Gateway_Chassis", columns=("_uuid", "name"))
@@ -48,7 +49,7 @@ def scale_gateway_rows(nb):
     ]
 
 
-def assert_scale_counts(nb, workers):
+def assert_scale_counts(nb: Ovsdb, workers: Any) -> None:
     assert len(scale_rows(nb, "Logical_Switch")) == 1 + 2 * workers
     assert len(scale_rows(nb, "Logical_Router")) == 1 + workers
     assert len(scale_rows(nb, "Logical_Router_Port")) == 1 + 3 * workers
@@ -66,7 +67,7 @@ def assert_scale_counts(nb, workers):
     )
 
 
-def assert_scale_group_attachments(nb, workers):
+def assert_scale_group_attachments(nb: Ovsdb, workers: Any) -> None:
     group = nb.by_name(
         "Load_Balancer_Group",
         "cluster-lb-group1",
@@ -82,7 +83,7 @@ def assert_scale_group_attachments(nb, workers):
     ) == {f"gwrouter-ovn-scale-{index}" for index in range(workers)}
 
 
-def assert_scale_external_vlans(nb, workers):
+def assert_scale_external_vlans(nb: Ovsdb, workers: Any) -> None:
     for index in {0, workers - 1}:
         port = nb.by_name(
             "Logical_Switch_Port",
@@ -94,7 +95,7 @@ def assert_scale_external_vlans(nb, workers):
         assert port["tag_request"] == index + 1
 
 
-def scale_southbound_names(workers):
+def scale_southbound_names(workers: Any) -> tuple[set[str], set[str]]:
     names = [f"ovn-scale-{index}" for index in range(workers)]
     datapaths = {"ls-join1", "lr-cluster1"}
     ports = {"ls-join1-to-rtr"}
@@ -117,7 +118,7 @@ def scale_southbound_names(workers):
     return datapaths, ports
 
 
-def southbound_names(sb):
+def southbound_names(sb: Ovsdb) -> tuple[set[Any], set[Any]]:
     datapaths = {
         external_ids.get("name")
         for external_ids in sb.values("Datapath_Binding", "external_ids")
@@ -126,7 +127,7 @@ def southbound_names(sb):
     return datapaths - {None}, ports
 
 
-def assert_scale_southbound(sb, workers):
+def assert_scale_southbound(sb: Ovsdb, workers: Any) -> None:
     expected_datapaths, expected_ports = scale_southbound_names(workers)
     datapaths, ports = southbound_names(sb)
     assert expected_datapaths <= datapaths
@@ -136,7 +137,7 @@ def assert_scale_southbound(sb, workers):
 SCALE_CHASSIS = "ovn-scale-0"
 
 
-def scale_chassis_sync(runner):
+def scale_chassis_sync(runner: Runner) -> int:
     timeout = read_int(os.environ, "OTT_SCALE_CHASSIS_TIMEOUT", 120)
     start = time.monotonic()
     runner.run(
@@ -149,7 +150,7 @@ def scale_chassis_sync(runner):
     return timeout
 
 
-def assert_scale_chassis(runner, nb, sb):
+def assert_scale_chassis(runner: Runner, nb: Ovsdb, sb: Ovsdb) -> str:
     timeout = scale_chassis_sync(runner)
     nb_cfg = nb.value("NB_Global", "nb_cfg")
     row = sb.by_name("Chassis", SCALE_CHASSIS, "_uuid")
@@ -187,7 +188,7 @@ def assert_scale_chassis(runner, nb, sb):
     return row["_uuid"]
 
 
-def scale_ports(count):
+def scale_ports(count: int) -> list[dict[str, Any]]:
     result = []
     for index in range(count):
         mac = "02:0a:" + ":".join(
@@ -205,7 +206,7 @@ def scale_ports(count):
     return result
 
 
-def scale_port_rows(nb):
+def scale_port_rows(nb: Ovsdb) -> list[dict[str, Any]]:
     return nb.find(
         "Logical_Switch_Port",
         f"{OWNER}{json.dumps(f'self-scale-ports:{SCALE_CHASSIS}')}",
@@ -213,7 +214,13 @@ def scale_port_rows(nb):
     )
 
 
-def assert_scale_ports(runner, nb, sb, count, snapshots=None):
+def assert_scale_ports(
+    runner: Runner,
+    nb: Ovsdb,
+    sb: Ovsdb,
+    count: int,
+    snapshots: Optional[Snapshots] = None,
+) -> None:
     timeout = scale_chassis_sync(runner)
     expected = scale_ports(count)
     rows = {row["name"]: row for row in scale_port_rows(nb)}
@@ -273,7 +280,7 @@ def assert_scale_ports(runner, nb, sb, count, snapshots=None):
                 snapshots.save(name, row["_uuid"])
 
 
-def assert_scale_port_absent(runner, nb, sb, index):
+def assert_scale_port_absent(runner: Runner, nb: Ovsdb, sb: Ovsdb, index: int) -> None:
     name = f"ovn-scale-pod-{index}"
     interface = f"osp{index:08x}"
     timeout = read_int(os.environ, "OTT_SCALE_CHASSIS_TIMEOUT", 120)
@@ -298,12 +305,12 @@ def assert_scale_port_absent(runner, nb, sb, index):
 
 
 class TestPreconditions:
-    def test_northbound_database_is_available(self):
+    def test_northbound_database_is_available(self) -> None:
         assert Runner().succeeds("ovn-nbctl", "show")
 
 
 class TestInitial:
-    def test_switches_and_routers(self, nb, snapshots):
+    def test_switches_and_routers(self, nb: Ovsdb, snapshots: Snapshots) -> None:
         switch = nb.by_name("Logical_Switch", "self-moved", "_uuid", "other_config")
         router = nb.by_name("Logical_Router", "self-r1", "_uuid", "options")
 
@@ -330,7 +337,7 @@ class TestInitial:
         }
         snapshots.save("switch", switch["_uuid"])
 
-    def test_router_ports(self, nb, snapshots):
+    def test_router_ports(self, nb: Ovsdb, snapshots: Snapshots) -> None:
         port = nb.by_name(
             "Logical_Router_Port",
             "self-rp",
@@ -371,7 +378,9 @@ class TestInitial:
         snapshots.save("router-port", port["_uuid"])
         snapshots.save("router-switch-port", switch_port["_uuid"])
 
-    def test_localnet_and_gateway_chassis(self, nb, snapshots):
+    def test_localnet_and_gateway_chassis(
+        self, nb: Ovsdb, snapshots: Snapshots
+    ) -> None:
         localnet = nb.by_name(
             "Logical_Switch_Port",
             "self-localnet",
@@ -418,7 +427,7 @@ class TestInitial:
         snapshots.save("localnet", localnet["_uuid"])
         snapshots.save("gateway", gateway["_uuid"])
 
-    def test_dhcp_options(self, nb, snapshots):
+    def test_dhcp_options(self, nb: Ovsdb, snapshots: Snapshots) -> None:
         dhcp = nb.managed("DHCP_Options", "self-dhcp", "_uuid", "cidr", "options")
         dhcp_v6 = nb.managed("DHCP_Options", "self-dhcp-v6", "_uuid", "cidr", "options")
 
@@ -431,7 +440,7 @@ class TestInitial:
         snapshots.save("dhcp", dhcp["_uuid"])
         snapshots.save("dhcp-v6", dhcp_v6["_uuid"])
 
-    def test_nat_load_balancer_and_route(self, nb, snapshots):
+    def test_nat_load_balancer_and_route(self, nb: Ovsdb, snapshots: Snapshots) -> None:
         nat = nb.managed(
             "NAT",
             "self-nat",
@@ -534,7 +543,7 @@ class TestInitial:
         snapshots.save("load-balancer", load_balancer["_uuid"])
         snapshots.save("route", route["_uuid"])
 
-    def test_acls(self, nb, snapshots):
+    def test_acls(self, nb: Ovsdb, snapshots: Snapshots) -> None:
         acl = nb.managed(
             "ACL",
             "self-acl",
@@ -578,8 +587,13 @@ class TestReconfigured:
         ],
     )
     def test_named_identity_is_recorded(
-        self, nb, snapshots, table, identifier, snapshot
-    ):
+        self,
+        nb: Ovsdb,
+        snapshots: Snapshots,
+        table: str,
+        identifier: str,
+        snapshot: str,
+    ) -> None:
         snapshots.save(
             snapshot,
             nb.by_name(table, identifier, "_uuid")["_uuid"],
@@ -599,8 +613,13 @@ class TestReconfigured:
         ],
     )
     def test_managed_identity_is_recorded(
-        self, nb, snapshots, table, identifier, snapshot
-    ):
+        self,
+        nb: Ovsdb,
+        snapshots: Snapshots,
+        table: str,
+        identifier: str,
+        snapshot: str,
+    ) -> None:
         snapshots.save(
             snapshot,
             nb.managed(table, identifier, "_uuid")["_uuid"],
@@ -608,7 +627,7 @@ class TestReconfigured:
 
 
 class TestScaleInitial:
-    def test_three_workers_are_complete(self, nb, sb):
+    def test_three_workers_are_complete(self, nb: Ovsdb, sb: Ovsdb) -> None:
         assert_scale_counts(nb, 3)
         assert_scale_group_attachments(nb, 3)
         assert_scale_external_vlans(nb, 3)
@@ -672,12 +691,16 @@ class TestScaleInitial:
             ),
         ],
     )
-    def test_stable_identity_is_recorded(self, nb, snapshots, table, name, snapshot):
+    def test_stable_identity_is_recorded(
+        self, nb: Ovsdb, snapshots: Snapshots, table: str, name: str, snapshot: str
+    ) -> None:
         snapshots.save(snapshot, nb.by_name(table, name, "_uuid")["_uuid"])
 
 
 class TestScaleExpanded:
-    def test_500_workers_are_complete(self, nb, sb, snapshots):
+    def test_500_workers_are_complete(
+        self, nb: Ovsdb, sb: Ovsdb, snapshots: Snapshots
+    ) -> None:
         assert_scale_counts(nb, 500)
         assert_scale_group_attachments(nb, 500)
         assert_scale_external_vlans(nb, 500)
@@ -706,37 +729,47 @@ class TestScaleExpanded:
 
 
 class TestScaleChassisInitial:
-    def test_chassis_guest_is_connected(self, runner, nb, sb, snapshots):
+    def test_chassis_guest_is_connected(
+        self, runner: Runner, nb: Ovsdb, sb: Ovsdb, snapshots: Snapshots
+    ) -> None:
         snapshots.save("scale-chassis", assert_scale_chassis(runner, nb, sb))
 
 
 class TestScaleChassisExpanded:
     def test_chassis_guest_processes_500_worker_topology(
-        self, runner, nb, sb, snapshots
-    ):
+        self, runner: Runner, nb: Ovsdb, sb: Ovsdb, snapshots: Snapshots
+    ) -> None:
         assert assert_scale_chassis(runner, nb, sb) == snapshots.load("scale-chassis")
 
 
 class TestScalePortsInitial:
-    def test_three_ports_are_bound(self, runner, nb, sb, snapshots):
+    def test_three_ports_are_bound(
+        self, runner: Runner, nb: Ovsdb, sb: Ovsdb, snapshots: Snapshots
+    ) -> None:
         assert_scale_ports(runner, nb, sb, 3, snapshots)
 
 
 class TestScalePortsExpanded:
-    def test_reapply_preserves_three_bound_ports(self, runner, nb, sb, snapshots):
+    def test_reapply_preserves_three_bound_ports(
+        self, runner: Runner, nb: Ovsdb, sb: Ovsdb, snapshots: Snapshots
+    ) -> None:
         assert_scale_ports(runner, nb, sb, 3, snapshots)
 
 
 class TestScalePortsContracted:
-    def test_two_ports_remain_bound(self, runner, nb, sb, snapshots):
+    def test_two_ports_remain_bound(
+        self, runner: Runner, nb: Ovsdb, sb: Ovsdb, snapshots: Snapshots
+    ) -> None:
         assert_scale_ports(runner, nb, sb, 2, snapshots)
 
-    def test_removed_port_leaves_no_stale_state(self, runner, nb, sb):
+    def test_removed_port_leaves_no_stale_state(
+        self, runner: Runner, nb: Ovsdb, sb: Ovsdb
+    ) -> None:
         assert_scale_port_absent(runner, nb, sb, 2)
 
 
 class TestResult:
-    def test_switches_and_routers(self, nb, snapshots):
+    def test_switches_and_routers(self, nb: Ovsdb, snapshots: Snapshots) -> None:
         switch = nb.by_name("Logical_Switch", "self-moved", "_uuid", "other_config")
         router = nb.by_name("Logical_Router", "self-r1", "options")
 
@@ -759,7 +792,9 @@ class TestResult:
         assert not nb.exists("Logical_Router", "name=self-r2")
         assert nb.by_name("Logical_Router", "self-r3", "options")["options"] == {}
 
-    def test_router_port_moved_without_recreation(self, nb, snapshots):
+    def test_router_port_moved_without_recreation(
+        self, nb: Ovsdb, snapshots: Snapshots
+    ) -> None:
         port = nb.by_name(
             "Logical_Router_Port",
             "self-rp",
@@ -797,7 +832,9 @@ class TestResult:
         assert not nb.exists("Logical_Router_Port", "name=self-rp-delete")
         assert not nb.exists("Logical_Switch_Port", "name=self-rp-delete-sw")
 
-    def test_localnet_and_gateway_reconfiguration(self, nb, snapshots):
+    def test_localnet_and_gateway_reconfiguration(
+        self, nb: Ovsdb, snapshots: Snapshots
+    ) -> None:
         localnet = nb.by_name(
             "Logical_Switch_Port",
             "self-localnet",
@@ -857,7 +894,7 @@ class TestResult:
         assert not nb.exists("Logical_Switch_Port", "name=self-localnet-delete")
         assert nb.exists("Logical_Switch_Port", "name=self-localnet-unmanaged")
 
-    def test_dhcp_reconfiguration(self, nb, snapshots):
+    def test_dhcp_reconfiguration(self, nb: Ovsdb, snapshots: Snapshots) -> None:
         dhcp = nb.managed("DHCP_Options", "self-dhcp", "_uuid", "cidr", "options")
         dhcp_v6 = nb.managed("DHCP_Options", "self-dhcp-v6", "_uuid", "cidr", "options")
 
@@ -877,7 +914,7 @@ class TestResult:
         assert not nb.exists("DHCP_Options", f"{MANAGED}self-dhcp-delete")
         assert nb.exists("DHCP_Options", "cidr=10.10.0.0/24")
 
-    def test_acl_reconfiguration(self, nb, snapshots):
+    def test_acl_reconfiguration(self, nb: Ovsdb, snapshots: Snapshots) -> None:
         acl = nb.managed(
             "ACL",
             "self-acl",
@@ -923,7 +960,7 @@ class TestResult:
             "self-sw"
         ]
 
-    def test_nat_load_balancer_and_route(self, nb, snapshots):
+    def test_nat_load_balancer_and_route(self, nb: Ovsdb, snapshots: Snapshots) -> None:
         nat = nb.managed(
             "NAT",
             "self-nat",
@@ -1039,7 +1076,9 @@ class TestResult:
 
 
 class TestScaleResult:
-    def test_contracted_topology_is_complete(self, nb, sb, snapshots):
+    def test_contracted_topology_is_complete(
+        self, nb: Ovsdb, sb: Ovsdb, snapshots: Snapshots
+    ) -> None:
         assert_scale_counts(nb, 2)
         assert_scale_group_attachments(nb, 2)
         assert_scale_external_vlans(nb, 2)
@@ -1056,7 +1095,7 @@ class TestScaleResult:
             "_uuid",
         )["_uuid"] == snapshots.load("scale-worker-port")
 
-    def test_removed_workers_leave_no_southbound_topology(self, sb):
+    def test_removed_workers_leave_no_southbound_topology(self, sb: Ovsdb) -> None:
         current_datapaths, current_ports = scale_southbound_names(2)
         expanded_datapaths, expanded_ports = scale_southbound_names(500)
         datapaths, ports = southbound_names(sb)
@@ -1068,7 +1107,7 @@ class TestScaleResult:
         "name",
         ["ovn-scale-2", "ovn-scale-3", "ovn-scale-4"],
     )
-    def test_removed_workers_leave_no_topology(self, nb, name):
+    def test_removed_workers_leave_no_topology(self, nb: Ovsdb, name: str) -> None:
         assert not nb.exists("Logical_Switch", f"name=lswitch-{name}")
         assert not nb.exists("Logical_Switch", f"name=ext-{name}")
         assert not nb.exists("Logical_Router", f"name=gwrouter-{name}")
@@ -1084,14 +1123,18 @@ class TestScaleResult:
 
 class TestScaleChassisResult:
     def test_chassis_guest_processes_contracted_topology(
-        self, runner, nb, sb, snapshots
-    ):
+        self, runner: Runner, nb: Ovsdb, sb: Ovsdb, snapshots: Snapshots
+    ) -> None:
         assert assert_scale_chassis(runner, nb, sb) == snapshots.load("scale-chassis")
 
 
 class TestScalePortsResult:
-    def test_two_ports_remain_bound(self, runner, nb, sb, snapshots):
+    def test_two_ports_remain_bound(
+        self, runner: Runner, nb: Ovsdb, sb: Ovsdb, snapshots: Snapshots
+    ) -> None:
         assert_scale_ports(runner, nb, sb, 2, snapshots)
 
-    def test_removed_port_remains_absent(self, runner, nb, sb):
+    def test_removed_port_remains_absent(
+        self, runner: Runner, nb: Ovsdb, sb: Ovsdb
+    ) -> None:
         assert_scale_port_absent(runner, nb, sb, 2)

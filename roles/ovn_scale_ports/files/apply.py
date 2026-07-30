@@ -3,12 +3,12 @@ import os
 import subprocess
 import time
 from pathlib import Path
-
+from typing import Any, Sequence
 
 OWNER = "ovn-tmt-tests-owner"
 
 
-def _decode(value):
+def _decode(value: Any) -> Any:
     if not isinstance(value, list) or len(value) != 2:
         return value
     kind, contents = value
@@ -21,7 +21,7 @@ def _decode(value):
     return value
 
 
-def _run(command):
+def _run(command: Sequence[object]) -> str:
     return subprocess.run(
         list(map(str, command)),
         check=True,
@@ -30,7 +30,7 @@ def _run(command):
     ).stdout.strip()
 
 
-def _rows(command, table, *columns):
+def _rows(command: Sequence[str], table: str, *columns: str) -> list[dict[str, Any]]:
     result = json.loads(
         _run(
             [
@@ -52,7 +52,7 @@ def _rows(command, table, *columns):
     ]
 
 
-def _batch(command, groups, size=50):
+def _batch(command: Sequence[str], groups: Sequence[Any], size: int = 50) -> None:
     for offset in range(0, len(groups), size):
         arguments = []
         for group in groups[offset : offset + size]:
@@ -64,15 +64,15 @@ def _batch(command, groups, size=50):
             _run([*command, *arguments])
 
 
-def _quoted(value):
+def _quoted(value: Any) -> str:
     return json.dumps(value, separators=(",", ":"))
 
 
-def _external_id(key, value):
+def _external_id(key: str, value: Any) -> str:
     return f"external_ids:{key}={_quoted(value)}"
 
 
-def _references(rows, column):
+def _references(rows: Sequence[dict[str, Any]], column: str) -> dict[str, str]:
     result = {}
     for row in rows:
         values = row[column]
@@ -81,7 +81,7 @@ def _references(rows, column):
     return result
 
 
-def _configure_nb(state):
+def _configure_nb(state: dict[str, Any]) -> None:
     command = state["nbctl"]
     owner = state["owner"]
     switches = _rows(command, "Logical_Switch", "_uuid", "name", "ports")
@@ -133,7 +133,7 @@ def _configure_nb(state):
     _batch(command, groups)
 
 
-def _configure_ovs(state):
+def _configure_ovs(state: dict[str, Any]) -> None:
     owner = state["owner"]
     command = state["ovs_vsctl"]
     bridges = _rows(command, "Bridge", "_uuid", "name", "ports")
@@ -186,13 +186,13 @@ def _configure_ovs(state):
     _batch(command, groups)
 
 
-def apply(state):
+def apply(state: dict[str, Any]) -> None:
     state["southbound"]["started_ns"] = time.monotonic_ns()
     _configure_nb(state)
     _configure_ovs(state)
 
 
-def main():
+def main() -> None:
     path = Path(os.environ["OVN_SCALE_PORTS_PATH"])
     state = json.loads(path.read_text())
     apply(state)

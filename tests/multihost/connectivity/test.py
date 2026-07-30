@@ -1,10 +1,15 @@
-import pytest
+from typing import Callable
 
+import pytest
+from ovn_test.command import Runner
+from ovn_test.network import Network
 
 pytestmark = pytest.mark.usefixtures("setup_scenario")
 
 
-def test_switching_acls_and_routing(runner, network):
+def test_switching_acls_and_routing(
+    runner: Runner, network: Callable[[str], Network]
+) -> None:
     compute_1 = network("compute-1")
     compute_2 = network("compute-2")
     assert compute_1.namespace_exists("sw0p1")

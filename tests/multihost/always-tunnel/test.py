@@ -1,15 +1,21 @@
-import pytest
+from typing import Callable
 
+import pytest
+from ovn_test.command import Runner
+from ovn_test.network import Network
+from ovn_test.topology import Topology
 
 pytestmark = pytest.mark.usefixtures("setup_scenario")
 
 
-def test_provider_traffic_honors_always_tunnel(runner, topology, network):
+def test_provider_traffic_honors_always_tunnel(
+    runner: Runner, topology: Topology, network: Callable[[str], Network]
+) -> None:
     compute = network("compute-1")
     compute_2_ip = topology.hostname("compute-2")
     provider_hub_ip = topology.hostname("gateway-1")
 
-    def set_always_tunnel(enabled, check=True):
+    def set_always_tunnel(enabled: bool, check: bool = True) -> None:
         if enabled:
             runner.run(
                 "ovn-nbctl",
@@ -31,7 +37,7 @@ def test_provider_traffic_honors_always_tunnel(runner, topology, network):
             )
         runner.run("ovn-nbctl", "--wait=hv", "sync", check=check)
 
-    def assert_paths(tunnel_destination):
+    def assert_paths(tunnel_destination: str) -> None:
         for mac, destination in (
             ("02:00:00:60:10:04", "10.60.0.4"),
             ("02:00:00:60:00:01", "20.60.0.3"),

@@ -3,9 +3,7 @@ import shutil
 from pathlib import Path
 
 import pytest
-
 from ovn_test.command import Runner
-
 
 OVN_BINARIES = (
     "ovs-vswitchd",
@@ -18,7 +16,7 @@ OVN_BINARIES = (
 
 
 @pytest.fixture(autouse=True)
-def local_sbin(monkeypatch):
+def local_sbin(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("PATH", f"/usr/local/sbin:{os.environ['PATH']}")
 
 
@@ -27,17 +25,17 @@ class TestPreconditions:
         "binary",
         ("ovn-nbctl", "ovn-sbctl", "ovn-northd", "ovn-controller"),
     )
-    def test_ovn_binary_is_absent(self, binary):
+    def test_ovn_binary_is_absent(self, binary: str) -> None:
         assert not shutil.which(binary)
 
 
 class TestResult:
     @pytest.mark.parametrize("binary", OVN_BINARIES)
-    def test_binary_is_installed_and_runnable(self, binary):
+    def test_binary_is_installed_and_runnable(self, binary: str) -> None:
         assert shutil.which(binary)
         Runner().run(binary, "--version")
 
-    def test_git_refspec_is_configured(self, tree):
+    def test_git_refspec_is_configured(self, tree: Path) -> None:
         tasks = (tree / "roles/ovn_install/tasks/git.yml").read_text()
 
         assert (
@@ -45,14 +43,14 @@ class TestResult:
             '{{ ovn_install_git_version }}"'
         ) in tasks
 
-    def test_werror_configuration(self):
+    def test_werror_configuration(self) -> None:
         if os.environ.get("OTT_EXPECT_WERROR", "false") != "true":
             pytest.skip("Werror was not requested")
 
         assert "--enable-Werror" in Path("/usr/src/ovn/ovs/config.log").read_text()
         assert "--enable-Werror" in Path("/usr/src/ovn/config.log").read_text()
 
-    def test_dpdk_support(self):
+    def test_dpdk_support(self) -> None:
         if os.environ.get("OTT_EXPECT_DPDK", "false") != "true":
             pytest.skip("DPDK was not requested")
 

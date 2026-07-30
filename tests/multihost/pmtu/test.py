@@ -1,8 +1,12 @@
 import json
 import os
+import subprocess
+from typing import Any, Callable
 
 import pytest
-
+from ovn_test.command import Runner
+from ovn_test.network import Network
+from ovn_test.topology import Topology
 
 pytestmark = pytest.mark.usefixtures("setup_scenario")
 
@@ -14,7 +18,9 @@ sock.sendto(bytes(1024), ("10.70.0.1", 8080))
 """
 
 
-def test_path_mtu_across_encapsulation(runner, topology, network):
+def test_path_mtu_across_encapsulation(
+    runner: Runner, topology: Topology, network: Callable[[str], Network]
+) -> None:
     encapsulation = os.environ.get("OTT_TEST_ENCAP", "geneve")
     settings = {
         "geneve": ("genev_sys_6081", 942),
@@ -35,14 +41,19 @@ def test_path_mtu_across_encapsulation(runner, topology, network):
         )
     )[0]
 
-    def replace_underlay_mtu(mtu):
-        command = ["ip", "route", "replace", f"{compute_2_ip}/32"]
+    def replace_underlay_mtu(mtu: int) -> None:
+        command: list[object] = [
+            "ip",
+            "route",
+            "replace",
+            f"{compute_2_ip}/32",
+        ]
         if route.get("gateway"):
             command.extend(("via", route["gateway"]))
         command.extend(("dev", route["dev"], "mtu", mtu))
         runner.run(*command, guest="compute-1")
 
-    def reset_endpoint_routes():
+    def reset_endpoint_routes() -> None:
         runner.namespace(
             "pmtu-vm1",
             "ip",
@@ -75,7 +86,7 @@ def test_path_mtu_across_encapsulation(runner, topology, network):
             guest="compute-1",
         )
 
-    def set_encapsulation(value, check=True):
+    def set_encapsulation(value: Any, check: bool = True) -> None:
         for guest in ("compute-1", "compute-2", "gateway-1"):
             runner.run(
                 "ovs-vsctl",
@@ -87,7 +98,7 @@ def test_path_mtu_across_encapsulation(runner, topology, network):
                 check=check,
             )
 
-    def oversized_ping(destination):
+    def oversized_ping(destination: str) -> subprocess.CompletedProcess[str]:
         return runner.namespace(
             "pmtu-vm1",
             "ping",

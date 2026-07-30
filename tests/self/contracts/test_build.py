@@ -1,14 +1,15 @@
 import stat
 import subprocess
-
-import pytest
+from pathlib import Path
+from typing import Any, NoReturn
 
 import ovn_test.build
+import pytest
 from ovn_test.build import run_make
 from ovn_test.command import Runner
 
 
-def test_run_make_preserves_failure_and_artifacts(tmp_path):
+def test_run_make_preserves_failure_and_artifacts(tmp_path: Path) -> None:
     source = tmp_path / "source"
     data = tmp_path / "data"
     source.mkdir()
@@ -51,7 +52,7 @@ check:
             assert mode & stat.S_IROTH
 
 
-def test_run_make_uses_requested_target(tmp_path):
+def test_run_make_uses_requested_target(tmp_path: Path) -> None:
     source = tmp_path / "source"
     data = tmp_path / "data"
     source.mkdir()
@@ -68,12 +69,14 @@ distcheck:
     assert (source / "ovn-fixture.tar.gz").is_file()
 
 
-def test_make_failure_wins_over_artifact_copy_failure(tmp_path, monkeypatch):
+def test_make_failure_wins_over_artifact_copy_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     source = tmp_path / "source"
     source.mkdir()
     (source / "Makefile").write_text("check:\n\tfalse\n")
 
-    def fail_copy(*_):
+    def fail_copy(*_: Any) -> NoReturn:
         raise PermissionError("cannot copy artifacts")
 
     monkeypatch.setattr(ovn_test.build, "_collect_artifacts", fail_copy)

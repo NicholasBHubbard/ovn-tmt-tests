@@ -1,10 +1,10 @@
 import hashlib
+from typing import Any
 
 import pytest
-
 from ovn_test.command import Runner
 from ovn_test.network import Network
-
+from ovn_test.state import Snapshots
 
 ENDPOINTS = (
     "self-direct",
@@ -18,53 +18,53 @@ ENDPOINTS = (
 
 
 @pytest.fixture
-def runner():
+def runner() -> Runner:
     return Runner()
 
 
 @pytest.fixture
-def network(runner):
+def network(runner: Runner) -> Network:
     return Network(runner)
 
 
-def bridge(runner, interface):
+def bridge(runner: Runner, interface: str) -> str:
     return runner.output("ovs-vsctl", "port-to-br", interface)
 
 
-def long_host_interface():
+def long_host_interface() -> str:
     digest = hashlib.sha1(b"self-long-endpoint-name", usedforsecurity=False).hexdigest()
     return f"ovse-{digest[:10]}"
 
 
-def identity(runner, name):
+def identity(runner: Runner, name: str) -> str:
     return runner.output("stat", "-Lc", "%i", f"/var/run/netns/{name}")
 
 
-def host_ifindex(runner, interface):
+def host_ifindex(runner: Runner, interface: str) -> str:
     return runner.output("cat", f"/sys/class/net/{interface}/ifindex")
 
 
 class TestPreconditions:
     @pytest.mark.parametrize("bridge_name", ("self-br-a", "self-br-b"))
-    def test_bridge_is_absent(self, runner, bridge_name):
+    def test_bridge_is_absent(self, runner: Runner, bridge_name: str) -> None:
         assert not runner.succeeds("ovs-vsctl", "br-exists", bridge_name)
 
     @pytest.mark.parametrize("endpoint", ENDPOINTS)
-    def test_endpoint_is_absent(self, network, endpoint):
+    def test_endpoint_is_absent(self, network: Network, endpoint: Any) -> None:
         assert not network.namespace_exists(endpoint)
         assert network.link(f"{endpoint}-p") is None
 
-    def test_shortened_host_interface_is_absent(self, network):
+    def test_shortened_host_interface_is_absent(self, network: Network) -> None:
         assert network.link(long_host_interface()) is None
 
 
 class TestInitial:
-    def test_attachments(self, runner):
+    def test_attachments(self, runner: Runner) -> None:
         assert bridge(runner, "self-direct-p") == "self-br-a"
         assert bridge(runner, "self-peer-p") == "self-br-a"
         assert bridge(runner, long_host_interface()) == "self-br-a"
 
-    def test_long_endpoint(self, network):
+    def test_long_endpoint(self, network: Network) -> None:
         link = network.link("inside0", "self-long-endpoint-name")
         assert link["address"] == "02:00:00:00:20:07"
 
@@ -72,11 +72,11 @@ class TestInitial:
         ("endpoint", "mtu"),
         (("self-direct", 1400), ("self-peer", 1450)),
     )
-    def test_mtu(self, network, endpoint, mtu):
+    def test_mtu(self, network: Network, endpoint: Any, mtu: int) -> None:
         assert network.link(f"{endpoint}-p")["mtu"] == mtu
         assert network.link(endpoint, endpoint)["mtu"] == mtu
 
-    def test_direct_endpoint(self, runner, network):
+    def test_direct_endpoint(self, runner: Runner, network: Network) -> None:
         link = network.link("self-direct", "self-direct")
         assert link["address"] == "02:00:00:00:20:01"
         assert sorted(
@@ -93,7 +93,7 @@ class TestInitial:
             "192.0.2.20",
         )
 
-    def test_routes(self, network):
+    def test_routes(self, network: Network) -> None:
         assert (
             network.routes("self-direct", 4, "main", "default")[0]["gateway"]
             == "192.0.2.1"
@@ -106,7 +106,7 @@ class TestInitial:
             == "2001:db8:1::1"
         )
 
-    def test_identity_is_recorded(self, runner, snapshots):
+    def test_identity_is_recorded(self, runner: Runner, snapshots: Snapshots) -> None:
         snapshots.save("ovs-endpoint-ns", identity(runner, "self-direct"))
         snapshots.save(
             "ovs-endpoint-ifindex",
@@ -115,7 +115,7 @@ class TestInitial:
 
 
 class TestReconfigured:
-    def test_identity_is_recorded(self, runner, snapshots):
+    def test_identity_is_recorded(self, runner: Runner, snapshots: Snapshots) -> None:
         snapshots.save(
             "ovs-endpoint-reconfigured-ns",
             identity(runner, "self-direct"),
@@ -128,12 +128,16 @@ class TestReconfigured:
 
 class TestResult:
     @pytest.mark.parametrize("endpoint", ("self-direct", "self-peer"))
-    def test_endpoints_moved_bridges(self, runner, network, endpoint):
+    def test_endpoints_moved_bridges(
+        self, runner: Runner, network: Network, endpoint: Any
+    ) -> None:
         assert network.namespace_exists(endpoint)
         assert network.link(f"{endpoint}-p") is not None
         assert bridge(runner, f"{endpoint}-p") == "self-br-b"
 
-    def test_long_endpoint_moved_bridges(self, runner, network):
+    def test_long_endpoint_moved_bridges(
+        self, runner: Runner, network: Network
+    ) -> None:
         assert bridge(runner, long_host_interface()) == "self-br-b"
         link = network.link("endpoint0", "self-long-endpoint-name")
         assert link["address"] == "02:00:00:00:20:17"
@@ -151,11 +155,13 @@ class TestResult:
         ("endpoint", "mtu"),
         (("self-direct", 1500), ("self-peer", 1300)),
     )
-    def test_mtu(self, network, endpoint, mtu):
+    def test_mtu(self, network: Network, endpoint: Any, mtu: int) -> None:
         assert network.link(f"{endpoint}-p")["mtu"] == mtu
         assert network.link(endpoint, endpoint)["mtu"] == mtu
 
-    def test_direct_endpoint_reconfigured(self, runner, network):
+    def test_direct_endpoint_reconfigured(
+        self, runner: Runner, network: Network
+    ) -> None:
         link = network.link("self-direct", "self-direct")
         assert link["address"] == "02:00:00:00:20:11"
         assert network.addresses("self-direct", "self-direct", scope="global") == [
@@ -163,7 +169,7 @@ class TestResult:
         ]
         runner.namespace("self-direct", "ping", "-c", "1", "-W", "2", "203.0.113.20")
 
-    def test_routes_replaced(self, network):
+    def test_routes_replaced(self, network: Network) -> None:
         assert (
             network.routes("self-direct", 4, "main", "default")[0]["gateway"]
             == "203.0.113.1"
@@ -174,7 +180,7 @@ class TestResult:
         assert network.routes("self-direct", 4, 100) == []
         assert network.routes("self-direct", 6, 200) == []
 
-    def test_identity_was_preserved(self, runner, snapshots):
+    def test_identity_was_preserved(self, runner: Runner, snapshots: Snapshots) -> None:
         namespace = identity(runner, "self-direct")
         ifindex = host_ifindex(runner, "self-direct-p")
         assert namespace == snapshots.load("ovs-endpoint-ns")
@@ -183,12 +189,16 @@ class TestResult:
         assert ifindex == snapshots.load("ovs-endpoint-reconfigured-ifindex")
 
     @pytest.mark.parametrize("endpoint", ("self-delete", "self-away", "self-stale"))
-    def test_removed_endpoints_are_absent(self, runner, network, endpoint):
+    def test_removed_endpoints_are_absent(
+        self, runner: Runner, network: Network, endpoint: Any
+    ) -> None:
         interface = f"{endpoint}-p"
         assert not network.namespace_exists(endpoint)
         assert network.link(interface) is None
         assert not runner.succeeds("ovs-vsctl", "port-to-br", interface)
 
-    def test_unlisted_endpoint_is_unchanged(self, runner, network):
+    def test_unlisted_endpoint_is_unchanged(
+        self, runner: Runner, network: Network
+    ) -> None:
         assert bridge(runner, "self-keep-p") == "self-br-a"
         assert network.link("self-keep", "self-keep")["mtu"] == 1450

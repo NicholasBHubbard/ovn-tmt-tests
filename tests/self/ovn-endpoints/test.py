@@ -1,49 +1,51 @@
 import hashlib
 from pathlib import Path
+from typing import Any
 
 import pytest
-
 from ovn_test.command import Runner
 from ovn_test.network import Network
 from ovn_test.ovsdb import Ovsdb
-
+from ovn_test.state import Snapshots
 
 ENDPOINTS = ("self-vm1", "self-vm2", "self-remote", "self-delete")
 
 
 @pytest.fixture
-def runner():
+def runner() -> Runner:
     return Runner()
 
 
 @pytest.fixture
-def network(runner):
+def network(runner: Runner) -> Network:
     return Network(runner)
 
 
 @pytest.fixture
-def nb(runner):
+def nb(runner: Runner) -> Ovsdb:
     return Ovsdb(runner, "ovn-nbctl")
 
 
 @pytest.fixture
-def ovs(runner):
+def ovs(runner: Runner) -> Ovsdb:
     return Ovsdb(runner, "ovs-vsctl")
 
 
-def namespace_identity(runner, name):
+def namespace_identity(runner: Runner, name: str) -> str:
     return runner.output("stat", "-Lc", "%i", f"/var/run/netns/{name}")
 
 
-def host_ifindex(runner, interface):
+def host_ifindex(runner: Runner, interface: str) -> str:
     return runner.output("cat", f"/sys/class/net/{interface}/ifindex")
 
 
-def process_arguments(runner, pid):
+def process_arguments(runner: Runner, pid: str) -> str:
     return runner.output("ps", "-p", pid, "-o", "args=", check=False)
 
 
-def assert_logical_port(nb, name, switch, mac, addresses):
+def assert_logical_port(
+    nb: Ovsdb, name: str, switch: Any, mac: str, addresses: Any
+) -> None:
     port = nb.by_name("Logical_Switch_Port", name, "_uuid", "addresses")
     assert nb.referring_names("Logical_Switch", "ports", port["_uuid"]) == [switch]
     assert port["addresses"] == " ".join((mac, *addresses))
@@ -51,20 +53,20 @@ def assert_logical_port(nb, name, switch, mac, addresses):
 
 class TestPreconditions:
     @pytest.mark.parametrize("endpoint", ENDPOINTS)
-    def test_endpoint_is_absent(self, network, endpoint):
+    def test_endpoint_is_absent(self, network: Network, endpoint: Any) -> None:
         assert not network.namespace_exists(endpoint)
         assert network.link(f"{endpoint}-p") is None
 
 
 class TestHostState:
-    def test_host_resolver_is_recorded(self, snapshots):
+    def test_host_resolver_is_recorded(self, snapshots: Snapshots) -> None:
         content = Path("/etc/resolv.conf").read_bytes()
         snapshots.save(
             "ovn-endpoint-resolver",
             hashlib.sha256(content).hexdigest(),
         )
 
-    def test_namespace_fixture_is_created(self):
+    def test_namespace_fixture_is_created(self) -> None:
         path = Path("/etc/netns/self-vm1/preserve")
         path.parent.mkdir(parents=True, exist_ok=True)
         path.touch()
@@ -72,7 +74,7 @@ class TestHostState:
 
 
 class TestInitial:
-    def test_port_state_is_recorded(self, nb, snapshots):
+    def test_port_state_is_recorded(self, nb: Ovsdb, snapshots: Snapshots) -> None:
         port = nb.by_name(
             "Logical_Switch_Port",
             "self-port3",
@@ -90,11 +92,11 @@ class TestInitial:
         ("endpoint", "mtu"),
         (("self-vm1", 1400), ("self-vm2", 1450)),
     )
-    def test_mtu(self, network, endpoint, mtu):
+    def test_mtu(self, network: Network, endpoint: Any, mtu: int) -> None:
         assert network.link(f"{endpoint}-p")["mtu"] == mtu
         assert network.link(endpoint, endpoint)["mtu"] == mtu
 
-    def test_identity_is_recorded(self, runner, snapshots):
+    def test_identity_is_recorded(self, runner: Runner, snapshots: Snapshots) -> None:
         snapshots.save(
             "ovn-endpoint-ns",
             namespace_identity(runner, "self-vm1"),
@@ -104,7 +106,7 @@ class TestInitial:
             host_ifindex(runner, "self-vm1-p"),
         )
 
-    def test_port_configuration(self, nb):
+    def test_port_configuration(self, nb: Ovsdb) -> None:
         assert (
             nb.by_name("Logical_Switch_Port", "self-port3", "addresses")["addresses"]
             == "02:00:00:00:03:01 dynamic"
@@ -113,7 +115,7 @@ class TestInitial:
         assert options["requested-chassis"] == "default-0"
         assert options["mcast_flood"] == "false"
 
-    def test_dhcp_options(self, nb):
+    def test_dhcp_options(self, nb: Ovsdb) -> None:
         port = nb.by_name(
             "Logical_Switch_Port",
             "self-port3",
@@ -125,7 +127,9 @@ class TestInitial:
         assert port["dhcpv4_options"] == dhcp4["_uuid"]
         assert port["dhcpv6_options"] == dhcp6["_uuid"]
 
-    def test_dhcp_lease(self, runner, network, snapshots):
+    def test_dhcp_lease(
+        self, runner: Runner, network: Network, snapshots: Snapshots
+    ) -> None:
         address = snapshots.load("ovn-endpoint-dynamic-address")
         assert network.addresses("self-vm2", "self-vm2", scope="global") == [
             f"{address}/24"
@@ -147,7 +151,7 @@ class TestInitial:
         assert "--timeout 10" in process_arguments(runner, pid)
         snapshots.save("ovn-endpoint-dhcp-pid", pid)
 
-    def test_dhcp_resolver(self, snapshots):
+    def test_dhcp_resolver(self, snapshots: Snapshots) -> None:
         resolver = Path("/etc/netns/self-vm2/resolv.conf")
         assert "nameserver 192.0.2.53" in resolver.read_text()
         host_hash = hashlib.sha256(Path("/etc/resolv.conf").read_bytes()).hexdigest()
@@ -155,7 +159,7 @@ class TestInitial:
 
 
 class TestReconfigured:
-    def test_identity_is_recorded(self, runner, snapshots):
+    def test_identity_is_recorded(self, runner: Runner, snapshots: Snapshots) -> None:
         snapshots.save(
             "ovn-endpoint-reconfigured-ns",
             namespace_identity(runner, "self-vm1"),
@@ -167,7 +171,7 @@ class TestReconfigured:
 
 
 class TestResult:
-    def test_vm1(self, runner, network, nb, ovs):
+    def test_vm1(self, runner: Runner, network: Network, nb: Ovsdb, ovs: Ovsdb) -> None:
         assert_logical_port(
             nb,
             "self-port1",
@@ -193,11 +197,11 @@ class TestResult:
             "2001:db8:2::1/64",
         ]
 
-    def test_vm1_options(self, nb):
+    def test_vm1_options(self, nb: Ovsdb) -> None:
         options = nb.by_name("Logical_Switch_Port", "self-port1", "options")["options"]
         assert options == {"requested-chassis": "another-host"}
 
-    def test_other_ports(self, nb):
+    def test_other_ports(self, nb: Ovsdb) -> None:
         assert_logical_port(
             nb,
             "self-port2",
@@ -213,7 +217,9 @@ class TestResult:
             (),
         )
 
-    def test_remote_endpoint_is_realized(self, runner, network, ovs):
+    def test_remote_endpoint_is_realized(
+        self, runner: Runner, network: Network, ovs: Ovsdb
+    ) -> None:
         assert network.namespace_exists("self-remote")
         assert network.link("self-remote-p") is not None
         assert runner.output("ovs-vsctl", "port-to-br", "self-remote-p") == "self-br"
@@ -234,11 +240,11 @@ class TestResult:
         ("endpoint", "mtu"),
         (("self-vm1", 1500), ("self-remote", 1300)),
     )
-    def test_mtu(self, network, endpoint, mtu):
+    def test_mtu(self, network: Network, endpoint: Any, mtu: int) -> None:
         assert network.link(f"{endpoint}-p")["mtu"] == mtu
         assert network.link(endpoint, endpoint)["mtu"] == mtu
 
-    def test_deleted_port_and_dhcp_links(self, nb):
+    def test_deleted_port_and_dhcp_links(self, nb: Ovsdb) -> None:
         assert not nb.exists("Logical_Switch_Port", "name=self-port4")
         port = nb.by_name(
             "Logical_Switch_Port",
@@ -249,14 +255,16 @@ class TestResult:
         assert port["dhcpv4_options"] == []
         assert port["dhcpv6_options"] == []
 
-    def test_port_identity_was_preserved(self, nb, snapshots):
+    def test_port_identity_was_preserved(self, nb: Ovsdb, snapshots: Snapshots) -> None:
         assert nb.by_name(
             "Logical_Switch_Port",
             "self-port3",
             "_uuid",
         )["_uuid"] == snapshots.load("ovn-endpoint-port")
 
-    def test_endpoint_identity_was_preserved(self, runner, snapshots):
+    def test_endpoint_identity_was_preserved(
+        self, runner: Runner, snapshots: Snapshots
+    ) -> None:
         namespace = namespace_identity(runner, "self-vm1")
         ifindex = host_ifindex(runner, "self-vm1-p")
         assert namespace == snapshots.load("ovn-endpoint-ns")
@@ -264,7 +272,7 @@ class TestResult:
         assert ifindex == snapshots.load("ovn-endpoint-ifindex")
         assert ifindex == snapshots.load("ovn-endpoint-reconfigured-ifindex")
 
-    def test_routes_replaced(self, network):
+    def test_routes_replaced(self, network: Network) -> None:
         assert (
             network.routes("self-vm1", 4, "main", "default")[0]["gateway"]
             == "192.0.2.1"
@@ -278,17 +286,19 @@ class TestResult:
         assert network.routes("self-vm1", 6, 200, "default") == []
 
     @pytest.mark.parametrize("endpoint", ("self-vm2", "self-delete"))
-    def test_removed_endpoints_are_absent(self, network, endpoint):
+    def test_removed_endpoints_are_absent(
+        self, network: Network, endpoint: Any
+    ) -> None:
         assert not network.namespace_exists(endpoint)
         assert network.link(f"{endpoint}-p") is None
 
-    def test_dhcp_state_removed(self, runner, snapshots):
+    def test_dhcp_state_removed(self, runner: Runner, snapshots: Snapshots) -> None:
         pid = snapshots.load("ovn-endpoint-dhcp-pid")
         assert "dhclient" not in process_arguments(runner, pid)
         assert not list(Path("/run/ovn-tmt-tests").glob("self-vm2-dhclient4.*"))
         assert not Path("/etc/netns/self-vm2").exists()
 
-    def test_host_and_static_namespace_files(self, snapshots):
+    def test_host_and_static_namespace_files(self, snapshots: Snapshots) -> None:
         host_hash = hashlib.sha256(Path("/etc/resolv.conf").read_bytes()).hexdigest()
         assert host_hash == snapshots.load("ovn-endpoint-resolver")
         assert Path("/etc/netns/self-vm1/preserve").is_file()

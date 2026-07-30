@@ -1,22 +1,35 @@
 import ipaddress
 import json
 import math
+import os
 import time
 from pathlib import Path
+from typing import Any, Callable, Iterable, Mapping, Optional, Sequence, TypeVar, Union
 
 from ovn_test.load_balancer import replace, socket
 
+T = TypeVar("T")
 
-def _command(*parts, check=True):
+
+def _command(*parts: object, check: bool = True) -> tuple[tuple[object, ...], bool]:
     return parts, check
 
 
-def _positive(name, value):
+def _positive(name: str, value: int) -> None:
     if isinstance(value, bool) or not isinstance(value, int) or value < 1:
         raise ValueError(f"{name} must be a positive integer")
 
 
-def _validate_common(initial, iterations, timeout, ipv4, ipv6, mtu, chassis, total):
+def _validate_common(
+    initial: int,
+    iterations: int,
+    timeout: int,
+    ipv4: bool,
+    ipv6: bool,
+    mtu: int,
+    chassis: int,
+    total: int,
+) -> None:
     for name, value in (
         ("initial", initial),
         ("iterations", iterations),
@@ -40,7 +53,15 @@ def _validate_common(initial, iterations, timeout, ipv4, ipv6, mtu, chassis, tot
         raise ValueError("the workload exceeds its endpoint address space")
 
 
-def validate_light(initial, iterations, timeout, ipv4, ipv6, mtu, chassis):
+def validate_light(
+    initial: int,
+    iterations: int,
+    timeout: int,
+    ipv4: bool,
+    ipv6: bool,
+    mtu: int,
+    chassis: int,
+) -> None:
     _validate_common(
         initial,
         iterations,
@@ -54,16 +75,16 @@ def validate_light(initial, iterations, timeout, ipv4, ipv6, mtu, chassis):
 
 
 def validate_heavy(
-    initial,
-    iterations,
-    pods_per_service,
-    protocols,
-    timeout,
-    ipv4,
-    ipv6,
-    mtu,
-    chassis,
-):
+    initial: int,
+    iterations: int,
+    pods_per_service: int,
+    protocols: Sequence[str],
+    timeout: int,
+    ipv4: bool,
+    ipv6: bool,
+    mtu: int,
+    chassis: int,
+) -> None:
     _positive("pods_per_service", pods_per_service)
     if initial % pods_per_service:
         raise ValueError("initial pods must contain complete services")
@@ -83,7 +104,9 @@ def validate_heavy(
     )
 
 
-def load_scale_topology(path, computes):
+def load_scale_topology(
+    path: Union[str, os.PathLike[str]], computes: Sequence[str]
+) -> dict[str, Any]:
     topology = json.loads(Path(path).read_text())
     workers = topology.get("workers", [])
     if not workers:
@@ -102,19 +125,19 @@ def load_scale_topology(path, computes):
 class Workload:
     def __init__(
         self,
-        runner,
-        computes,
-        name,
-        prefix,
-        metrics_file,
-        ipv4=True,
-        ipv6=True,
-        mtu=1342,
-        timeout=60,
-        sync_timeout=None,
-        scale_topology=None,
-        base_ports_per_worker=0,
-    ):
+        runner: Any,
+        computes: Sequence[str],
+        name: str,
+        prefix: str,
+        metrics_file: Union[str, os.PathLike[str]],
+        ipv4: bool = True,
+        ipv6: bool = True,
+        mtu: int = 1342,
+        timeout: int = 60,
+        sync_timeout: Optional[int] = None,
+        scale_topology: Optional[dict[str, Any]] = None,
+        base_ports_per_worker: int = 0,
+    ) -> None:
         self.runner = runner
         self.computes = computes
         self.name = name
@@ -152,9 +175,9 @@ class Workload:
         self.metrics_file.parent.mkdir(parents=True, exist_ok=True)
         self.metrics_file.write_text("iteration,phase,duration_ns\n")
 
-    def endpoint(self, index):
+    def endpoint(self, index: int) -> dict[str, Any]:
         value = index + 1
-        endpoint = {
+        endpoint: dict[str, Any] = {
             "guest": self.computes[index % len(self.computes)],
             "namespace": f"{self.prefix}{index:05d}",
             "interface": f"{self.prefix}{index:05d}-p",
@@ -201,33 +224,33 @@ class Workload:
             endpoint[f"prefix{version}"] = network.prefixlen
         return endpoint
 
-    def service_name(self, service, protocol, family):
+    def service_name(self, service: int, protocol: str, family: int) -> str:
         return f"{self.name}-{service:05d}-{protocol}-v{family}"
 
     @staticmethod
-    def _socket(address, port, family):
+    def _socket(address: str, port: int, family: int) -> str:
         return socket(address, port, family)
 
     @staticmethod
-    def vip(service, family):
+    def vip(service: int, family: int) -> str:
         value = service + 1
         if family == 4:
             return f"100.0.{value >> 8 & 255}.{value & 255}"
         return f"100::{value:x}"
 
-    def record_metric(self, iteration, phase, start):
+    def record_metric(self, iteration: object, phase: str, start: int) -> None:
         duration = time.time_ns() - start
         with self.metrics_file.open("a") as output:
             output.write(f"{iteration},{phase},{duration}\n")
         print(f"metric iteration={iteration} phase={phase} duration_ns={duration}")
 
-    def measure(self, iteration, phase, action):
+    def measure(self, iteration: object, phase: str, action: Callable[[], T]) -> T:
         start = time.time_ns()
         result = action()
         self.record_metric(iteration, phase, start)
         return result
 
-    def _destroy_named(self, table, name):
+    def _destroy_named(self, table: str, name: str) -> None:
         output = self.runner.output(
             "ovn-nbctl",
             "--bare",
@@ -239,7 +262,7 @@ class Workload:
         for uuid in output.split():
             self.runner.run("ovn-nbctl", "destroy", table, uuid)
 
-    def create_namespace(self):
+    def create_namespace(self) -> None:
         if self.load_balancer_group:
             self.load_balancer_group_uuid = self._named_uuid(
                 "Load_Balancer_Group",
@@ -262,14 +285,20 @@ class Workload:
             )
             self.address_set_ids[family] = address_set_id
 
-    def create_topology(self):
+    def create_topology(self) -> None:
         if self.workers:
             raise RuntimeError("prepared scale topology is owned by provisioning")
         self._destroy_named("Logical_Switch", self.name)
         self.runner.run("ovn-nbctl", "ls-add", self.name)
         self.create_namespace()
 
-    def add_endpoint(self, index, phase, passive=False, converge=True):
+    def add_endpoint(
+        self,
+        index: int,
+        phase: str,
+        passive: bool = False,
+        converge: bool = True,
+    ) -> dict[str, Any]:
         endpoint = self.endpoint(index)
         self.endpoints.append(endpoint)
         addresses = [endpoint["mac"]]
@@ -421,7 +450,7 @@ class Workload:
             self.record_metric(index, f"{phase}_convergence", start)
         return endpoint
 
-    def wait_for_binding(self, port):
+    def wait_for_binding(self, port: str) -> None:
         self.runner.wait(
             "ovn-sbctl",
             "--bare",
@@ -434,7 +463,7 @@ class Workload:
             until=lambda result: bool(result.stdout.strip("[] \n\t")),
         )
 
-    def sync(self):
+    def sync(self) -> None:
         self.runner.run(
             "ovn-nbctl",
             "--wait=hv",
@@ -444,13 +473,13 @@ class Workload:
 
     def _replace_load_balancer(
         self,
-        name,
-        protocol,
-        vips=None,
-        switches=(),
-        routers=(),
-        group=None,
-    ):
+        name: str,
+        protocol: str,
+        vips: Optional[Mapping[str, Sequence[str]]] = None,
+        switches: Iterable[str] = (),
+        routers: Iterable[str] = (),
+        group: Optional[str] = None,
+    ) -> None:
         self.load_balancers.append(name)
         replace(
             self.runner,
@@ -463,7 +492,7 @@ class Workload:
             group,
         )
 
-    def add_background_load_balancers(self, protocols):
+    def add_background_load_balancers(self, protocols: Sequence[str]) -> None:
         if not self.workers:
             raise RuntimeError("background load balancers need a scale topology")
 
@@ -506,7 +535,7 @@ class Workload:
                         routers=[worker["gateway_router"]],
                     )
 
-    def add_service(self, service, backend, protocols):
+    def add_service(self, service: int, backend: int, protocols: Sequence[str]) -> None:
         endpoint = self.endpoint(backend)
         group = None
         if self.load_balancer_group:
@@ -540,7 +569,9 @@ class Workload:
                     group=group,
                 )
 
-    def verify_connectivity(self, index, target_index=None):
+    def verify_connectivity(
+        self, index: int, target_index: Optional[int] = None
+    ) -> None:
         source = self.endpoint(index)
         if target_index is None:
             target_index = (index % len(self.computes) + 1) % len(self.computes)
@@ -571,7 +602,7 @@ class Workload:
             )
         self.record_metric(index, "connectivity", start)
 
-    def _remove_endpoint(self, endpoint):
+    def _remove_endpoint(self, endpoint: dict[str, Any]) -> None:
         self.runner.run(
             "ovn-nbctl",
             "--if-exists",
@@ -594,10 +625,10 @@ class Workload:
         )
         endpoint["removed"] = True
 
-    def remove_endpoint(self, endpoint):
+    def remove_endpoint(self, endpoint: dict[str, Any]) -> None:
         self._remove_endpoint(endpoint)
 
-    def _named_uuid(self, table, name):
+    def _named_uuid(self, table: str, name: str) -> str:
         output = self.runner.output(
             "ovn-nbctl",
             "--bare",
@@ -611,13 +642,13 @@ class Workload:
             raise RuntimeError(f"expected one {table} named {name!r}")
         return matches[0]
 
-    def cleanup(self):
+    def cleanup(self) -> None:
         if self.cleaned:
             return
         start = time.time_ns()
         first_error = None
 
-        def attempt(*command, **kwargs):
+        def attempt(*command: object, **kwargs: Any) -> None:
             nonlocal first_error
             try:
                 if command:
@@ -650,7 +681,7 @@ class Workload:
         if first_error is not None:
             raise first_error
 
-    def verify_cleanup(self):
+    def verify_cleanup(self) -> None:
         objects = [
             *(("Load_Balancer", name) for name in self.load_balancers),
             *(("Logical_Switch_Port", endpoint["port"]) for endpoint in self.endpoints),

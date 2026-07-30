@@ -1,7 +1,8 @@
 import os
+from pathlib import Path
+from typing import Any, Optional
 
 import pytest
-
 from ovn_test.ansible import Ansible
 from ovn_test.command import Runner
 from ovn_test.ovsdb import Ovsdb
@@ -10,26 +11,26 @@ from ovn_test.topology import Topology
 
 
 @pytest.fixture
-def topology():
+def topology() -> Topology:
     return Topology.from_environment()
 
 
 @pytest.fixture
-def runner(topology):
+def runner(topology: Topology) -> Runner:
     return Runner(topology)
 
 
 @pytest.fixture
-def nb(runner):
+def nb(runner: Runner) -> Ovsdb:
     return Ovsdb(runner, "ovn-nbctl")
 
 
 @pytest.fixture
-def sb(runner):
+def sb(runner: Runner) -> Ovsdb:
     return Ovsdb(runner, "ovn-sbctl")
 
 
-def ping(runner, guest, namespace, destination):
+def ping(runner: Runner, guest: str, namespace: str, destination: str) -> None:
     runner.wait(
         "ip",
         "netns",
@@ -47,29 +48,31 @@ def ping(runner, guest, namespace, destination):
     )
 
 
-def connection(runner, database):
+def connection(runner: Runner, database: str) -> str:
     return runner.output(database, "get-connection")
 
 
-def ssl_configuration(runner, database, guest=None):
+def ssl_configuration(
+    runner: Runner, database: str, guest: Optional[str] = None
+) -> str:
     return runner.output(database, "get-ssl", guest=guest)
 
 
 class TestPreconditions:
     @pytest.mark.parametrize("process", ("ovn-northd", "ovn-controller"))
-    def test_ovn_process_is_absent(self, runner, process):
+    def test_ovn_process_is_absent(self, runner: Runner, process: Any) -> None:
         assert processes(runner, process) == []
 
-    def test_southbound_database_is_unavailable(self, runner):
+    def test_southbound_database_is_unavailable(self, runner: Runner) -> None:
         assert not runner.succeeds("ovn-sbctl", "show")
 
 
 class TestTLS:
-    def test_databases_use_tls(self, runner):
+    def test_databases_use_tls(self, runner: Runner) -> None:
         assert "pssl:" in connection(runner, "ovn-nbctl")
         assert "pssl:" in connection(runner, "ovn-sbctl")
 
-    def test_compute_chassis_use_tls(self, runner, topology):
+    def test_compute_chassis_use_tls(self, runner: Runner, topology: Topology) -> None:
         for guest in topology.role("compute"):
             remote = runner.output(
                 "ovs-vsctl",
@@ -88,7 +91,9 @@ class TestTLS:
             )
 
     @pytest.mark.parametrize("database", ("ovn-nbctl", "ovn-sbctl"))
-    def test_remote_database_connection(self, runner, topology, database):
+    def test_remote_database_connection(
+        self, runner: Runner, topology: Topology, database: str
+    ) -> None:
         port = "6641" if database == "ovn-nbctl" else "6642"
         runner.run(
             database,
@@ -100,18 +105,20 @@ class TestTLS:
             guest="compute-1",
         )
 
-    def test_packet_traffic(self, runner):
+    def test_packet_traffic(self, runner: Runner) -> None:
         ping(runner, "compute-1", "self-tls-a", "192.0.2.22")
 
 
 class TestTCP:
-    def test_databases_returned_to_tcp(self, runner):
+    def test_databases_returned_to_tcp(self, runner: Runner) -> None:
         assert "ptcp:" in connection(runner, "ovn-nbctl")
         assert "ptcp:" in connection(runner, "ovn-sbctl")
         assert ssl_configuration(runner, "ovn-nbctl") == ""
         assert ssl_configuration(runner, "ovn-sbctl") == ""
 
-    def test_compute_chassis_returned_to_tcp(self, runner, topology):
+    def test_compute_chassis_returned_to_tcp(
+        self, runner: Runner, topology: Topology
+    ) -> None:
         for guest in topology.role("compute"):
             remote = runner.output(
                 "ovs-vsctl",
@@ -123,17 +130,19 @@ class TestTCP:
             ).strip('"')
             assert remote.startswith("tcp:")
 
-    def test_pki_state_is_removed(self, runner, topology):
+    def test_pki_state_is_removed(self, runner: Runner, topology: Topology) -> None:
         for guest in topology.guests():
             assert ssl_configuration(runner, "ovs-vsctl", guest=guest) == ""
             assert not runner.succeeds("test", "-e", "/run/ovn-test-pki", guest=guest)
 
-    def test_packet_traffic(self, runner):
+    def test_packet_traffic(self, runner: Runner) -> None:
         ping(runner, "compute-1", "self-tls-a", "192.0.2.22")
 
 
 class TestResult:
-    def test_test_scoped_ansible_execution(self, topology, test_data):
+    def test_test_scoped_ansible_execution(
+        self, topology: Topology, test_data: Path
+    ) -> None:
         ansible = Ansible.from_environment(topology=topology)
         ansible.run("tests/self/multihost/ansible-execution.yml")
         marker = "TASK [Confirm test-scoped Ansible execution reaches each guest]"
@@ -144,27 +153,27 @@ class TestResult:
             recaps = [line.split()[0] for line in log.splitlines() if " : ok=" in line]
             assert recaps == [guest]
 
-    def test_central_services(self, runner):
+    def test_central_services(self, runner: Runner) -> None:
         assert processes(runner, "ovsdb-server")
         assert processes(runner, "ovn-northd")
         runner.run("ovn-nbctl", "show")
         runner.run("ovn-sbctl", "show")
 
-    def test_chassis_registration(self, sb):
+    def test_chassis_registration(self, sb: Ovsdb) -> None:
         chassis = sb.find("Chassis", columns=("name",))
         assert chassis
         expected = os.environ.get("OTT_EXPECTED_CHASSIS")
         if expected is not None:
             assert len(chassis) == int(expected)
 
-    def test_cross_guest_execution(self, runner):
+    def test_cross_guest_execution(self, runner: Runner) -> None:
         guest = os.environ.get("OTT_MULTIHOST_TEST_GUEST")
         if guest is None:
             pytest.skip("no cross-guest target configured")
         assert runner.output("hostname", guest=guest)
         assert not runner.succeeds("false", guest=guest)
 
-    def test_provider_mesh_connectivity(self, runner):
+    def test_provider_mesh_connectivity(self, runner: Runner) -> None:
         if os.environ.get("OTT_EXPECTED_CHASSIS") != "2":
             pytest.skip("provider mesh belongs to the standard plan")
         ping(runner, "compute-1", "self-provider-1", "192.0.2.2")
@@ -174,7 +183,9 @@ class TestResult:
         ("guest", "expected"),
         (("central", 1), ("compute-1", 2), ("compute-2", 1)),
     )
-    def test_provider_mesh_tunnels(self, runner, guest, expected):
+    def test_provider_mesh_tunnels(
+        self, runner: Runner, guest: str, expected: Any
+    ) -> None:
         if os.environ.get("OTT_EXPECTED_CHASSIS") != "2":
             pytest.skip("provider mesh belongs to the standard plan")
         output = runner.output(
@@ -188,7 +199,9 @@ class TestResult:
         )
         assert len(output.split()) == expected
 
-    def test_inventory_name_fallback(self, runner, tree, test_data):
+    def test_inventory_name_fallback(
+        self, runner: Runner, tree: Path, test_data: Path
+    ) -> None:
         inventory = test_data / "fallback-inventory.ini"
         inventory.write_text(
             "[central]\n"

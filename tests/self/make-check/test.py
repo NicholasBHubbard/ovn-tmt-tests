@@ -1,20 +1,22 @@
+from pathlib import Path
+
 from ovn_test.command import Runner
 
 
 class TestFixture:
-    def test_makefile_exists(self):
+    def test_makefile_exists(self) -> None:
         from pathlib import Path
 
         assert Path("/tmp/make-check-workspace/Makefile").is_file()
 
 
 class TestResult:
-    def test_role_ran_make(self):
+    def test_role_ran_make(self) -> None:
         from pathlib import Path
 
         assert Path("/tmp/make-check-passed").is_file()
 
-    def test_missing_source_is_rejected(self, tree):
+    def test_missing_source_is_rejected(self, tree: Path) -> None:
         result = Runner().run(
             "ansible-playbook",
             "-i",
@@ -35,7 +37,7 @@ class TestResult:
             in result.stdout + result.stderr
         )
 
-    def test_ci_configuration(self, tree):
+    def test_ci_configuration(self, tree: Path) -> None:
         plans = tree / "plans/ovn-ci"
         main = (plans / "main.fmf").read_text()
         all_plans = "\n".join(path.read_text() for path in plans.glob("*.fmf"))

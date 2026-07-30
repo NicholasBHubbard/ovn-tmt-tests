@@ -3,9 +3,10 @@ import json
 import os
 import subprocess
 from pathlib import Path
+from typing import Any, Sequence
 
 
-def _decode(value):
+def _decode(value: Any) -> Any:
     if not isinstance(value, list) or len(value) != 2:
         return value
     kind, contents = value
@@ -16,7 +17,7 @@ def _decode(value):
     return value
 
 
-def _run(*args):
+def _run(*args: object) -> str:
     return subprocess.run(
         ["ovn-nbctl", *map(str, args)],
         check=True,
@@ -25,7 +26,7 @@ def _run(*args):
     ).stdout.strip()
 
 
-def _rows(table, condition):
+def _rows(table: str, condition: str) -> list[dict[str, Any]]:
     output = _run(
         "--format=json",
         "--data=json",
@@ -44,7 +45,7 @@ def _rows(table, condition):
     ]
 
 
-def _batch(commands):
+def _batch(commands: Sequence[Sequence[object]]) -> None:
     for offset in range(0, len(commands), 100):
         arguments = []
         for command in commands[offset : offset + 100]:
@@ -55,7 +56,7 @@ def _batch(commands):
             _run(*arguments)
 
 
-def apply(groups):
+def apply(groups: Sequence[dict[str, Any]]) -> None:
     names = [group.get("name", group["id"]) for group in groups]
     if len(names) != len(set(names)):
         raise ValueError("load balancer group names must be unique")
@@ -113,7 +114,7 @@ def apply(groups):
         _batch(commands)
 
 
-def main():
+def main() -> None:
     path = os.environ.get("OVN_LOAD_BALANCER_GROUPS_PATH")
     if path:
         data = json.loads(Path(path).read_text())

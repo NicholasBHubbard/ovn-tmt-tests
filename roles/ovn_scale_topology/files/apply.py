@@ -3,14 +3,14 @@ import os
 import subprocess
 import time
 from pathlib import Path
-
+from typing import Any, Mapping, Sequence
 
 OWNER = "ovn-tmt-tests-owner"
 IDENTIFIER = "ovn-tmt-tests-id"
 SCOPE = "ovn-tmt-tests-scope"
 
 
-def _decode(value):
+def _decode(value: Any) -> Any:
     if not isinstance(value, list) or len(value) != 2:
         return value
     kind, contents = value
@@ -23,7 +23,7 @@ def _decode(value):
     return value
 
 
-def _run(*args):
+def _run(*args: object) -> str:
     return subprocess.run(
         ["ovn-nbctl", *map(str, args)],
         check=True,
@@ -32,7 +32,7 @@ def _run(*args):
     ).stdout.strip()
 
 
-def _rows(table, *columns):
+def _rows(table: str, *columns: str) -> list[dict[str, Any]]:
     result = json.loads(
         _run(
             "--format=json",
@@ -51,7 +51,7 @@ def _rows(table, *columns):
     ]
 
 
-def _references(rows, column):
+def _references(rows: Sequence[dict[str, Any]], column: str) -> dict[str, str]:
     result = {}
     for row in rows:
         values = row[column]
@@ -60,7 +60,7 @@ def _references(rows, column):
     return result
 
 
-def _batch(groups, size=50):
+def _batch(groups: Sequence[Any], size: int = 50) -> None:
     for offset in range(0, len(groups), size):
         arguments = []
         for command in sum(groups[offset : offset + size], []):
@@ -71,15 +71,17 @@ def _batch(groups, size=50):
             _run(*arguments)
 
 
-def _quoted(value):
+def _quoted(value: Any) -> str:
     return json.dumps(value, separators=(",", ":"))
 
 
-def _external_id(key, value):
+def _external_id(key: str, value: Any) -> str:
     return f"external_ids:{key}={_quoted(value)}"
 
 
-def _options(table, name, column, values):
+def _options(
+    table: str, name: str, column: str, values: Mapping[str, Any]
+) -> list[list[str]]:
     commands = [["clear", table, name, column]]
     commands.extend(
         ["set", table, name, f"{column}:{key}={_quoted(str(value).lower())}"]
@@ -88,11 +90,11 @@ def _options(table, name, column, values):
     return commands
 
 
-def _managed(rows, owner):
+def _managed(rows: Sequence[dict[str, Any]], owner: str) -> list[dict[str, Any]]:
     return [row for row in rows if row.get("external_ids", {}).get(OWNER) == owner]
 
 
-def _identified(rows):
+def _identified(rows: Sequence[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     return {
         row.get("external_ids", {}).get(IDENTIFIER): row
         for row in rows
@@ -100,7 +102,7 @@ def _identified(rows):
     }
 
 
-def _configure_roots(topology, owner):
+def _configure_roots(topology: dict[str, Any], owner: str) -> None:
     groups = []
     for switch in topology["switches"]:
         name = switch["name"]
@@ -133,18 +135,25 @@ def _configure_roots(topology, owner):
     _batch(groups)
 
 
-def _configure_ports(topology, owner, routers, switches, router_ports, switch_ports):
+def _configure_ports(
+    topology: dict[str, Any],
+    owner: str,
+    routers: Sequence[dict[str, Any]],
+    switches: Sequence[dict[str, Any]],
+    router_ports: Sequence[dict[str, Any]],
+    switch_ports: Sequence[dict[str, Any]],
+) -> None:
     router_parent = _references(routers, "ports")
     switch_parent = _references(switches, "ports")
-    router_ports = {row["name"]: row for row in router_ports}
-    switch_ports = {row["name"]: row for row in switch_ports}
+    router_ports_by_name = {row["name"]: row for row in router_ports}
+    switch_ports_by_name = {row["name"]: row for row in switch_ports}
     groups = []
 
     for port in topology["router_ports"]:
         name = port["name"]
         switch_name = port["switch_port"]
         commands = []
-        current = router_ports.get(name)
+        current = router_ports_by_name.get(name)
         if current:
             old_parent = router_parent.get(current["_uuid"])
             if old_parent != port["router"]:
@@ -195,7 +204,7 @@ def _configure_ports(topology, owner, routers, switches, router_ports, switch_po
             ]
         )
 
-        current = switch_ports.get(switch_name)
+        current = switch_ports_by_name.get(switch_name)
         if current:
             old_parent = switch_parent.get(current["_uuid"])
             if old_parent != port["switch"]:
@@ -237,7 +246,7 @@ def _configure_ports(topology, owner, routers, switches, router_ports, switch_po
     for port in topology["localnet_ports"]:
         name = port["name"]
         commands = []
-        current = switch_ports.get(name)
+        current = switch_ports_by_name.get(name)
         if current:
             old_parent = switch_parent.get(current["_uuid"])
             if old_parent != port["switch"]:
@@ -283,7 +292,11 @@ def _configure_ports(topology, owner, routers, switches, router_ports, switch_po
     _batch(groups)
 
 
-def _configure_gateway_chassis(topology, router_ports, gateway_chassis):
+def _configure_gateway_chassis(
+    topology: dict[str, Any],
+    router_ports: Sequence[dict[str, Any]],
+    gateway_chassis: Sequence[dict[str, Any]],
+) -> None:
     parent = _references(router_ports, "gateway_chassis")
     current = {row["name"]: row for row in gateway_chassis}
     groups = []
@@ -349,7 +362,12 @@ def _configure_gateway_chassis(topology, router_ports, gateway_chassis):
     _batch(groups)
 
 
-def _configure_routes(topology, routers, routes, owner):
+def _configure_routes(
+    topology: dict[str, Any],
+    routers: Sequence[dict[str, Any]],
+    routes: Sequence[dict[str, Any]],
+    owner: str,
+) -> None:
     parent = _references(routers, "static_routes")
     current = _identified(routes)
     groups = []
@@ -422,7 +440,12 @@ def _configure_routes(topology, routers, routes, owner):
     _batch(groups)
 
 
-def _configure_nat(topology, routers, rules, owner):
+def _configure_nat(
+    topology: dict[str, Any],
+    routers: Sequence[dict[str, Any]],
+    rules: Sequence[dict[str, Any]],
+    owner: str,
+) -> None:
     parent = _references(routers, "nat")
     current = _identified(rules)
     groups = []
@@ -473,7 +496,7 @@ def _configure_nat(topology, routers, rules, owner):
     _batch(groups)
 
 
-def _cleanup(topology, owner, state):
+def _cleanup(topology: dict[str, Any], owner: str, state: dict[str, Any]) -> None:
     desired = topology["managed"]
     desired_switch_ports = {
         port["switch_port"] for port in topology["router_ports"]
@@ -548,7 +571,7 @@ def _cleanup(topology, owner, state):
     _batch(groups)
 
 
-def _record_removed(topology, state):
+def _record_removed(topology: dict[str, Any], state: dict[str, Any]) -> None:
     expected = topology["southbound"]
     previous_datapaths = {
         row["name"]
@@ -564,7 +587,7 @@ def _record_removed(topology, state):
     expected["absent_ports"] = sorted(previous_ports - set(expected["ports"]))
 
 
-def apply(topology):
+def apply(topology: dict[str, Any]) -> None:
     owner = topology["owner"]
     topology["southbound"]["started_ns"] = time.monotonic_ns()
     _configure_roots(topology, owner)
@@ -629,7 +652,7 @@ def apply(topology):
     )
 
 
-def main():
+def main() -> None:
     path = Path(os.environ["OVN_SCALE_TOPOLOGY_PATH"])
     topology = json.loads(path.read_text())
     apply(topology)

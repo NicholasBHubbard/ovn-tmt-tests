@@ -1,10 +1,15 @@
-import pytest
+from typing import Callable
 
+import pytest
+from ovn_test.network import Network
+from ovn_test.ovsdb import Ovsdb
 
 pytestmark = pytest.mark.usefixtures("setup_scenario")
 
 
-def test_redirect_bridged_traffic(nb, sb, network):
+def test_redirect_bridged_traffic(
+    nb: Ovsdb, sb: Ovsdb, network: Callable[[str], Network]
+) -> None:
     options = nb.value("Logical_Router_Port", "options", "name=rr-public")
     assert options["redirect-type"] == "bridged"
 

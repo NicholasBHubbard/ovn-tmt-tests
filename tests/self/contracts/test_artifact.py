@@ -1,27 +1,28 @@
 import hashlib
 import json
+import subprocess
+from pathlib import Path
+from typing import Any, Union
 
 import pytest
-
 from ovn_test.command import Runner
-
 
 REPOSITORY = "https://github.com/ovn-org/ovn.git"
 
 
 @pytest.fixture
-def artifact(tmp_path):
+def artifact(tmp_path: Path) -> Path:
     path = tmp_path / "artifact.tar"
     path.write_bytes(b"")
     return path
 
 
 @pytest.fixture
-def manifest(tmp_path):
+def manifest(tmp_path: Path) -> Path:
     return tmp_path / "manifest.json"
 
 
-def identity(**changes):
+def identity(**changes: Any) -> dict[str, Any]:
     values = {
         "distribution": "test",
         "distribution_version": "2",
@@ -43,11 +44,16 @@ def identity(**changes):
     return values
 
 
-def write_manifest(path, values):
+def write_manifest(path: Path, values: Any) -> None:
     path.write_text(json.dumps(values))
 
 
-def playbook(runner, tree, path, variables):
+def playbook(
+    runner: Runner,
+    tree: Path,
+    path: Union[str, Path],
+    variables: dict[str, Any],
+) -> subprocess.CompletedProcess[str]:
     command = [
         "ansible-playbook",
         "-i",
@@ -64,7 +70,13 @@ def playbook(runner, tree, path, variables):
     return runner.run(*command, cwd=tree, check=False)
 
 
-def install(runner, tree, artifact, manifest, **variables):
+def install(
+    runner: Runner,
+    tree: Path,
+    artifact: Path,
+    manifest: Path,
+    **variables: Any,
+) -> subprocess.CompletedProcess[str]:
     return playbook(
         runner,
         tree,
@@ -81,7 +93,13 @@ def install(runner, tree, artifact, manifest, **variables):
     )
 
 
-def validate(runner, tree, artifact, manifest, **variables):
+def validate(
+    runner: Runner,
+    tree: Path,
+    artifact: Path,
+    manifest: Path,
+    **variables: Any,
+) -> subprocess.CompletedProcess[str]:
     return playbook(
         runner,
         tree,
@@ -97,7 +115,7 @@ def validate(runner, tree, artifact, manifest, **variables):
     )
 
 
-def assert_rejected(result, message):
+def assert_rejected(result: Any, message: str) -> None:
     assert result.returncode
     assert message in result.stdout + result.stderr
 
@@ -111,13 +129,13 @@ def assert_rejected(result, message):
     ],
 )
 def test_incompatible_host_is_rejected(
-    tree,
-    artifact,
-    manifest,
-    distribution,
-    version,
-    architecture,
-):
+    tree: Path,
+    artifact: Any,
+    manifest: Any,
+    distribution: str,
+    version: str,
+    architecture: str,
+) -> None:
     write_manifest(
         manifest,
         {
@@ -130,7 +148,9 @@ def test_incompatible_host_is_rejected(
     assert_rejected(result, "OVN artifact is incompatible with this host.")
 
 
-def test_build_configuration_mismatch_is_rejected(tree, artifact, manifest):
+def test_build_configuration_mismatch_is_rejected(
+    tree: Path, artifact: Any, manifest: Any
+) -> None:
     write_manifest(manifest, identity(ovn_git_repo="wrong"))
     result = install(Runner(), tree, artifact, manifest)
     assert_rejected(
@@ -139,7 +159,7 @@ def test_build_configuration_mismatch_is_rejected(tree, artifact, manifest):
     )
 
 
-def test_reuse_requires_revision(tree, artifact, manifest):
+def test_reuse_requires_revision(tree: Path, artifact: Any, manifest: Any) -> None:
     write_manifest(manifest, identity(ovn_revision="old", sha256="wrong"))
     result = install(
         Runner(),
@@ -154,7 +174,9 @@ def test_reuse_requires_revision(tree, artifact, manifest):
     )
 
 
-def test_revision_mismatch_is_rejected(tree, artifact, manifest):
+def test_revision_mismatch_is_rejected(
+    tree: Path, artifact: Any, manifest: Any
+) -> None:
     write_manifest(manifest, identity(ovn_revision="old", sha256="wrong"))
     result = install(
         Runner(),
@@ -169,7 +191,9 @@ def test_revision_mismatch_is_rejected(tree, artifact, manifest):
     )
 
 
-def test_dpdk_identity_mismatch_is_rejected(tree, artifact, manifest):
+def test_dpdk_identity_mismatch_is_rejected(
+    tree: Path, artifact: Any, manifest: Any
+) -> None:
     write_manifest(
         manifest,
         identity(
@@ -196,7 +220,7 @@ def test_dpdk_identity_mismatch_is_rejected(tree, artifact, manifest):
     )
 
 
-def test_bad_checksum_is_rejected(tree, artifact, manifest):
+def test_bad_checksum_is_rejected(tree: Path, artifact: Any, manifest: Any) -> None:
     write_manifest(manifest, identity(sha256="wrong"))
     result = install(Runner(), tree, artifact, manifest)
     assert_rejected(
@@ -205,13 +229,17 @@ def test_bad_checksum_is_rejected(tree, artifact, manifest):
     )
 
 
-def test_non_installing_consumer_can_validate(tree, artifact, manifest):
+def test_non_installing_consumer_can_validate(
+    tree: Path, artifact: Any, manifest: Any
+) -> None:
     checksum = hashlib.sha256(artifact.read_bytes()).hexdigest()
     write_manifest(manifest, identity(sha256=checksum))
     assert validate(Runner(), tree, artifact, manifest).returncode == 0
 
 
-def test_invalid_artifact_action_is_rejected(tree, artifact, manifest):
+def test_invalid_artifact_action_is_rejected(
+    tree: Path, artifact: Any, manifest: Any
+) -> None:
     checksum = hashlib.sha256(artifact.read_bytes()).hexdigest()
     write_manifest(manifest, identity(sha256=checksum))
     result = validate(
@@ -224,7 +252,9 @@ def test_invalid_artifact_action_is_rejected(tree, artifact, manifest):
     assert_rejected(result, "ovn_artifact_action must be build or validate.")
 
 
-def test_missing_reusable_artifact_is_rejected(tree, tmp_path, manifest):
+def test_missing_reusable_artifact_is_rejected(
+    tree: Path, tmp_path: Path, manifest: Any
+) -> None:
     result = playbook(
         Runner(),
         tree,
@@ -240,7 +270,7 @@ def test_missing_reusable_artifact_is_rejected(tree, tmp_path, manifest):
     assert_rejected(result, "The requested reusable OVN artifact is missing.")
 
 
-def test_disabled_artifact_build_skips_role(tree):
+def test_disabled_artifact_build_skips_role(tree: Path) -> None:
     result = playbook(
         Runner(),
         tree,

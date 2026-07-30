@@ -1,8 +1,9 @@
 import subprocess
+from pathlib import Path
+from typing import Any, Optional
 
 import pytest
 import yaml
-
 from ovn_test.command import Runner
 from ovn_test.config import read_bool, read_int, read_list
 from ovn_test.namespace import OvnNamespace, validate_cluster_density
@@ -18,7 +19,7 @@ from ovn_test.workload import (
 
 
 class FakeRunner:
-    def __init__(self):
+    def __init__(self) -> None:
         self.calls = []
         self.batches = []
         self.fail = set()
@@ -26,7 +27,13 @@ class FakeRunner:
         self.returncodes = {}
         self.waits = []
 
-    def run(self, *command, guest=None, input=None, check=True):
+    def run(
+        self,
+        *command: Any,
+        guest: Optional[str] = None,
+        input: Any = None,
+        check: bool = True,
+    ) -> subprocess.CompletedProcess[str]:
         self.calls.append((guest, command, input))
         if command in self.fail:
             raise subprocess.CalledProcessError(1, command)
@@ -52,17 +59,21 @@ class FakeRunner:
             "",
         )
 
-    def output(self, *command, **options):
+    def output(self, *command: Any, **options: Any) -> str:
         return self.run(*command, **options).stdout.strip()
 
-    def namespace(self, namespace, *command, **options):
+    def namespace(
+        self, namespace: str, *command: Any, **options: Any
+    ) -> subprocess.CompletedProcess[str]:
         return self.run("ip", "netns", "exec", namespace, *command, **options)
 
-    def run_many(self, commands, guest=None):
+    def run_many(
+        self, commands: Any, guest: Optional[str] = None
+    ) -> subprocess.CompletedProcess[str]:
         self.batches.append((guest, commands))
         return subprocess.CompletedProcess([], 0, "", "")
 
-    def wait(self, *command, **options):
+    def wait(self, *command: Any, **options: Any) -> subprocess.CompletedProcess[str]:
         self.waits.append((command, options))
         result = self.run(*command, check=False, guest=options.get("guest"))
         condition = options.get("until")
@@ -71,7 +82,7 @@ class FakeRunner:
         return result
 
 
-def topology_data():
+def topology_data() -> dict[str, Any]:
     return {
         "guest": {"name": "central", "hostname": "192.0.2.1", "role": "central"},
         "guests": {
@@ -95,14 +106,14 @@ def topology_data():
     }
 
 
-def contains(command, *parts):
+def contains(command: Any, *parts: Any) -> bool:
     return any(
         command[index : index + len(parts)] == parts
         for index in range(len(command) - len(parts) + 1)
     )
 
 
-def test_topology_loads_guests_and_roles(tmp_path):
+def test_topology_loads_guests_and_roles(tmp_path: Path) -> None:
     path = tmp_path / "topology.yaml"
     path.write_text(yaml.safe_dump(topology_data()))
 
@@ -115,10 +126,12 @@ def test_topology_loads_guests_and_roles(tmp_path):
     assert not topology.is_local("compute-1")
 
 
-def test_runner_executes_locally_and_over_ssh(capsys):
+def test_runner_executes_locally_and_over_ssh(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     calls = []
 
-    def execute(command, **kwargs):
+    def execute(command: Any, **kwargs: Any) -> Any:
         calls.append((command, kwargs))
         return subprocess.CompletedProcess(command, 0, "ok\n", "")
 
@@ -149,10 +162,10 @@ def test_runner_executes_locally_and_over_ssh(capsys):
     assert "+ ovn-nbctl show" in capsys.readouterr().out
 
 
-def test_runner_uses_configured_driver_connection():
+def test_runner_uses_configured_driver_connection() -> None:
     calls = []
 
-    def execute(command, **kwargs):
+    def execute(command: Any, **kwargs: Any) -> Any:
         calls.append(command)
         return subprocess.CompletedProcess(command, 0, "", "")
 
@@ -171,7 +184,7 @@ def test_runner_uses_configured_driver_connection():
 
 
 @pytest.mark.parametrize("ssl", (False, True))
-def test_runner_uses_cluster_database_remotes(ssl):
+def test_runner_uses_cluster_database_remotes(ssl: bool) -> None:
     calls = []
     data = topology_data()
     data["guests"]["central-2"] = {
@@ -218,7 +231,7 @@ def test_runner_uses_cluster_database_remotes(ssl):
         assert "OVN_SBCTL_OPTIONS" not in command_environment
 
 
-def test_workload_identity_is_deterministic(tmp_path):
+def test_workload_identity_is_deterministic(tmp_path: Path) -> None:
     workload = Workload(
         FakeRunner(),
         ["compute-1", "compute-2"],
@@ -243,7 +256,7 @@ def test_workload_identity_is_deterministic(tmp_path):
     assert workload.vip(3, 6) == "100::4"
 
 
-def test_loads_scale_topology_for_provisioned_guests(tmp_path):
+def test_loads_scale_topology_for_provisioned_guests(tmp_path: Path) -> None:
     path = tmp_path / "scale.json"
     path.write_text(
         """{
@@ -266,7 +279,7 @@ def test_loads_scale_topology_for_provisioned_guests(tmp_path):
         load_scale_topology(path, ["compute-2"])
 
 
-def test_workload_uses_prepared_scale_topology(tmp_path):
+def test_workload_uses_prepared_scale_topology(tmp_path: Path) -> None:
     runner = FakeRunner()
     topology = {
         "load_balancer_group": "cluster-lb-group",
@@ -353,7 +366,7 @@ def test_workload_uses_prepared_scale_topology(tmp_path):
     ) in [command for command, _ in batch]
 
 
-def test_workload_reserves_base_worker_addresses_and_identities(tmp_path):
+def test_workload_reserves_base_worker_addresses_and_identities(tmp_path: Path) -> None:
     topology = {
         "load_balancer_group": "cluster-lb-group",
         "workers": [
@@ -392,7 +405,7 @@ def test_workload_reserves_base_worker_addresses_and_identities(tmp_path):
     assert workload.endpoint(0)["mac"] == "02:00:00:00:00:15"
 
 
-def test_workload_base_ports_do_not_require_namespace_state(tmp_path):
+def test_workload_base_ports_do_not_require_namespace_state(tmp_path: Path) -> None:
     runner = FakeRunner()
     topology = {
         "load_balancer_group": "cluster-lb-group",
@@ -438,7 +451,7 @@ def test_workload_base_ports_do_not_require_namespace_state(tmp_path):
     )
 
 
-def test_external_peers_exercise_worker_gateway_paths():
+def test_external_peers_exercise_worker_gateway_paths() -> None:
     runner = FakeRunner()
     peers = ExternalPeers(
         runner,
@@ -516,7 +529,7 @@ def test_external_peers_exercise_worker_gateway_paths():
     peers.verify_cleanup()
 
 
-def test_workload_creates_namespace_objects(tmp_path):
+def test_workload_creates_namespace_objects(tmp_path: Path) -> None:
     runner = FakeRunner()
     workload = Workload(
         runner,
@@ -542,7 +555,7 @@ def test_workload_creates_namespace_objects(tmp_path):
     assert len([command for command in commands if "Address_Set" in command]) == 4
 
 
-def test_workload_creates_ocp_port_state(tmp_path):
+def test_workload_creates_ocp_port_state(tmp_path: Path) -> None:
     runner = FakeRunner()
     workload = Workload(
         runner,
@@ -582,7 +595,7 @@ def test_workload_creates_ocp_port_state(tmp_path):
     ]
 
 
-def test_workload_creates_passive_port_without_namespace(tmp_path):
+def test_workload_creates_passive_port_without_namespace(tmp_path: Path) -> None:
     runner = FakeRunner()
     workload = Workload(
         runner,
@@ -616,7 +629,7 @@ def test_workload_creates_passive_port_without_namespace(tmp_path):
     assert runner.waits[0][0][-1] == "logical_port=density-heavy-00000"
 
 
-def test_workload_can_defer_endpoint_convergence(tmp_path):
+def test_workload_can_defer_endpoint_convergence(tmp_path: Path) -> None:
     runner = FakeRunner()
     workload = Workload(
         runner,
@@ -638,7 +651,7 @@ def test_workload_can_defer_endpoint_convergence(tmp_path):
     assert sync in [call[1] for call in runner.calls]
 
 
-def test_workload_removes_logical_and_local_endpoint_state(tmp_path):
+def test_workload_removes_logical_and_local_endpoint_state(tmp_path: Path) -> None:
     runner = FakeRunner()
     workload = Workload(
         runner,
@@ -665,7 +678,7 @@ def test_workload_removes_logical_and_local_endpoint_state(tmp_path):
     assert len(runner.calls) > calls_after_removal
 
 
-def test_workload_adds_every_service_load_balancer(tmp_path):
+def test_workload_adds_every_service_load_balancer(tmp_path: Path) -> None:
     runner = FakeRunner()
     workload = Workload(
         runner,
@@ -711,7 +724,7 @@ def test_workload_adds_every_service_load_balancer(tmp_path):
     assert 'vips:"[100::4]:80"="[fd00:240::8]:8080"' in command
 
 
-def test_workload_reproduces_scale_background_load_balancers(tmp_path):
+def test_workload_reproduces_scale_background_load_balancers(tmp_path: Path) -> None:
     runner = FakeRunner()
     topology = {
         "load_balancer_group": "cluster-lb-group",
@@ -789,7 +802,7 @@ def test_workload_reproduces_scale_background_load_balancers(tmp_path):
     assert not [argument for argument in gateway if argument.startswith("vips:")]
 
 
-def test_ovn_namespace_reproduces_cluster_density_state():
+def test_ovn_namespace_reproduces_cluster_density_state() -> None:
     runner = FakeRunner()
     namespace = OvnNamespace(
         runner,
@@ -844,7 +857,7 @@ def test_ovn_namespace_reproduces_cluster_density_state():
     assert namespace.cleaned
 
 
-def test_ovn_namespace_cleans_partially_created_address_sets():
+def test_ovn_namespace_cleans_partially_created_address_sets() -> None:
     runner = FakeRunner()
     namespace = OvnNamespace(
         runner,
@@ -879,7 +892,7 @@ def test_ovn_namespace_cleans_partially_created_address_sets():
         ) in commands
 
 
-def test_scale_baseline_reuses_worker_topology(tmp_path):
+def test_scale_baseline_reuses_worker_topology(tmp_path: Path) -> None:
     runner = FakeRunner()
     topology = {
         "physical_bridge": "br-provider",
@@ -953,7 +966,7 @@ def test_scale_baseline_reuses_worker_topology(tmp_path):
     assert baseline.workload.cleaned
 
 
-def test_workload_uses_shared_command_waits(tmp_path):
+def test_workload_uses_shared_command_waits(tmp_path: Path) -> None:
     runner = FakeRunner()
     workload = Workload(
         runner,
@@ -999,7 +1012,7 @@ def test_workload_uses_shared_command_waits(tmp_path):
     assert runner.waits[2][0][-1] == "10.240.0.4"
 
 
-def test_cleanup_attempts_every_object_after_a_failure(tmp_path):
+def test_cleanup_attempts_every_object_after_a_failure(tmp_path: Path) -> None:
     runner = FakeRunner()
     workload = Workload(
         runner,
@@ -1039,7 +1052,7 @@ def test_cleanup_attempts_every_object_after_a_failure(tmp_path):
     assert len(runner.calls) == completed_calls
 
 
-def test_cleanup_verification_checks_remote_endpoint_state(tmp_path):
+def test_cleanup_verification_checks_remote_endpoint_state(tmp_path: Path) -> None:
     runner = FakeRunner()
     workload = Workload(
         runner,
@@ -1101,7 +1114,7 @@ def test_cleanup_verification_checks_remote_endpoint_state(tmp_path):
         {"startup": 0, "total": 65535, "build_pods": 0},
     ],
 )
-def test_cluster_density_validation_rejects_invalid_values(values):
+def test_cluster_density_validation_rejects_invalid_values(values: Any) -> None:
     config = {
         "startup": 1,
         "total": 2,
@@ -1122,7 +1135,7 @@ def test_cluster_density_validation_rejects_invalid_values(values):
         validate_cluster_density(**config)
 
 
-def test_cluster_density_validation_accepts_original_defaults():
+def test_cluster_density_validation_accepts_original_defaults() -> None:
     validate_cluster_density(
         startup=3800,
         total=4000,
@@ -1155,7 +1168,7 @@ def test_cluster_density_validation_accepts_original_defaults():
         {"initial": 65534},
     ],
 )
-def test_light_validation_rejects_invalid_values(values):
+def test_light_validation_rejects_invalid_values(values: Any) -> None:
     config = {
         "initial": 2,
         "iterations": 1,
@@ -1171,7 +1184,7 @@ def test_light_validation_rejects_invalid_values(values):
         validate_light(**config)
 
 
-def test_light_validation_accepts_address_boundary():
+def test_light_validation_accepts_address_boundary() -> None:
     validate_light(
         initial=65533,
         iterations=1,
@@ -1193,7 +1206,7 @@ def test_light_validation_accepts_address_boundary():
         {"initial": 65534},
     ],
 )
-def test_heavy_validation_rejects_invalid_values(values):
+def test_heavy_validation_rejects_invalid_values(values: Any) -> None:
     config = {
         "initial": 4,
         "iterations": 2,
@@ -1211,7 +1224,7 @@ def test_heavy_validation_rejects_invalid_values(values):
         validate_heavy(**config)
 
 
-def test_environment_configuration_is_parsed():
+def test_environment_configuration_is_parsed() -> None:
     environment = {
         "COUNT": "7",
         "ENABLED": "yes",
@@ -1224,12 +1237,12 @@ def test_environment_configuration_is_parsed():
     assert read_int(environment, "MISSING", 3) == 3
 
 
-def test_environment_integer_rejects_invalid_values():
+def test_environment_integer_rejects_invalid_values() -> None:
     with pytest.raises(ValueError):
         read_int({"COUNT": "many"}, "COUNT", 1)
 
 
 @pytest.mark.parametrize("value", ["maybe", "", "2"])
-def test_environment_boolean_rejects_invalid_values(value):
+def test_environment_boolean_rejects_invalid_values(value: Any) -> None:
     with pytest.raises(ValueError):
         read_bool({"ENABLED": value}, "ENABLED", True)

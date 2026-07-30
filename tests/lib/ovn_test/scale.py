@@ -1,13 +1,19 @@
 import os
 from pathlib import Path
+from typing import Any, Mapping, Optional, Sequence, Union
 
 from ovn_test.config import read_bool
 from ovn_test.network import ExternalPeers
 from ovn_test.system import ovsdb_control_socket
+from ovn_test.topology import Topology
 from ovn_test.workload import Workload
 
 
-def verify_scale_environment(runner, topology, environment=None):
+def verify_scale_environment(
+    runner: Any,
+    topology: Topology,
+    environment: Optional[Mapping[str, str]] = None,
+) -> list[str]:
     environment = os.environ if environment is None else environment
     computes = topology.role("compute")
     central = topology.role("central")
@@ -66,20 +72,20 @@ def verify_scale_environment(runner, topology, environment=None):
 class ScaleBaseline:
     def __init__(
         self,
-        runner,
-        computes,
-        scale_topology,
-        data_dir,
-        pods_per_worker,
-        protocols,
-        ipv4,
-        ipv6,
-        mtu,
-        timeout,
-        sync_timeout,
-        name,
-        prefix,
-    ):
+        runner: Any,
+        computes: Sequence[str],
+        scale_topology: dict[str, Any],
+        data_dir: Union[str, os.PathLike[str]],
+        pods_per_worker: int,
+        protocols: Sequence[str],
+        ipv4: bool,
+        ipv6: bool,
+        mtu: int,
+        timeout: int,
+        sync_timeout: int,
+        name: str,
+        prefix: str,
+    ) -> None:
         self.pods_per_worker = pods_per_worker
         self.protocols = protocols
         self.external = ExternalPeers(
@@ -104,7 +110,7 @@ class ScaleBaseline:
             scale_topology=scale_topology,
         )
 
-    def create(self):
+    def create(self) -> None:
         count = self.pods_per_worker * len(self.workload.workers)
         self.external.create()
         for index in range(count):
@@ -115,12 +121,12 @@ class ScaleBaseline:
             self.workload.verify_connectivity(index, (index + 1) % count)
             self.external.verify(self.workload.endpoint(index))
 
-    def cleanup(self):
+    def cleanup(self) -> None:
         try:
             self.workload.cleanup()
         finally:
             self.external.cleanup()
 
-    def verify_cleanup(self):
+    def verify_cleanup(self) -> None:
         self.workload.verify_cleanup()
         self.external.verify_cleanup()

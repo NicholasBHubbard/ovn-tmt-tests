@@ -1,8 +1,8 @@
 import shutil
 from pathlib import Path
+from typing import Any
 
 import pytest
-
 
 COMMANDS = (
     "ip",
@@ -22,16 +22,16 @@ COMMANDS = (
 
 
 class TestPreconditions:
-    def test_dhcpd_is_absent(self):
+    def test_dhcpd_is_absent(self) -> None:
         assert not shutil.which("dhcpd")
 
 
 class TestResult:
     @pytest.mark.parametrize("command", COMMANDS)
-    def test_command_is_available(self, command):
+    def test_command_is_available(self, command: Any) -> None:
         assert shutil.which(command)
 
-    def test_fedora_nc_uses_ncat(self):
+    def test_fedora_nc_uses_ncat(self) -> None:
         if not Path("/etc/fedora-release").exists():
             pytest.skip("not Fedora")
 

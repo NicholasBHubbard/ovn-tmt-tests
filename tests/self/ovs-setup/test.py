@@ -1,12 +1,14 @@
 import shutil
+from pathlib import Path
 
 from ovn_test.command import Runner
 from ovn_test.ovsdb import Ovsdb
+from ovn_test.state import Snapshots
 from ovn_test.system import processes
 
 
 class TestPreconditions:
-    def test_ovs_is_not_configured(self):
+    def test_ovs_is_not_configured(self) -> None:
         runner = Runner()
 
         assert not runner.succeeds("ovs-vsctl", "show")
@@ -14,7 +16,7 @@ class TestPreconditions:
         assert not processes(runner, "ovsdb-server")
 
 
-def external_id(runner, name):
+def external_id(runner: Runner, name: str) -> str:
     return runner.output(
         "ovs-vsctl",
         "--if-exists",
@@ -26,7 +28,7 @@ def external_id(runner, name):
 
 
 class TestInitial:
-    def test_bridges_and_external_ids(self, snapshots):
+    def test_bridges_and_external_ids(self, snapshots: Snapshots) -> None:
         runner = Runner()
         ovs = Ovsdb(runner, "ovs-vsctl")
 
@@ -46,7 +48,7 @@ class TestInitial:
 
 
 class TestReconfigured:
-    def test_bridge_identity_is_recorded(self, snapshots):
+    def test_bridge_identity_is_recorded(self, snapshots: Snapshots) -> None:
         ovs = Ovsdb(Runner(), "ovs-vsctl")
 
         snapshots.save(
@@ -60,7 +62,7 @@ class TestReconfigured:
 
 
 class TestResult:
-    def test_git_refspec_is_configured(self, tree):
+    def test_git_refspec_is_configured(self, tree: Path) -> None:
         tasks = (tree / "roles/ovs_setup/tasks/git.yml").read_text()
 
         assert (
@@ -68,7 +70,7 @@ class TestResult:
             '{{ ovs_setup_git_version }}"'
         ) in tasks
 
-    def test_ovs_is_running(self):
+    def test_ovs_is_running(self) -> None:
         runner = Runner()
 
         assert runner.succeeds("ovs-vsctl", "show")
@@ -77,7 +79,7 @@ class TestResult:
         assert processes(runner, "ovsdb-server")
         assert processes(runner, "ovs-vswitchd")
 
-    def test_reusable_ovs_state(self, snapshots):
+    def test_reusable_ovs_state(self, snapshots: Snapshots) -> None:
         runner = Runner()
         ovs = Ovsdb(runner, "ovs-vsctl")
         bridge_uuid = ovs.by_name(

@@ -1,11 +1,11 @@
 import os
+from pathlib import Path
+from typing import Any
 
 import pytest
-
 from ovn_test.command import Runner
 from ovn_test.ovsdb import Ovsdb
 from ovn_test.system import processes
-
 
 EXTERNAL_IDS = (
     "ovn-remote",
@@ -18,34 +18,34 @@ EXTERNAL_IDS = (
 
 
 @pytest.fixture
-def runner():
+def runner() -> Runner:
     return Runner()
 
 
 @pytest.fixture
-def ovs(runner):
+def ovs(runner: Runner) -> Ovsdb:
     return Ovsdb(runner, "ovs-vsctl")
 
 
 @pytest.fixture
-def sb(runner):
+def sb(runner: Runner) -> Ovsdb:
     return Ovsdb(runner, "ovn-sbctl")
 
 
-def external_ids(ovs):
+def external_ids(ovs: Ovsdb) -> Any:
     return ovs.value("Open_vSwitch", "external_ids")
 
 
 class TestPreconditions:
-    def test_controller_is_absent(self, runner):
+    def test_controller_is_absent(self, runner: Runner) -> None:
         assert processes(runner, "ovn-controller") == []
 
     @pytest.mark.parametrize("bridge", ("br-int", "br-ex"))
-    def test_bridge_is_absent(self, runner, bridge):
+    def test_bridge_is_absent(self, runner: Runner, bridge: str) -> None:
         assert not runner.succeeds("ovs-vsctl", "br-exists", bridge)
 
     @pytest.mark.parametrize("key", EXTERNAL_IDS)
-    def test_external_id_is_absent(self, runner, key):
+    def test_external_id_is_absent(self, runner: Runner, key: str) -> None:
         assert not runner.succeeds(
             "ovs-vsctl",
             "get",
@@ -56,7 +56,7 @@ class TestPreconditions:
 
 
 class TestInitial:
-    def test_gateway_configuration(self, runner, ovs):
+    def test_gateway_configuration(self, runner: Runner, ovs: Ovsdb) -> None:
         assert runner.succeeds("ovs-vsctl", "br-exists", "br-ex")
         ids = external_ids(ovs)
         assert ids["ovn-cms-options"] == "enable-chassis-as-gw,prefer-chassis-as-gw"
@@ -65,7 +65,7 @@ class TestInitial:
 
 
 class TestReconfigured:
-    def test_gateway_configuration(self, ovs):
+    def test_gateway_configuration(self, ovs: Ovsdb) -> None:
         ids = external_ids(ovs)
         assert ids["ovn-cms-options"] == "enable-chassis-as-gw"
         assert "ovn-monitor-all" not in ids
@@ -82,7 +82,9 @@ class TestInvalid:
             ),
         ],
     )
-    def test_configuration_is_rejected(self, runner, tree, case, message):
+    def test_configuration_is_rejected(
+        self, runner: Runner, tree: Path, case: Any, message: str
+    ) -> None:
         result = runner.run(
             "ansible-playbook",
             "-i",
@@ -100,7 +102,7 @@ class TestInvalid:
 
 
 class TestResult:
-    def test_tls_chassis(self, runner, sb):
+    def test_tls_chassis(self, runner: Runner, sb: Ovsdb) -> None:
         if os.environ.get("OTT_CHASSIS_TEST_MODE", "system") != "tls":
             pytest.skip("system chassis plan")
         assert processes(runner, "ovn-controller")
@@ -116,7 +118,7 @@ class TestResult:
         assert runner.output("ovs-vsctl", "get", "Open_vSwitch", ".", "ssl") != "[]"
         assert sb.exists("Chassis", "name=tls-chassis")
 
-    def test_system_chassis(self, runner, ovs, sb):
+    def test_system_chassis(self, runner: Runner, ovs: Ovsdb, sb: Ovsdb) -> None:
         if os.environ.get("OTT_CHASSIS_TEST_MODE", "system") == "tls":
             pytest.skip("TLS chassis plan")
         assert processes(runner, "ovn-controller")

@@ -1,10 +1,13 @@
 import importlib.util
 import time
+from pathlib import Path
+from types import ModuleType
+from typing import Any
 
 import pytest
 
 
-def load(tree, name, path):
+def load(tree: Path, name: str, path: str) -> ModuleType:
     spec = importlib.util.spec_from_file_location(name, tree / path)
     assert spec is not None
     assert spec.loader is not None
@@ -13,7 +16,7 @@ def load(tree, name, path):
     return module
 
 
-def configuration(**overrides):
+def configuration(**overrides: Any) -> dict[str, Any]:
     return {
         "id": "contract",
         "worker_count": 500,
@@ -40,7 +43,7 @@ def configuration(**overrides):
     }
 
 
-def port_configuration(**overrides):
+def port_configuration(**overrides: Any) -> dict[str, Any]:
     return {
         "id": "contract-ports",
         "port_count": 3,
@@ -64,7 +67,7 @@ def port_configuration(**overrides):
     }
 
 
-def test_generates_arbitrary_worker_count(tree):
+def test_generates_arbitrary_worker_count(tree: Path) -> None:
     topology = load(
         tree,
         "scale_topology",
@@ -84,7 +87,7 @@ def test_generates_arbitrary_worker_count(tree):
     assert topology["physical_bridge"] == "br-provider"
 
 
-def test_assigns_logical_workers_to_provisioned_chassis(tree):
+def test_assigns_logical_workers_to_provisioned_chassis(tree: Path) -> None:
     topology = load(
         tree,
         "scale_topology_chassis",
@@ -119,7 +122,7 @@ def test_assigns_logical_workers_to_provisioned_chassis(tree):
     )
 
 
-def test_rejects_exhausted_chassis_vlan_space(tree):
+def test_rejects_exhausted_chassis_vlan_space(tree: Path) -> None:
     generate = load(
         tree,
         "scale_topology_vlan_limit",
@@ -130,7 +133,7 @@ def test_rejects_exhausted_chassis_vlan_space(tree):
         generate(configuration(worker_count=4095, chassis=["compute-1"]))
 
 
-def test_configures_requested_snat_conntrack_zone(tree):
+def test_configures_requested_snat_conntrack_zone(tree: Path) -> None:
     topology = load(
         tree,
         "scale_topology_snat_zone",
@@ -144,7 +147,7 @@ def test_configures_requested_snat_conntrack_zone(tree):
     ] == [42, 42]
 
 
-def test_generates_scale_ports_for_current_chassis(tree):
+def test_generates_scale_ports_for_current_chassis(tree: Path) -> None:
     ports = load(
         tree,
         "scale_ports",
@@ -162,7 +165,7 @@ def test_generates_scale_ports_for_current_chassis(tree):
     assert all("container" not in port for port in ports["ports"])
 
 
-def test_accepts_explicit_local_scale_ports(tree):
+def test_accepts_explicit_local_scale_ports(tree: Path) -> None:
     ports = load(
         tree,
         "explicit_scale_ports",
@@ -201,7 +204,9 @@ def test_accepts_explicit_local_scale_ports(tree):
     }
 
 
-def test_scale_port_cleanup_batches_a_valid_ovs_command(tree, monkeypatch):
+def test_scale_port_cleanup_batches_a_valid_ovs_command(
+    tree: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     apply = load(
         tree,
         "scale_ports_cleanup",
@@ -240,7 +245,7 @@ def test_scale_port_cleanup_batches_a_valid_ovs_command(tree, monkeypatch):
     assert captured == [[["--if-exists", "del-port", "old-interface"]]]
 
 
-def test_explicit_worker_names_override_generation(tree):
+def test_explicit_worker_names_override_generation(tree: Path) -> None:
     topology = load(
         tree,
         "scale_topology",
@@ -250,7 +255,7 @@ def test_explicit_worker_names_override_generation(tree):
     assert [worker["name"] for worker in topology["workers"]] == ["alpha", "beta"]
 
 
-def test_records_removed_southbound_objects(tree):
+def test_records_removed_southbound_objects(tree: Path) -> None:
     topology = {
         "owner": "contract",
         "southbound": {
@@ -296,7 +301,9 @@ def test_records_removed_southbound_objects(tree):
     assert topology["southbound"]["absent_ports"] == ["old-port"]
 
 
-def test_apply_records_convergence_start_before_changes(tree, monkeypatch, capsys):
+def test_apply_records_convergence_start_before_changes(
+    tree: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
     topology = {
         "owner": "contract",
         "southbound": {},
@@ -329,7 +336,7 @@ def test_apply_records_convergence_start_before_changes(tree, monkeypatch, capsy
     assert before <= topology["southbound"]["started_ns"] <= after
 
 
-def test_southbound_checker_rejects_missing_and_stale_objects(tree):
+def test_southbound_checker_rejects_missing_and_stale_objects(tree: Path) -> None:
     checker = load(
         tree,
         "southbound_convergence",
