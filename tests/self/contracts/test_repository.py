@@ -491,6 +491,24 @@ def test_artifact_role_contract(tree: Path) -> None:
                 "OTT_SCALE_WORKERS:",
             ),
         ),
+        (
+            "np-cross-namespace.fmf",
+            "np-cross-namespace",
+            (
+                "OTT_SCALE_BASE_PODS_PER_WORKER:",
+                "OTT_CLUSTERED:",
+                "OTT_COMPUTE_PHYSICAL_BRIDGE:",
+                "OTT_COMPUTE_PHYSICAL_NETWORK:",
+                "OTT_MONITOR_ALL:",
+                "OTT_SCALE_LB_PROTOCOLS:",
+                "OTT_SCALE_NAMESPACES:",
+                "OTT_SCALE_PODS_PER_NAMESPACE:",
+                "OTT_SCALE_POLICY_ALLOW_PRIORITY:",
+                "OTT_SCALE_POLICY_CONTROL_PRIORITY:",
+                "OTT_SCALE_POLICY_DENY_PRIORITY:",
+                "OTT_SCALE_WORKERS:",
+            ),
+        ),
     ),
 )
 def test_scale_workload_contract(
@@ -510,6 +528,13 @@ def test_scale_workload_contract(
     if test in {"density-heavy", "cluster-density", "np-multitenant"}:
         metadata = yaml.safe_load(plan_path.read_text())
         assert metadata["environment+"]["OTT_SCALE_IPV6"] == "false"
+    if test in {
+        "density-heavy",
+        "cluster-density",
+        "np-multitenant",
+        "np-cross-namespace",
+    }:
+        metadata = yaml.safe_load(plan_path.read_text())
         assert [guest["role"] for guest in metadata["provision+"]] == [
             "central-follower",
             "central-follower",
