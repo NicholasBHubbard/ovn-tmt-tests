@@ -1,0 +1,76 @@
+- name: Verify kube-burner configuration
+  ansible.builtin.assert:
+    that:
+      - kube_burner_version | length > 0
+      - kube_burner_install_dir | length > 0
+      - kube_burner_cache_dir | length > 0
+      - kube_burner_release_base_url | length > 0
+
+- name: Select kube-burner release platform
+  ansible.builtin.set_fact:
+    kube_burner_release_os: "{{ ansible_system | lower }}"
+    kube_burner_release_arch: >-
+      {{ {
+        'x86_64': 'x86_64',
+        'amd64': 'x86_64',
+        'aarch64': 'arm64',
+        'arm64': 'arm64',
+        'ppc64le': 'ppc64le',
+        's390x': 's390x'
+      }.get(ansible_architecture, '') }}
+
+- name: Verify kube-burner release platform
+  ansible.builtin.assert:
+    that:
+      - kube_burner_release_os in ['linux', 'darwin']
+      - kube_burner_release_arch | length > 0
+    fail_msg: >-
+      kube-burner-ocp does not provide a supported release for
+      {{ ansible_system }}/{{ ansible_architecture }}.
+
+- name: Select kube-burner release files
+  ansible.builtin.set_fact:
+    kube_burner_archive: >-
+      kube-burner-ocp-V{{ kube_burner_version }}-{{ kube_burner_release_os }}-{{ kube_burner_release_arch }}.tar.gz
+    kube_burner_release_url: >-
+      {{ kube_burner_release_base_url }}/v{{ kube_burner_version }}
+    kube_burner_effective_checksum_url: >-
+      {{ kube_burner_checksum_url | default(
+        kube_burner_release_base_url ~ '/v' ~ kube_burner_version
+        ~ '/kube-burner-ocp-checksums.txt', true) }}
+    kube_burner_extract_dir: >-
+      {{ kube_burner_cache_dir }}/{{ kube_burner_version }}-{{ kube_burner_release_os }}-{{ kube_burner_release_arch }}
+
+- name: Create kube-burner directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ kube_burner_cache_dir }}"
+    - "{{ kube_burner_extract_dir }}"
+    - "{{ kube_burner_install_dir }}"
+
+- name: Download kube-burner archive
+  ansible.builtin.get_url:
+    url: "{{ kube_burner_release_url }}/{{ kube_burner_archive }}"
+    dest: "{{ kube_burner_cache_dir }}/{{ kube_burner_archive }}"
+    checksum: >-
+      {{ 'sha256:' ~ (kube_burner_checksum | default(
+           kube_burner_effective_checksum_url, true))
+         if kube_burner_verify_checksum | bool else omit }}
+    mode: "0644"
+
+- name: Extract kube-burner
+  ansible.builtin.unarchive:
+    src: "{{ kube_burner_cache_dir }}/{{ kube_burner_archive }}"
+    dest: "{{ kube_burner_extract_dir }}"
+    remote_src: true
+    creates: "{{ kube_burner_extract_dir }}/kube-burner-ocp"
+
+- name: Install kube-burner in PATH
+  ansible.builtin.copy:
+    src: "{{ kube_burner_extract_dir }}/kube-burner-ocp"
+    dest: "{{ kube_burner_install_dir }}/kube-burner-ocp"
+    remote_src: true
+    mode: "0755"

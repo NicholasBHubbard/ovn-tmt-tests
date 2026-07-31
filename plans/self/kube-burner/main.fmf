@@ -1,0 +1,13 @@
+summary: Base configuration for kube-burner self-tests
+
+environment:
+  OTT_KUBE_BURNER_VERSION: "1.11.12"
+  OTT_KUBE_BURNER_VERIFY_CHECKSUM: "true"
+
+discover:
+  how: fmf
+  test:
+    - /tests/self/kube-burner
+
+execute:
+  how: tmt

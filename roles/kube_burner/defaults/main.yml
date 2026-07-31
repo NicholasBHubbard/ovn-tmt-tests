@@ -1,0 +1,9 @@
+kube_burner_version: "1.11.12"
+kube_burner_install_dir: /usr/local/bin
+kube_burner_cache_dir: /var/tmp/kube-burner-ocp
+kube_burner_release_base_url: https://github.com/kube-burner/kube-burner-ocp/releases/download
+kube_burner_verify_checksum: true
+# A release-manifest URL is derived when this is empty.
+kube_burner_checksum_url: ""
+# Set a SHA-256 digest here to verify without downloading the release manifest.
+kube_burner_checksum: ""

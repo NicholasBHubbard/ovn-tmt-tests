@@ -1,0 +1,5 @@
+- name: Install kube-burner-ocp
+  hosts: all
+  become: true
+  roles:
+    - kube_burner

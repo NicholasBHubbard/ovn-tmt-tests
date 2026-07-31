@@ -1,0 +1,18 @@
+summary: Test kube-burner installation on Fedora
+
+provision:
+  - how: virtual
+    image: fedora
+
+prepare:
+  - name: Check kube-burner preconditions
+    how: shell
+    order: 80
+    script: python3 -m pytest ./tests/self/kube-burner/test.py::TestPreconditions
+  - name: Install kube-burner
+    how: ansible
+    order: 90
+    playbook: playbooks/kube-burner.yml
+    extra-args: >-
+      -e kube_burner_version=$OTT_KUBE_BURNER_VERSION
+      -e kube_burner_verify_checksum=$OTT_KUBE_BURNER_VERIFY_CHECKSUM

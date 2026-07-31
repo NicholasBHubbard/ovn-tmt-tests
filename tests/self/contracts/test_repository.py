@@ -12,6 +12,7 @@ INHERITED_SELF_PLANS = (
     "brew-packages",
     "ci",
     "dpdk-build",
+    "kube-burner",
     "make-check",
     "multihost",
     "ovn-central",
