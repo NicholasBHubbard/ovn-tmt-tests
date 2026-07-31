@@ -255,6 +255,35 @@ class OvnNamespace:
                 "allow-related",
             )
 
+    def allow_to(
+        self,
+        other: "OvnNamespace",
+        family: int,
+        priority: int = 3,
+    ) -> None:
+        network = self._ip_family(family)
+        other._ip_family(family)
+        self.enforce()
+        other.enforce()
+        other._set_acl(
+            f"allow-from-{family}-{self.name}",
+            other.port_group,
+            "to-lport",
+            priority,
+            f"{network}.src == ${self.address_sets[family]} && "
+            f"outport == @{other.port_group}",
+            "allow-related",
+        )
+        self._set_acl(
+            f"allow-to-{family}-{other.name}",
+            self.port_group,
+            "to-lport",
+            priority,
+            f"{network}.dst == ${other.address_sets[family]} && "
+            f"inport == @{self.port_group}",
+            "allow-related",
+        )
+
     def allow_external(
         self,
         addresses: Sequence[str],

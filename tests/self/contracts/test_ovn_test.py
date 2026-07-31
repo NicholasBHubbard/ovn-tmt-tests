@@ -1029,6 +1029,66 @@ def test_ovn_namespace_manages_ipv6_network_policy_state() -> None:
     namespace.verify_cleanup()
 
 
+@pytest.mark.parametrize(
+    ("family", "source_address", "target_address", "network", "address_set_prefix"),
+    (
+        (4, "10.0.0.1", "10.0.1.1", "ip4", "as_"),
+        (6, "fd00::1", "fd00:1::1", "ip6", "as6_"),
+    ),
+)
+def test_ovn_namespace_allows_traffic_to_another_namespace(
+    family: int,
+    source_address: str,
+    target_address: str,
+    network: str,
+    address_set_prefix: str,
+) -> None:
+    runner = FakeRunner()
+    settings = {"ipv4": family == 4, "ipv6": family == 6}
+    source = OvnNamespace(runner, "network-policy", "source", 0, **settings)
+    target = OvnNamespace(runner, "network-policy", "target", 1, **settings)
+
+    source.create()
+    target.create()
+    source.add_endpoints([{"port": "source-pod", f"ipv{family}": source_address}])
+    target.add_endpoints([{"port": "target-pod", f"ipv{family}": target_address}])
+    source.allow_to(target, family, priority=7)
+
+    commands = [call[1] for call in runner.calls]
+    assert (
+        "ovn-nbctl",
+        "--type=port-group",
+        "--may-exist",
+        "acl-add",
+        "pg_target",
+        "to-lport",
+        7,
+        f"{network}.src == ${address_set_prefix}source && outport == @pg_target",
+        "allow-related",
+    ) in commands
+    assert (
+        "ovn-nbctl",
+        "--type=port-group",
+        "--may-exist",
+        "acl-add",
+        "pg_source",
+        "to-lport",
+        7,
+        f"{network}.dst == ${address_set_prefix}target && inport == @pg_source",
+        "allow-related",
+    ) in commands
+    for port_group, port in (
+        ("pg_source", "source-pod"),
+        ("pg_target", "target-pod"),
+    ):
+        assert ("ovn-nbctl", "pg-set-ports", port_group, port) in commands
+
+    source.cleanup()
+    target.cleanup()
+    source.verify_cleanup()
+    target.verify_cleanup()
+
+
 def test_ovn_namespace_rejects_invalid_policy_addresses() -> None:
     namespace = OvnNamespace(
         FakeRunner(),
