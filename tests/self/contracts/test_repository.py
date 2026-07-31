@@ -36,13 +36,21 @@ def assert_contains(tree: Path, path: Union[str, Path], expected: Any) -> None:
     assert expected in content(tree, path), path
 
 
+def plan_metadata(
+    tree: Path, path: Union[str, Path], node: Optional[str] = None
+) -> dict[str, Any]:
+    metadata = yaml.safe_load(content(tree, path)) or {}
+    return metadata if node is None else metadata[f"/{node}"]
+
+
 def prepare_phase(
     tree: Path,
     path: Union[str, Path],
     name: Optional[str] = None,
     playbook: Optional[str] = None,
+    node: Optional[str] = None,
 ) -> dict[str, Any]:
-    metadata = yaml.safe_load(content(tree, path)) or {}
+    metadata = plan_metadata(tree, path, node)
     phases = []
     for key in ("prepare", "prepare+", "prepare+<"):
         value = metadata.get(key, [])
@@ -180,24 +188,33 @@ def test_plan_role_configuration_is_top_down(tree: Path) -> None:
         if path.is_relative_to(plans / "self"):
             continue
         metadata = yaml.safe_load(path.read_text()) or {}
-        for key in ("prepare", "prepare+", "prepare+<"):
-            phases = metadata.get(key, [])
-            for phase in phases if isinstance(phases, list) else [phases]:
-                arguments = shlex.split(phase.get("extra-args", ""))
-                for option, assignment in zip(arguments, arguments[1:]):
-                    if option == "-e" and "=" in assignment:
-                        assert "$OTT_" in assignment, (path, assignment)
+        nodes = [metadata]
+        nodes.extend(
+            value
+            for key, value in metadata.items()
+            if key.startswith("/") and key != "/" and isinstance(value, dict)
+        )
+        for node in nodes:
+            for key in ("prepare", "prepare+", "prepare+<"):
+                phases = node.get(key, [])
+                for phase in phases if isinstance(phases, list) else [phases]:
+                    arguments = shlex.split(phase.get("extra-args", ""))
+                    for option, assignment in zip(arguments, arguments[1:]):
+                        if option == "-e" and "=" in assignment:
+                            assert "$OTT_" in assignment, (path, assignment)
 
 
 @pytest.mark.parametrize(
-    ("path", "phase"),
+    ("path", "phase", "node"),
     (
-        ("plans/ovn-ci/main.fmf", None),
-        ("plans/main.fmf", "Set up OVN topology"),
+        ("plans/ovn-ci/main.fmf", None, None),
+        ("plans/main.fmf", "Set up OVN topology", "ovn-fake-multinode"),
     ),
 )
-def test_install_configuration_is_complete(tree: Path, path: Path, phase: str) -> None:
-    variables = extra_variables(prepare_phase(tree, path, phase))
+def test_install_configuration_is_complete(
+    tree: Path, path: Path, phase: Optional[str], node: Optional[str]
+) -> None:
+    variables = extra_variables(prepare_phase(tree, path, phase, node=node))
     expected = {
         "ovn_install_method": "$OTT_INSTALL_METHOD",
         "ovn_install_cc": "$OTT_CC",
@@ -261,8 +278,10 @@ def test_multihost_parent_propagates_configuration(tree: Path) -> None:
 
 def test_multihost_diagnostics_are_general_and_top_down(tree: Path) -> None:
     path = "plans/main.fmf"
-    metadata = yaml.safe_load(content(tree, path))
-    start = prepare_phase(tree, path, "Start guest diagnostics")
+    metadata = plan_metadata(tree, path, "ovn-fake-multinode")
+    start = prepare_phase(
+        tree, path, "Start guest diagnostics", node="ovn-fake-multinode"
+    )
     collect = metadata["finish"][0]
 
     assert start["playbook"] == "playbooks/run-diagnostics-start.yml"
@@ -306,12 +325,21 @@ def test_multihost_tls_contract(tree: Path) -> None:
 def test_multihost_runtime_configuration_is_complete(tree: Path) -> None:
     path = "plans/main.fmf"
     driver = extra_variables(
-        prepare_phase(tree, path, "Set up cross-guest test driver")
+        prepare_phase(
+            tree, path, "Set up cross-guest test driver", node="ovn-fake-multinode"
+        )
     )
     authorize = extra_variables(
-        prepare_phase(tree, path, "Authorize cross-guest test driver")
+        prepare_phase(
+            tree,
+            path,
+            "Authorize cross-guest test driver",
+            node="ovn-fake-multinode",
+        )
     )
-    topology = extra_variables(prepare_phase(tree, path, "Set up OVN topology"))
+    topology = extra_variables(
+        prepare_phase(tree, path, "Set up OVN topology", node="ovn-fake-multinode")
+    )
 
     assert driver["multihost_driver_user"] == "$OTT_DRIVER_USER"
     assert driver["multihost_driver_runtime_dir"] == "$OTT_DRIVER_RUNTIME_DIR"
@@ -393,11 +421,34 @@ def test_top_level_plan_inheritance_is_explicit(tree: Path) -> None:
     shared = {"ovn-fake-multinode", "ovn-scale-testing"}
     assert {path.name for path in plans.iterdir() if path.is_dir()} >= shared
 
+    root = plan_metadata(tree, "plans/main.fmf")
+    assert root["/"] == {"inherit": False}
+    assert {key.removeprefix("/") for key in root if key != "/"} == shared
+
+    fake = root["/ovn-fake-multinode"]
+    scale = root["/ovn-scale-testing"]
+    assert fake["environment"].items() <= scale["environment"].items()
+    scale_prepare = [
+        phase
+        for phase in scale["prepare"]
+        if phase["name"] != "Install scale workload dependencies"
+    ]
+    assert len(fake["prepare"]) == len(scale_prepare)
+    assert all(
+        fake_phase is scale_phase
+        for fake_phase, scale_phase in zip(fake["prepare"], scale_prepare)
+    )
+    assert fake["execute"] is scale["execute"]
+    assert fake["finish"] is scale["finish"]
+    assert "<<: *multihost_plan" in content(tree, "plans/main.fmf")
+    assert "<<: *multihost_environment" in content(tree, "plans/main.fmf")
+    assert "discover" not in fake
+    assert "discover" not in scale
+
     for family in (path for path in plans.iterdir() if path.is_dir()):
         parent = family / "main.fmf"
         if family.name in shared:
-            if parent.is_file():
-                assert "inherit: false" not in parent.read_text()
+            assert not parent.exists()
             continue
         assert parent.is_file(), family
         metadata = yaml.safe_load(parent.read_text()) or {}
@@ -603,15 +654,17 @@ def test_label_policy_plans_share_one_workload(tree: Path, mode: str) -> None:
 
 
 def test_scale_workloads_inherit_common_configuration(tree: Path) -> None:
-    parent = content(tree, "plans/ovn-scale-testing/main.fmf")
+    parent = plan_metadata(tree, "plans/main.fmf", "ovn-scale-testing")
     for setting in (
-        "OTT_SCALE_DURATION:",
-        "OTT_SCALE_TIMEOUT:",
-        "OTT_SCALE_IPV4:",
-        "OTT_SCALE_IPV6:",
-        "OTT_SCALE_MTU:",
-        "OTT_SCALE_SYNC_TIMEOUT:",
+        "OTT_SCALE_DURATION",
+        "OTT_SCALE_TIMEOUT",
+        "OTT_SCALE_IPV4",
+        "OTT_SCALE_IPV6",
+        "OTT_SCALE_MTU",
+        "OTT_SCALE_SYNC_TIMEOUT",
     ):
-        assert setting in parent
-    assert parent.count("role: compute") == 2
-    assert "Install scale workload dependencies" in parent
+        assert setting in parent["environment"]
+    assert [guest["role"] for guest in parent["provision"]].count("compute") == 2
+    assert "Install scale workload dependencies" in {
+        phase["name"] for phase in parent["prepare"]
+    }

@@ -1,164 +1,216 @@
-# Shared only by the ovn-fake-multinode and ovn-scale-testing plan families.
-# Every other top-level family must disable inheritance in its main.fmf.
-summary: Base configuration for multihost replacement plans
-enabled: false
+# Keep the /plans node empty. Each family below explicitly opts into the
+# shared multihost configuration; unrelated plan families inherit nothing.
+/:
+  inherit: false
 
-environment:
-  OTT_ARTIFACT_BUILD: "true"
-  OTT_ARTIFACT_CACHE_DIR: ""
-  OTT_ARTIFACT_EXPECTED_REVISION: ""
-  OTT_ARTIFACT_NAME: ovn-multihost
-  OTT_CC: gcc
-  OTT_CLUSTERED: "false"
-  OTT_COMPUTE_PHYSICAL_BRIDGE: ""
-  OTT_COMPUTE_PHYSICAL_NETWORK: ""
-  OTT_CONFIGURE_FLAGS: ""
-  OTT_DPDK: "false"
-  OTT_DPDK_CHECKSUM: sha256:bcae7d42c449fc456dfb279feabcbe0599a29bebb2fe2905761e187339d96b8e
-  OTT_DPDK_DIR: /usr/local/dpdk
-  OTT_DPDK_DRIVERS: net/null,net/tap,net/virtio
-  OTT_DPDK_SOURCE_DIR: /usr/src/dpdk
-  OTT_DPDK_VERSION: 24.11.1
-  OTT_DIAGNOSTICS: "true"
-  OTT_DIAGNOSTICS_LOG_BYTES: "10485760"
-  OTT_DIAGNOSTICS_RUNTIME_DIR: /run/ovn-tmt-tests/diagnostics
-  OTT_DRIVER_KEY_PATH: ""
-  OTT_DRIVER_RUNTIME_DIR: /run/ovn-tmt-tests/multihost-driver
-  OTT_DRIVER_USER: root
-  OTT_DISTRO_VERSION: latest
-  OTT_GATEWAY_BRIDGES: '["br-int","br-ex"]'
-  OTT_GATEWAY_BRIDGE_MAPPINGS: public:br-ex
-  OTT_GATEWAY_CHASSIS_NAME: ""
-  OTT_GATEWAY_CMS_OPTIONS: '["enable-chassis-as-gw"]'
-  OTT_GIT_REPO: https://github.com/ovn-org/ovn.git
-  OTT_GIT_VERSION: main
-  OTT_INSTALL_METHOD: artifact
-  OTT_MAKE_FLAGS: ""
-  OTT_MONITOR_ALL: "false"
-  OTT_NB_PORT: "6641"
-  OTT_PACKAGE_DIR: ""
-  OTT_PACKAGE_FILES: "[]"
-  OTT_PKI_REMOTE_DIR: /run/ovn-test-pki
-  OTT_SB_PORT: "6642"
-  OTT_SB_WAIT_TIMEOUT: "2700"
-  OTT_SOURCE_DIR: /usr/src/ovn
-  OTT_SSL_ENABLED: "false"
-  OTT_TEST_DEBUG: "false"
-  OTT_WERROR: "true"
+/ovn-fake-multinode: &multihost_plan
+  summary: Base configuration for fake-multinode workloads
+  enabled: false
 
-prepare:
-  - name: Start guest diagnostics
-    how: ansible
-    order: 10
-    playbook: playbooks/run-diagnostics-start.yml
-    extra-args: >-
-      -e run_diagnostics_enabled=$OTT_DIAGNOSTICS
-      -e 'run_diagnostics_runtime_dir=$OTT_DIAGNOSTICS_RUNTIME_DIR'
+  environment: &multihost_environment
+    OTT_ARTIFACT_BUILD: "true"
+    OTT_ARTIFACT_CACHE_DIR: ""
+    OTT_ARTIFACT_EXPECTED_REVISION: ""
+    OTT_ARTIFACT_NAME: ovn-multihost
+    OTT_CC: gcc
+    OTT_CLUSTERED: "false"
+    OTT_COMPUTE_PHYSICAL_BRIDGE: ""
+    OTT_COMPUTE_PHYSICAL_NETWORK: ""
+    OTT_CONFIGURE_FLAGS: ""
+    OTT_DPDK: "false"
+    OTT_DPDK_CHECKSUM: sha256:bcae7d42c449fc456dfb279feabcbe0599a29bebb2fe2905761e187339d96b8e
+    OTT_DPDK_DIR: /usr/local/dpdk
+    OTT_DPDK_DRIVERS: net/null,net/tap,net/virtio
+    OTT_DPDK_SOURCE_DIR: /usr/src/dpdk
+    OTT_DPDK_VERSION: 24.11.1
+    OTT_DIAGNOSTICS: "true"
+    OTT_DIAGNOSTICS_LOG_BYTES: "10485760"
+    OTT_DIAGNOSTICS_RUNTIME_DIR: /run/ovn-tmt-tests/diagnostics
+    OTT_DRIVER_KEY_PATH: ""
+    OTT_DRIVER_RUNTIME_DIR: /run/ovn-tmt-tests/multihost-driver
+    OTT_DRIVER_USER: root
+    OTT_DISTRO_VERSION: latest
+    OTT_GATEWAY_BRIDGES: '["br-int","br-ex"]'
+    OTT_GATEWAY_BRIDGE_MAPPINGS: public:br-ex
+    OTT_GATEWAY_CHASSIS_NAME: ""
+    OTT_GATEWAY_CMS_OPTIONS: '["enable-chassis-as-gw"]'
+    OTT_GIT_REPO: https://github.com/ovn-org/ovn.git
+    OTT_GIT_VERSION: main
+    OTT_INSTALL_METHOD: artifact
+    OTT_MAKE_FLAGS: ""
+    OTT_MONITOR_ALL: "false"
+    OTT_NB_PORT: "6641"
+    OTT_PACKAGE_DIR: ""
+    OTT_PACKAGE_FILES: "[]"
+    OTT_PKI_REMOTE_DIR: /run/ovn-test-pki
+    OTT_SB_PORT: "6642"
+    OTT_SB_WAIT_TIMEOUT: "2700"
+    OTT_SOURCE_DIR: /usr/src/ovn
+    OTT_SSL_ENABLED: "false"
+    OTT_TEST_DEBUG: "false"
+    OTT_WERROR: "true"
 
-  - name: Set up cross-guest test driver
-    how: ansible
-    order: 30
-    where: [central]
-    playbook: playbooks/multihost-driver.yml
-    extra-args: >-
-      -e multihost_driver_user=$OTT_DRIVER_USER
-      -e 'multihost_driver_runtime_dir=$OTT_DRIVER_RUNTIME_DIR'
-      -e 'multihost_driver_key_path={{ "$OTT_DRIVER_KEY_PATH" or "$OTT_DRIVER_RUNTIME_DIR/id_ed25519" }}'
+  prepare:
+    - &start_diagnostics
+      name: Start guest diagnostics
+      how: ansible
+      order: 10
+      playbook: playbooks/run-diagnostics-start.yml
+      extra-args: >-
+        -e run_diagnostics_enabled=$OTT_DIAGNOSTICS
+        -e 'run_diagnostics_runtime_dir=$OTT_DIAGNOSTICS_RUNTIME_DIR'
 
-  - name: Authorize cross-guest test driver
-    how: ansible
-    order: 31
-    playbook: playbooks/multihost-driver-authorize.yml
-    extra-args: '-e multihost_driver_user=$OTT_DRIVER_USER'
+    - &setup_driver
+      name: Set up cross-guest test driver
+      how: ansible
+      order: 30
+      where: [central]
+      playbook: playbooks/multihost-driver.yml
+      extra-args: >-
+        -e multihost_driver_user=$OTT_DRIVER_USER
+        -e 'multihost_driver_runtime_dir=$OTT_DRIVER_RUNTIME_DIR'
+        -e 'multihost_driver_key_path={{ "$OTT_DRIVER_KEY_PATH" or "$OTT_DRIVER_RUNTIME_DIR/id_ed25519" }}'
 
-  - name: Create OVN test PKI
-    how: ansible
-    order: 32
-    where: [central]
-    playbook: playbooks/ovn-test-pki-create.yml
-    extra-args: >-
-      -e ovn_test_pki_enabled=$OTT_SSL_ENABLED
-      -e 'ovn_test_pki_remote_dir=$OTT_PKI_REMOTE_DIR'
+    - &authorize_driver
+      name: Authorize cross-guest test driver
+      how: ansible
+      order: 31
+      playbook: playbooks/multihost-driver-authorize.yml
+      extra-args: '-e multihost_driver_user=$OTT_DRIVER_USER'
 
-  - name: Install OVN test PKI
-    how: ansible
-    order: 33
-    playbook: playbooks/ovn-test-pki-install.yml
-    extra-args: >-
-      -e ovn_test_pki_enabled=$OTT_SSL_ENABLED
-      -e 'ovn_test_pki_remote_dir=$OTT_PKI_REMOTE_DIR'
+    - &create_pki
+      name: Create OVN test PKI
+      how: ansible
+      order: 32
+      where: [central]
+      playbook: playbooks/ovn-test-pki-create.yml
+      extra-args: >-
+        -e ovn_test_pki_enabled=$OTT_SSL_ENABLED
+        -e 'ovn_test_pki_remote_dir=$OTT_PKI_REMOTE_DIR'
 
-  - name: Build OVN artifact
-    how: ansible
-    order: 40
-    where: [central]
-    playbook: playbooks/ovn-build-artifact.yml
-    extra-args: >-
-      -e 'ovn_artifact_enabled={{ "$OTT_INSTALL_METHOD" == "artifact" }}'
-      -e ovn_install_cc=$OTT_CC -e ovn_install_werror=$OTT_WERROR
-      -e ovn_install_dpdk_enabled=$OTT_DPDK -e 'ovn_install_configure_flags=$OTT_CONFIGURE_FLAGS'
-      -e ovn_install_git_repo=$OTT_GIT_REPO -e ovn_install_git_version=$OTT_GIT_VERSION
-      -e 'ovn_install_source_dir=$OTT_SOURCE_DIR' -e 'ovn_install_make_flags=$OTT_MAKE_FLAGS'
-      -e 'ovn_install_dpdk_dir=$OTT_DPDK_DIR' -e ovn_artifact_name=$OTT_ARTIFACT_NAME
-      -e ovn_artifact_build=$OTT_ARTIFACT_BUILD
-      -e 'ovn_artifact_cache_dir=$OTT_ARTIFACT_CACHE_DIR'
-      -e ovn_artifact_expected_revision=$OTT_ARTIFACT_EXPECTED_REVISION
-      -e ovn_install_dpdk_version=$OTT_DPDK_VERSION
-      -e ovn_install_dpdk_checksum=$OTT_DPDK_CHECKSUM
-      -e ovn_install_dpdk_drivers=$OTT_DPDK_DRIVERS
-      -e 'ovn_install_dpdk_source_dir=$OTT_DPDK_SOURCE_DIR'
+    - &install_pki
+      name: Install OVN test PKI
+      how: ansible
+      order: 33
+      playbook: playbooks/ovn-test-pki-install.yml
+      extra-args: >-
+        -e ovn_test_pki_enabled=$OTT_SSL_ENABLED
+        -e 'ovn_test_pki_remote_dir=$OTT_PKI_REMOTE_DIR'
 
-  - name: Set up OVN topology
-    how: ansible
-    playbook: playbooks/multihost.yml
-    extra-args: >-
-      -e ovn_install_method=$OTT_INSTALL_METHOD -e ovn_install_cc=$OTT_CC
-      -e ovn_install_werror=$OTT_WERROR -e ovn_install_dpdk_enabled=$OTT_DPDK
-      -e 'ovn_install_configure_flags=$OTT_CONFIGURE_FLAGS'
-      -e ovn_install_git_repo=$OTT_GIT_REPO -e ovn_install_git_version=$OTT_GIT_VERSION
-      -e 'ovn_install_source_dir=$OTT_SOURCE_DIR' -e 'ovn_install_make_flags=$OTT_MAKE_FLAGS'
-      -e 'ovn_install_dpdk_dir=$OTT_DPDK_DIR'
-      -e ovn_install_distro_version=$OTT_DISTRO_VERSION
-      -e 'ovn_install_package_dir=$OTT_PACKAGE_DIR'
-      -e 'ovn_install_package_files=$OTT_PACKAGE_FILES'
-      -e ovn_artifact_name=$OTT_ARTIFACT_NAME
-      -e ovn_artifact_build=$OTT_ARTIFACT_BUILD
-      -e 'ovn_artifact_cache_dir=$OTT_ARTIFACT_CACHE_DIR'
-      -e ovn_artifact_expected_revision=$OTT_ARTIFACT_EXPECTED_REVISION
-      -e ovn_install_dpdk_version=$OTT_DPDK_VERSION
-      -e ovn_install_dpdk_checksum=$OTT_DPDK_CHECKSUM
-      -e ovn_install_dpdk_drivers=$OTT_DPDK_DRIVERS
-      -e 'ovn_install_dpdk_source_dir=$OTT_DPDK_SOURCE_DIR'
-      -e ovn_multihost_ssl_enabled=$OTT_SSL_ENABLED
-      -e 'ovn_multihost_pki_dir=$OTT_PKI_REMOTE_DIR'
-      -e ovn_multihost_clustered=$OTT_CLUSTERED
-      -e ovn_multihost_monitor_all=$OTT_MONITOR_ALL
-      -e ovn_multihost_nb_port=$OTT_NB_PORT
-      -e ovn_multihost_sb_port=$OTT_SB_PORT
-      -e ovn_multihost_sb_wait_timeout=$OTT_SB_WAIT_TIMEOUT
-      -e 'ovn_compute_physical_bridge=$OTT_COMPUTE_PHYSICAL_BRIDGE'
-      -e 'ovn_compute_physical_network=$OTT_COMPUTE_PHYSICAL_NETWORK'
-      -e 'ovn_gateway_chassis_name=$OTT_GATEWAY_CHASSIS_NAME'
-      -e 'ovn_gateway_bridges=$OTT_GATEWAY_BRIDGES'
-      -e 'ovn_gateway_bridge_mappings=$OTT_GATEWAY_BRIDGE_MAPPINGS'
-      -e 'ovn_gateway_cms_options=$OTT_GATEWAY_CMS_OPTIONS'
+    - &build_artifact
+      name: Build OVN artifact
+      how: ansible
+      order: 40
+      where: [central]
+      playbook: playbooks/ovn-build-artifact.yml
+      extra-args: >-
+        -e 'ovn_artifact_enabled={{ "$OTT_INSTALL_METHOD" == "artifact" }}'
+        -e ovn_install_cc=$OTT_CC -e ovn_install_werror=$OTT_WERROR
+        -e ovn_install_dpdk_enabled=$OTT_DPDK -e 'ovn_install_configure_flags=$OTT_CONFIGURE_FLAGS'
+        -e ovn_install_git_repo=$OTT_GIT_REPO -e ovn_install_git_version=$OTT_GIT_VERSION
+        -e 'ovn_install_source_dir=$OTT_SOURCE_DIR' -e 'ovn_install_make_flags=$OTT_MAKE_FLAGS'
+        -e 'ovn_install_dpdk_dir=$OTT_DPDK_DIR' -e ovn_artifact_name=$OTT_ARTIFACT_NAME
+        -e ovn_artifact_build=$OTT_ARTIFACT_BUILD
+        -e 'ovn_artifact_cache_dir=$OTT_ARTIFACT_CACHE_DIR'
+        -e ovn_artifact_expected_revision=$OTT_ARTIFACT_EXPECTED_REVISION
+        -e ovn_install_dpdk_version=$OTT_DPDK_VERSION
+        -e ovn_install_dpdk_checksum=$OTT_DPDK_CHECKSUM
+        -e ovn_install_dpdk_drivers=$OTT_DPDK_DRIVERS
+        -e 'ovn_install_dpdk_source_dir=$OTT_DPDK_SOURCE_DIR'
 
-discover:
-  how: fmf
-  where:
-    - compute
-  test:
-    - /tests/ovn-fake-multinode/connectivity
+    - &setup_topology
+      name: Set up OVN topology
+      how: ansible
+      playbook: playbooks/multihost.yml
+      extra-args: >-
+        -e ovn_install_method=$OTT_INSTALL_METHOD -e ovn_install_cc=$OTT_CC
+        -e ovn_install_werror=$OTT_WERROR -e ovn_install_dpdk_enabled=$OTT_DPDK
+        -e 'ovn_install_configure_flags=$OTT_CONFIGURE_FLAGS'
+        -e ovn_install_git_repo=$OTT_GIT_REPO -e ovn_install_git_version=$OTT_GIT_VERSION
+        -e 'ovn_install_source_dir=$OTT_SOURCE_DIR' -e 'ovn_install_make_flags=$OTT_MAKE_FLAGS'
+        -e 'ovn_install_dpdk_dir=$OTT_DPDK_DIR'
+        -e ovn_install_distro_version=$OTT_DISTRO_VERSION
+        -e 'ovn_install_package_dir=$OTT_PACKAGE_DIR'
+        -e 'ovn_install_package_files=$OTT_PACKAGE_FILES'
+        -e ovn_artifact_name=$OTT_ARTIFACT_NAME
+        -e ovn_artifact_build=$OTT_ARTIFACT_BUILD
+        -e 'ovn_artifact_cache_dir=$OTT_ARTIFACT_CACHE_DIR'
+        -e ovn_artifact_expected_revision=$OTT_ARTIFACT_EXPECTED_REVISION
+        -e ovn_install_dpdk_version=$OTT_DPDK_VERSION
+        -e ovn_install_dpdk_checksum=$OTT_DPDK_CHECKSUM
+        -e ovn_install_dpdk_drivers=$OTT_DPDK_DRIVERS
+        -e 'ovn_install_dpdk_source_dir=$OTT_DPDK_SOURCE_DIR'
+        -e ovn_multihost_ssl_enabled=$OTT_SSL_ENABLED
+        -e 'ovn_multihost_pki_dir=$OTT_PKI_REMOTE_DIR'
+        -e ovn_multihost_clustered=$OTT_CLUSTERED
+        -e ovn_multihost_monitor_all=$OTT_MONITOR_ALL
+        -e ovn_multihost_nb_port=$OTT_NB_PORT
+        -e ovn_multihost_sb_port=$OTT_SB_PORT
+        -e ovn_multihost_sb_wait_timeout=$OTT_SB_WAIT_TIMEOUT
+        -e 'ovn_compute_physical_bridge=$OTT_COMPUTE_PHYSICAL_BRIDGE'
+        -e 'ovn_compute_physical_network=$OTT_COMPUTE_PHYSICAL_NETWORK'
+        -e 'ovn_gateway_chassis_name=$OTT_GATEWAY_CHASSIS_NAME'
+        -e 'ovn_gateway_bridges=$OTT_GATEWAY_BRIDGES'
+        -e 'ovn_gateway_bridge_mappings=$OTT_GATEWAY_BRIDGE_MAPPINGS'
+        -e 'ovn_gateway_cms_options=$OTT_GATEWAY_CMS_OPTIONS'
 
-execute:
-  how: tmt
+  execute:
+    how: tmt
 
-finish:
-  - name: Collect guest diagnostics
-    how: ansible
-    playbook: playbooks/run-diagnostics-collect.yml
-    extra-args: >-
-      -e run_diagnostics_enabled=$OTT_DIAGNOSTICS
-      -e 'run_diagnostics_runtime_dir=$OTT_DIAGNOSTICS_RUNTIME_DIR'
-      -e run_diagnostics_log_bytes=$OTT_DIAGNOSTICS_LOG_BYTES
-      -e 'run_diagnostics_output_dir=$TMT_PLAN_DATA/diagnostics'
+  finish:
+    - name: Collect guest diagnostics
+      how: ansible
+      playbook: playbooks/run-diagnostics-collect.yml
+      extra-args: >-
+        -e run_diagnostics_enabled=$OTT_DIAGNOSTICS
+        -e 'run_diagnostics_runtime_dir=$OTT_DIAGNOSTICS_RUNTIME_DIR'
+        -e run_diagnostics_log_bytes=$OTT_DIAGNOSTICS_LOG_BYTES
+        -e 'run_diagnostics_output_dir=$TMT_PLAN_DATA/diagnostics'
+
+/ovn-scale-testing:
+  <<: *multihost_plan
+  summary: Base configuration for OVN scale workloads
+  enabled: false
+
+  environment:
+    <<: *multihost_environment
+    OTT_SCALE_DURATION: 10m
+    OTT_SCALE_TIMEOUT: "60"
+    OTT_SCALE_IPV4: "true"
+    OTT_SCALE_IPV6: "true"
+    OTT_SCALE_MTU: "1342"
+    OTT_SCALE_SNAT_CT_ZONE: ""
+    OTT_SCALE_SYNC_TIMEOUT: "1800"
+
+  provision:
+    - name: central
+      role: central
+      how: virtual
+      image: fedora
+      connection: system
+    - name: compute-1
+      role: compute
+      how: virtual
+      image: fedora
+      connection: system
+    - name: compute-2
+      role: compute
+      how: virtual
+      image: fedora
+      connection: system
+
+  prepare:
+    - *start_diagnostics
+    - *setup_driver
+    - *authorize_driver
+    - *create_pki
+    - *install_pki
+    - *build_artifact
+    - *setup_topology
+    - name: Install scale workload dependencies
+      how: install
+      order: 20
+      where: [compute]
+      package:
+        - iproute
+        - iputils
