@@ -10,9 +10,11 @@ DISCLAIMER: This project is currently under development and is not ready for rea
 - Ansible collections:
   - `ansible.posix`
   - `community.general`
-- Bash
 - libvirt
 - Podman
+- Python 3.9 or newer
+- pytest
+- PyYAML
 - QEMU/KVM
 - tmt with the `provision-container` and `provision-virtual` plugins
 
