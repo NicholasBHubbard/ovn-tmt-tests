@@ -13,7 +13,6 @@ INHERITED_SELF_PLANS = (
     "ci",
     "dpdk-build",
     "kube-burner",
-    "make-check",
     "multihost",
     "ovn-central",
     "ovn-central-ssl",
@@ -426,6 +425,17 @@ def test_dpdk_plan_configuration_is_complete(tree: Path) -> None:
         tree,
         "roles/ovn_artifact/tasks/build.yml",
         'dpdk_build_source_dir: "{{ ovn_install_dpdk_source_dir',
+    )
+
+
+def test_make_check_configuration_is_top_down(tree: Path) -> None:
+    plan = plan_metadata(tree, "plans/ovn-ci/main.fmf")
+
+    assert plan["environment"]["OTT_MAKE_CHECK_TESTSUITEFLAGS"] == ""
+    assert_contains(
+        tree,
+        "tests/ovn-ci/make-check/test.py",
+        'os.environ.get("OTT_MAKE_CHECK_TESTSUITEFLAGS")',
     )
 
 

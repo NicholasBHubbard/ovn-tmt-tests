@@ -1,9 +1,0 @@
-summary: Base configuration for make_check self-tests
-
-discover:
-  how: fmf
-  test:
-    - /tests/self/make-check
-
-execute:
-  how: tmt

@@ -1,5 +1,0 @@
-- name: Run make check
-  hosts: all
-  become: true
-  roles:
-    - make_check
