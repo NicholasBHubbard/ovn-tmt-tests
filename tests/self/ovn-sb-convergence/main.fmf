@@ -1,0 +1,3 @@
+summary: Verify OVN Southbound convergence checks
+test: python3 -m pytest ./test.py::TestResult
+duration: 2m

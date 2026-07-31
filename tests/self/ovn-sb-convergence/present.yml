@@ -1,0 +1,27 @@
+- name: Create Southbound convergence fixtures
+  hosts: all
+  become: true
+  tasks:
+    - name: Create logical switch and port
+      ansible.builtin.command:
+        argv:
+          - ovn-nbctl
+          - --may-exist
+          - ls-add
+          - self-convergence
+          - --
+          - --may-exist
+          - lsp-add
+          - self-convergence
+          - self-convergence-port
+      changed_when: true
+
+- name: Wait for present Southbound objects
+  hosts: all
+  become: true
+  roles:
+    - role: ovn_sb_convergence
+      ovn_sb_convergence_datapaths:
+        - self-convergence
+      ovn_sb_convergence_ports:
+        - self-convergence-port

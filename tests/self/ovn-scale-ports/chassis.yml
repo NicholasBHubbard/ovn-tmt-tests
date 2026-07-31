@@ -1,0 +1,12 @@
+- name: Apply the scale chassis dependency
+  ansible.builtin.import_playbook: ../../../playbooks/ovn-chassis.yml
+  vars:
+    ovn_chassis_hosts: all
+    ovn_install_method: distro
+    ovs_setup_install_method: distro
+    ovn_chassis_name: ovn-scale-0
+    ovn_chassis_remote: tcp:127.0.0.1:6642
+    ovn_chassis_bridges:
+      - br-int
+      - br-ex
+    ovn_chassis_bridge_mappings: physnet:br-ex

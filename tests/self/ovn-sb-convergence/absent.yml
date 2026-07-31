@@ -1,0 +1,22 @@
+- name: Remove Southbound convergence fixtures
+  hosts: all
+  become: true
+  tasks:
+    - name: Remove logical switch
+      ansible.builtin.command:
+        argv:
+          - ovn-nbctl
+          - --if-exists
+          - ls-del
+          - self-convergence
+      changed_when: true
+
+- name: Wait for absent Southbound objects
+  hosts: all
+  become: true
+  roles:
+    - role: ovn_sb_convergence
+      ovn_sb_convergence_absent_datapaths:
+        - self-convergence
+      ovn_sb_convergence_absent_ports:
+        - self-convergence-port

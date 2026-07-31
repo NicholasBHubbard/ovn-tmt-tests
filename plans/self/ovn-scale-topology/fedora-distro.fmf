@@ -1,0 +1,50 @@
+summary: Test ovn-scale-topology role on Fedora
+
+provision:
+  - how: virtual
+    image: fedora
+
+prepare:
+  - name: Set up OVN central
+    how: ansible
+    playbook: playbooks/ovn-central.yml
+    extra-args: '-e ovn_install_method=distro -e ovs_setup_install_method=distro'
+  - name: Check scale topology preconditions
+    how: shell
+    order: 80
+    script: >-
+      python3 -m pytest
+      ./tests/self/ovn-scale-topology/test.py::TestPreconditions
+  - name: Apply three-worker scale topology
+    how: ansible
+    order: 90
+    playbook: tests/self/ovn-scale-topology/topology.yml
+    extra-args: -e ovn_scale_topology_worker_count=3
+  - name: Configure the scale chassis guest
+    how: ansible
+    order: 95
+    playbook: tests/self/ovn-scale-topology/chassis.yml
+  - name: Verify three-worker scale topology
+    how: shell
+    order: 100
+    script: >-
+      python3 -m pytest
+      ./tests/self/ovn-scale-topology/test.py::TestInitial
+      ./tests/self/ovn-scale-topology/test.py::TestChassisInitial
+  - name: Expand scale topology to 500 workers
+    how: ansible
+    order: 110
+    playbook: tests/self/ovn-scale-topology/topology.yml
+    extra-args: -e ovn_scale_topology_worker_count=500
+  - name: Verify expanded scale topology
+    how: shell
+    order: 120
+    script: >-
+      python3 -m pytest
+      ./tests/self/ovn-scale-topology/test.py::TestExpanded
+      ./tests/self/ovn-scale-topology/test.py::TestChassisExpanded
+  - name: Contract scale topology to two workers
+    how: ansible
+    order: 130
+    playbook: tests/self/ovn-scale-topology/topology.yml
+    extra-args: -e ovn_scale_topology_worker_count=2

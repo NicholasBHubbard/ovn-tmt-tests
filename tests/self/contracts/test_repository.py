@@ -20,6 +20,9 @@ INHERITED_SELF_PLANS = (
     "ovn-endpoints",
     "ovn-chassis",
     "ovn-install",
+    "ovn-sb-convergence",
+    "ovn-scale-ports",
+    "ovn-scale-topology",
     "ovn-system-test-deps",
     "ovn-topology",
     "ovn-unit-test-deps",
@@ -165,6 +168,24 @@ def test_self_test_children_inherit_common_steps(tree: Path, plan_dir: Path) -> 
 def test_disabled_self_test_parents_use_main_metadata(tree: Path) -> None:
     for path in (tree / "plans/self").rglob("base.fmf"):
         assert "\nenabled: false\n" not in f"\n{path.read_text()}\n"
+
+
+@pytest.mark.parametrize(
+    ("family", "role_reference"),
+    (
+        ("ovn-scale-topology", "ovn-scale-topology.yml"),
+        ("ovn-scale-ports", "ovn-scale-ports.yml"),
+        ("ovn-sb-convergence", "role: ovn_sb_convergence"),
+    ),
+)
+def test_scale_roles_have_focused_self_tests(
+    tree: Path, family: str, role_reference: str
+) -> None:
+    assert find_text(tree / "tests/self" / family, role_reference)
+    assert find_text(tree / "plans/self" / family, f"/tests/self/{family}")
+
+    generic = tree / "tests/self/ovn-topology"
+    assert not find_text(generic, role_reference)
 
 
 def test_ovn_ci_children_inherit_execution(tree: Path) -> None:

@@ -1,0 +1,9 @@
+summary: Base configuration for OVN scale topology self-tests
+
+discover:
+  how: fmf
+  test:
+    - /tests/self/ovn-scale-topology
+
+execute:
+  how: tmt

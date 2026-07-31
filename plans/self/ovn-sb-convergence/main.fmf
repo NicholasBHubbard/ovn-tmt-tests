@@ -1,0 +1,9 @@
+summary: Base configuration for OVN convergence self-tests
+
+discover:
+  how: fmf
+  test:
+    - /tests/self/ovn-sb-convergence
+
+execute:
+  how: tmt

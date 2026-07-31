@@ -1,0 +1,9 @@
+summary: Base configuration for OVN scale port self-tests
+
+discover:
+  how: fmf
+  test:
+    - /tests/self/ovn-scale-ports
+
+execute:
+  how: tmt
