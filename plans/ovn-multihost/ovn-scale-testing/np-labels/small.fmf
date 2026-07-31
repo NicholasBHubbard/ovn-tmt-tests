@@ -1,0 +1,7 @@
+# Divide pods into labels and allow each label to reach the pods selected by
+# excluding itself and the next label within each namespace.
+summary: Measure small label-selected network policies
+enabled: true
+
+environment+:
+  OTT_SCALE_LABEL_MODE: small

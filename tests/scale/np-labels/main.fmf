@@ -1,0 +1,2 @@
+summary: Measure label-selected network-policy convergence
+test: python3 -m pytest ./test.py

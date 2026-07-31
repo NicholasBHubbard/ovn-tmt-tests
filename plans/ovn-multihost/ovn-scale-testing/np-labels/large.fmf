@@ -1,0 +1,7 @@
+# Divide all pods into cluster-wide labels and allow each label to reach the
+# next label across namespace boundaries.
+summary: Measure large label-selected network policies
+enabled: true
+
+environment+:
+  OTT_SCALE_LABEL_MODE: large

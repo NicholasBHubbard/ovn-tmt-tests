@@ -509,6 +509,25 @@ def test_artifact_role_contract(tree: Path) -> None:
                 "OTT_SCALE_WORKERS:",
             ),
         ),
+        (
+            "np-labels/main.fmf",
+            "np-labels",
+            (
+                "OTT_SCALE_BASE_PODS_PER_WORKER:",
+                "OTT_CLUSTERED:",
+                "OTT_COMPUTE_PHYSICAL_BRIDGE:",
+                "OTT_COMPUTE_PHYSICAL_NETWORK:",
+                "OTT_MONITOR_ALL:",
+                "OTT_SCALE_LABELS:",
+                "OTT_SCALE_LB_PROTOCOLS:",
+                "OTT_SCALE_NAMESPACES:",
+                "OTT_SCALE_PODS_PER_NAMESPACE:",
+                "OTT_SCALE_POLICY_ALLOW_PRIORITY:",
+                "OTT_SCALE_POLICY_CONTROL_PRIORITY:",
+                "OTT_SCALE_POLICY_DENY_PRIORITY:",
+                "OTT_SCALE_WORKERS:",
+            ),
+        ),
     ),
 )
 def test_scale_workload_contract(
@@ -533,12 +552,22 @@ def test_scale_workload_contract(
         "cluster-density",
         "np-multitenant",
         "np-cross-namespace",
+        "np-labels",
     }:
         metadata = yaml.safe_load(plan_path.read_text())
         assert [guest["role"] for guest in metadata["provision+"]] == [
             "central-follower",
             "central-follower",
         ]
+
+
+@pytest.mark.parametrize("mode", ("small", "large"))
+def test_label_policy_plans_share_one_workload(tree: Path, mode: str) -> None:
+    path = tree / "plans/ovn-multihost/ovn-scale-testing/np-labels" / f"{mode}.fmf"
+    metadata = yaml.safe_load(path.read_text())
+
+    assert metadata["enabled"] is True
+    assert metadata["environment+"]["OTT_SCALE_LABEL_MODE"] == mode
 
 
 def test_scale_workloads_inherit_common_configuration(tree: Path) -> None:

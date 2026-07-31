@@ -1,12 +1,21 @@
 import ipaddress
 import json
 from collections.abc import Sequence
+from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from ovn_test.command import Runner
 from ovn_test.load_balancer import replace, socket
 
 VALID_PROTOCOLS = {"tcp", "udp", "sctp"}
+
+
+@dataclass
+class _NamespaceGroup:
+    port_group: str
+    address_sets: dict[int, str]
+    address_set_ids: dict[int, str] = field(default_factory=dict)
+    ready: bool = False
 
 
 def validate_cluster_density(
@@ -93,6 +102,7 @@ class OvnNamespace:
             6: f"as6_{name}",
         }
         self.address_set_ids: dict[int, str] = {}
+        self.groups: dict[str, _NamespaceGroup] = {}
         self.load_balancers: list[str] = []
         self.endpoints: list[dict[str, Any]] = []
         self.acls: dict[str, tuple[str, str, int, str, str]] = {}
@@ -111,31 +121,37 @@ class OvnNamespace:
         for uuid in output.split():
             self.runner.run("ovn-nbctl", "destroy", table, uuid)
 
+    def _create_port_group(self, name: str) -> None:
+        self._destroy_named("Port_Group", name)
+        self.runner.run(
+            "ovn-nbctl",
+            "pg-add",
+            name,
+            "--",
+            "set",
+            "Port_Group",
+            name,
+            f"external_ids:ovn-tmt-tests-owner={json.dumps(self.owner)}",
+        )
+
+    def _create_address_set(self, name: str) -> str:
+        self._destroy_named("Address_Set", name)
+        return self.runner.output(
+            "ovn-nbctl",
+            "create",
+            "Address_Set",
+            f"name={json.dumps(name)}",
+            f"external_ids:ovn-tmt-tests-owner={json.dumps(self.owner)}",
+        )
+
     def create(self) -> None:
         for name in self.port_groups:
-            self._destroy_named("Port_Group", name)
-            self.runner.run(
-                "ovn-nbctl",
-                "pg-add",
-                name,
-                "--",
-                "set",
-                "Port_Group",
-                name,
-                f"external_ids:ovn-tmt-tests-owner={json.dumps(self.owner)}",
-            )
+            self._create_port_group(name)
         for family, enabled in ((4, self.ipv4), (6, self.ipv6)):
             if not enabled:
                 continue
             name = self.address_sets[family]
-            self._destroy_named("Address_Set", name)
-            self.address_set_ids[family] = self.runner.output(
-                "ovn-nbctl",
-                "create",
-                "Address_Set",
-                f"name={json.dumps(name)}",
-                f"external_ids:ovn-tmt-tests-owner={json.dumps(self.owner)}",
-            )
+            self.address_set_ids[family] = self._create_address_set(name)
 
     def add_endpoints(self, endpoints: Sequence[dict[str, Any]]) -> None:
         for family, enabled in ((4, self.ipv4), (6, self.ipv6)):
@@ -284,6 +300,89 @@ class OvnNamespace:
             "allow-related",
         )
 
+    def set_group(self, name: str, endpoints: Sequence[dict[str, Any]]) -> None:
+        if not name:
+            raise ValueError("namespace group name cannot be empty")
+        ports = list(dict.fromkeys(endpoint["port"] for endpoint in endpoints))
+        addresses = {
+            family: list(
+                dict.fromkeys(endpoint[f"ipv{family}"] for endpoint in endpoints)
+            )
+            for family, enabled in ((4, self.ipv4), (6, self.ipv6))
+            if enabled
+        }
+        group = self.groups.get(name)
+        if group is None:
+            suffix = f"{self.name}_{len(self.groups)}"
+            group = _NamespaceGroup(
+                port_group=f"sub_pg_{suffix}",
+                address_sets={
+                    family: f"sub_as{'6' if family == 6 else ''}_{suffix}"
+                    for family in addresses
+                },
+            )
+            self.groups[name] = group
+        if not group.ready:
+            self._create_port_group(group.port_group)
+            for family, address_set in group.address_sets.items():
+                group.address_set_ids[family] = self._create_address_set(address_set)
+            group.ready = True
+
+        self.runner.run("ovn-nbctl", "pg-set-ports", group.port_group, *ports)
+        for family, values in addresses.items():
+            address_set_id = group.address_set_ids[family]
+            self.runner.run(
+                "ovn-nbctl",
+                "clear",
+                "Address_Set",
+                address_set_id,
+                "addresses",
+            )
+            if values:
+                self.runner.run(
+                    "ovn-nbctl",
+                    "add",
+                    "Address_Set",
+                    address_set_id,
+                    "addresses",
+                    *(json.dumps(value) for value in values),
+                )
+
+    def allow_between(
+        self,
+        source: str,
+        target: str,
+        family: int,
+        priority: int = 3,
+    ) -> None:
+        network = self._ip_family(family)
+        try:
+            source_group = self.groups[source]
+            target_group = self.groups[target]
+        except KeyError as error:
+            raise ValueError(
+                f"namespace group does not exist: {error.args[0]}"
+            ) from error
+        self.enforce()
+        self._set_acl(
+            f"allow-group-{family}-{source}-{target}-ingress",
+            self.port_group,
+            "to-lport",
+            priority,
+            f"{network}.src == ${source_group.address_sets[family]} && "
+            f"outport == @{target_group.port_group}",
+            "allow-related",
+        )
+        self._set_acl(
+            f"allow-group-{family}-{source}-{target}-egress",
+            self.port_group,
+            "to-lport",
+            priority,
+            f"{network}.dst == ${target_group.address_sets[family]} && "
+            f"inport == @{source_group.port_group}",
+            "allow-related",
+        )
+
     def allow_external(
         self,
         addresses: Sequence[str],
@@ -373,6 +472,16 @@ class OvnNamespace:
                     name,
                 )
             )
+        for group in self.groups.values():
+            attempt(
+                lambda group=group: self._destroy_named("Port_Group", group.port_group)
+            )
+            for address_set in group.address_sets.values():
+                attempt(
+                    lambda address_set=address_set: self._destroy_named(
+                        "Address_Set", address_set
+                    )
+                )
         for name in self.port_groups:
             attempt(lambda name=name: self._destroy_named("Port_Group", name))
         for family, name in self.address_sets.items():
@@ -385,13 +494,26 @@ class OvnNamespace:
     def verify_cleanup(self) -> None:
         for table, names in (
             ("Load_Balancer", self.load_balancers),
-            ("Port_Group", self.port_groups),
+            (
+                "Port_Group",
+                [
+                    *self.port_groups,
+                    *(group.port_group for group in self.groups.values()),
+                ],
+            ),
             (
                 "Address_Set",
                 [
-                    name
-                    for family, name in self.address_sets.items()
-                    if (family == 4 and self.ipv4) or (family == 6 and self.ipv6)
+                    *(
+                        name
+                        for family, name in self.address_sets.items()
+                        if (family == 4 and self.ipv4) or (family == 6 and self.ipv6)
+                    ),
+                    *(
+                        name
+                        for group in self.groups.values()
+                        for name in group.address_sets.values()
+                    ),
                 ],
             ),
         ):

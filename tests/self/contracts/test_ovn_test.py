@@ -1089,6 +1089,111 @@ def test_ovn_namespace_allows_traffic_to_another_namespace(
     target.verify_cleanup()
 
 
+@pytest.mark.parametrize(
+    ("family", "addresses", "network", "address_set_prefix"),
+    (
+        (4, ("10.0.0.1", "10.0.0.2", "10.0.0.3"), "ip4", "sub_as_"),
+        (6, ("fd00::1", "fd00::2", "fd00::3"), "ip6", "sub_as6_"),
+    ),
+)
+def test_ovn_namespace_manages_policy_groups(
+    family: int,
+    addresses: tuple[str, str, str],
+    network: str,
+    address_set_prefix: str,
+) -> None:
+    runner = FakeRunner()
+    namespace = OvnNamespace(
+        runner,
+        "network-policy",
+        "groups",
+        0,
+        ipv4=family == 4,
+        ipv6=family == 6,
+    )
+    endpoints = [
+        {"port": f"pod-{index}", f"ipv{family}": address}
+        for index, address in enumerate(addresses, 1)
+    ]
+
+    namespace.create()
+    namespace.add_endpoints(endpoints)
+    namespace.default_deny(family)
+    namespace.set_group("source", endpoints[:2])
+    namespace.set_group("target", endpoints[2:])
+    namespace.allow_between("source", "target", family, priority=7)
+
+    source_port_group = "sub_pg_groups_0"
+    target_port_group = "sub_pg_groups_1"
+    source_address_set = f"{address_set_prefix}groups_0"
+    target_address_set = f"{address_set_prefix}groups_1"
+    commands = [call[1] for call in runner.calls]
+    assert (
+        "ovn-nbctl",
+        "pg-set-ports",
+        source_port_group,
+        "pod-1",
+        "pod-2",
+    ) in commands
+    assert (
+        "ovn-nbctl",
+        "pg-set-ports",
+        target_port_group,
+        "pod-3",
+    ) in commands
+    for match in (
+        f"{network}.src == ${source_address_set} && outport == @{target_port_group}",
+        f"{network}.dst == ${target_address_set} && inport == @{source_port_group}",
+    ):
+        assert any(
+            "acl-add" in command
+            and command[-2:] == (match, "allow-related")
+            and 7 in command
+            for command in commands
+        )
+
+    previous_calls = len(runner.calls)
+    namespace.set_group("source", endpoints[1:2])
+    reconfiguration = [call[1] for call in runner.calls[previous_calls:]]
+    assert reconfiguration[0] == (
+        "ovn-nbctl",
+        "pg-set-ports",
+        source_port_group,
+        "pod-2",
+    )
+    assert reconfiguration[1][1:3] == ("clear", "Address_Set")
+    assert reconfiguration[2][-1] == f'"{addresses[1]}"'
+    assert not any("pg-add" in command for command in reconfiguration)
+
+    namespace.allow_between("source", "target", family, priority=8)
+    assert any(
+        command[:3] == ("ovn-nbctl", "--type=port-group", "acl-del") and 7 in command
+        for command in (call[1] for call in runner.calls)
+    )
+
+    previous_calls = len(runner.calls)
+    namespace.cleanup()
+    namespace.verify_cleanup()
+    cleanup_queries = [call[1] for call in runner.calls[previous_calls:]]
+    for name in (
+        source_port_group,
+        target_port_group,
+        source_address_set,
+        target_address_set,
+    ):
+        assert any(command[-1] == f'name="{name}"' for command in cleanup_queries)
+
+
+def test_ovn_namespace_rejects_invalid_policy_groups() -> None:
+    namespace = OvnNamespace(FakeRunner(), "network-policy", "groups", 0)
+
+    with pytest.raises(ValueError, match="name cannot be empty"):
+        namespace.set_group("", [])
+    namespace.set_group("source", [])
+    with pytest.raises(ValueError, match="does not exist: target"):
+        namespace.allow_between("source", "target", 4)
+
+
 def test_ovn_namespace_rejects_invalid_policy_addresses() -> None:
     namespace = OvnNamespace(
         FakeRunner(),
