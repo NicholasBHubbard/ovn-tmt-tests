@@ -8,14 +8,7 @@
   ansible.builtin.include_role:
     name: distro_packages
   vars:
-    distro_packages_names:
-      dnf:
-        - gcc
-        - meson
-        - ninja-build
-        - python3-pyelftools
-        - numactl-devel
-        - libpcap-devel
+    distro_packages_names: "{{ dpdk_build_dependency_package_names }}"
 
 - name: Download DPDK source
   ansible.builtin.get_url:

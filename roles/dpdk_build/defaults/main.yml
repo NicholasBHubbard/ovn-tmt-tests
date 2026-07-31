@@ -3,3 +3,18 @@ dpdk_build_checksum: "sha256:bcae7d42c449fc456dfb279feabcbe0599a29bebb2fe2905761
 dpdk_build_install_dir: /usr/local/dpdk
 dpdk_build_drivers: "net/null,net/tap,net/virtio"
 dpdk_build_source_dir: /usr/src/dpdk
+dpdk_build_dependency_package_names:
+  apt:
+    - build-essential
+    - libnuma-dev
+    - libpcap-dev
+    - meson
+    - ninja-build
+    - python3-pyelftools
+  dnf:
+    - gcc
+    - meson
+    - ninja-build
+    - python3-pyelftools
+    - numactl-devel
+    - libpcap-devel

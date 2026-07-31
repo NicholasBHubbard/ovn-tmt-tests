@@ -11,4 +11,4 @@ class TestResult:
         root = Path("/usr/local/dpdk")
 
         assert root.is_dir()
-        assert (root / "lib64/pkgconfig/libdpdk.pc").is_file()
+        assert list(root.rglob("libdpdk.pc"))

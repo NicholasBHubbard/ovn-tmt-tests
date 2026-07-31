@@ -1,0 +1,13 @@
+summary: Test DPDK build on Debian
+
+provision:
+  - how: virtual
+    image: debian
+
+prepare:
+  - how: shell
+    order: 80
+    script: python3 -m pytest ./tests/self/dpdk-build/test.py::TestPreconditions
+  - how: ansible
+    order: 90
+    playbook: playbooks/dpdk-build.yml
