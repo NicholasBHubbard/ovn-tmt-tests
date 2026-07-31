@@ -13,6 +13,13 @@ ovn_artifact_local_path: >-
   {{ ovn_artifact_cache_dir | default(inventory_dir, true) }}/{{ ovn_artifact_name }}.tar.gz
 ovn_artifact_manifest_local_path: >-
   {{ ovn_artifact_cache_dir | default(inventory_dir, true) }}/{{ ovn_artifact_name }}.json
+ovn_artifact_archive_package_names:
+  dnf:
+    - gzip
+    - tar
+  apt:
+    - gzip
+    - tar
 
 # System installation uses the target's facts. Image and VM builders may set
 # these to the identity of the filesystem that will consume the artifact.

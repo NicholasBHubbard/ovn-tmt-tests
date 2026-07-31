@@ -38,6 +38,13 @@
     state: directory
     mode: "0755"
 
+- name: Install OVN artifact archive tools
+  when: ovn_artifact_build | bool
+  ansible.builtin.include_role:
+    name: distro_packages
+  vars:
+    distro_packages_names: "{{ ovn_artifact_archive_package_names }}"
+
 - name: Reset OVN artifact staging directory
   when: ovn_artifact_build | bool
   ansible.builtin.file:

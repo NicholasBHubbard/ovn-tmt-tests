@@ -518,6 +518,14 @@ def test_artifact_role_contract(tree: Path) -> None:
     assert install.index("- name: Validate OVN artifact") < install.index(
         "- name: Install DPDK runtime dependencies"
     )
+    assert install.index("- name: Install OVN artifact archive tools") < install.index(
+        "- name: Install OVN artifact\n"
+    )
+    assert 'distro_packages_names: "{{ ovn_artifact_archive_package_names }}"' in install
+    build = content(tree, "roles/ovn_artifact/tasks/build.yml")
+    assert build.index("- name: Install OVN artifact archive tools") < build.index(
+        "- name: Create OVN artifact\n"
+    )
     validate = content(tree, "roles/ovn_artifact/tasks/validate.yml")
     assert "- name: Verify local OVN artifact checksum" in validate
     assert "ovn_artifact_identity:" in validate

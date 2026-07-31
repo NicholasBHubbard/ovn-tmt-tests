@@ -12,6 +12,12 @@
   vars:
     distro_packages_names: "{{ ovn_install_dpdk_runtime_package_names }}"
 
+- name: Install OVN artifact archive tools
+  ansible.builtin.include_role:
+    name: distro_packages
+  vars:
+    distro_packages_names: "{{ ovn_artifact_archive_package_names }}"
+
 - name: Install OVN artifact
   ansible.builtin.unarchive:
     src: "{{ ovn_artifact_local_path }}"
