@@ -1,0 +1,2 @@
+summary: Measure cluster and worker service routes
+test: python3 -m pytest ./test.py

@@ -528,6 +528,21 @@ def test_artifact_role_contract(tree: Path) -> None:
                 "OTT_SCALE_WORKERS:",
             ),
         ),
+        (
+            "service-route.fmf",
+            "service-route",
+            (
+                "OTT_SCALE_BASE_PODS_PER_WORKER:",
+                "OTT_CLUSTERED:",
+                "OTT_COMPUTE_PHYSICAL_BRIDGE:",
+                "OTT_COMPUTE_PHYSICAL_NETWORK:",
+                "OTT_MONITOR_ALL:",
+                "OTT_SCALE_LB_PROTOCOLS:",
+                "OTT_SCALE_SERVICE_BACKENDS:",
+                "OTT_SCALE_SERVICE_LOAD_BALANCERS:",
+                "OTT_SCALE_WORKERS:",
+            ),
+        ),
     ),
 )
 def test_scale_workload_contract(
@@ -553,6 +568,7 @@ def test_scale_workload_contract(
         "np-multitenant",
         "np-cross-namespace",
         "np-labels",
+        "service-route",
     }:
         metadata = yaml.safe_load(plan_path.read_text())
         assert [guest["role"] for guest in metadata["provision+"]] == [

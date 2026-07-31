@@ -1,0 +1,53 @@
+# Create cluster-wide and per-worker load balancers backed by pod endpoints,
+# then measure their creation and verify the endpoint network paths.
+summary: Measure OVN service-route convergence
+enabled: true
+
+environment+:
+  OTT_CLUSTERED: "true"
+  OTT_COMPUTE_PHYSICAL_BRIDGE: br-ex
+  OTT_COMPUTE_PHYSICAL_NETWORK: physnet
+  OTT_MONITOR_ALL: "true"
+  OTT_SCALE_BASE_PODS_PER_WORKER: "2"
+  OTT_SCALE_DURATION: 1h
+  OTT_SCALE_IPV6: "true"
+  OTT_SCALE_LB_PROTOCOLS: tcp,udp,sctp
+  OTT_SCALE_SERVICE_BACKENDS: "4"
+  OTT_SCALE_SERVICE_LOAD_BALANCERS: "16"
+  OTT_SCALE_TOPOLOGY_PATH: /run/ovn-tmt-tests/scale-topology.json
+  OTT_SCALE_WORKERS: "2"
+
+provision+:
+  - name: central-2
+    role: central-follower
+    how: virtual
+    image: fedora
+    connection: system
+  - name: central-3
+    role: central-follower
+    how: virtual
+    image: fedora
+    connection: system
+
+prepare+:
+  - name: Prepare service-route scale topology
+    how: ansible
+    order: 70
+    where: [central]
+    playbook: playbooks/ovn-scale-topology.yml
+    extra-args: >-
+      -e ovn_scale_topology_worker_count=$OTT_SCALE_WORKERS
+      -e ovn_scale_topology_ipv4=$OTT_SCALE_IPV4
+      -e ovn_scale_topology_ipv6=$OTT_SCALE_IPV6
+      -e ovn_scale_topology_physical_bridge=$OTT_COMPUTE_PHYSICAL_BRIDGE
+      -e ovn_scale_topology_physical_network=$OTT_COMPUTE_PHYSICAL_NETWORK
+      -e 'ovn_scale_topology_snat_ct_zone=$OTT_SCALE_SNAT_CT_ZONE'
+      -e 'ovn_scale_topology_manifest_path=$OTT_SCALE_TOPOLOGY_PATH'
+
+discover:
+  how: fmf
+  where: [central]
+  adjust-tests:
+    - duration: $OTT_SCALE_DURATION
+  test:
+    - /tests/scale/service-route

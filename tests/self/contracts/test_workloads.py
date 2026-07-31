@@ -26,6 +26,22 @@ def np_labels_config(mode: str = "small") -> dict[str, Any]:
     }
 
 
+def service_route_config() -> dict[str, Any]:
+    return {
+        "iterations": 16,
+        "backends": 4,
+        "base_pods": 2,
+        "protocols": ["tcp", "udp", "sctp"],
+        "timeout": 60,
+        "sync_timeout": 1800,
+        "ipv4": True,
+        "ipv6": True,
+        "mtu": 1342,
+        "workers": 2,
+        "chassis": 2,
+    }
+
+
 def test_dpdk_version_line_need_not_be_first(tree: Path) -> None:
     workload = runpy.run_path(str(tree / "tests/build/dpdk/test.py"))
 
@@ -213,6 +229,49 @@ def test_np_labels_rejects_invalid_configuration(
 ) -> None:
     workload = runpy.run_path(str(tree / "tests/scale/np-labels/test.py"))
     config = np_labels_config()
+    config[name] = value
+
+    with pytest.raises(ValueError, match=r".+"):
+        workload["validate_config"](config)
+
+
+def test_service_route_reproduces_original_workload_shape(tree: Path) -> None:
+    workload = runpy.run_path(str(tree / "tests/scale/service-route/test.py"))
+    config = service_route_config()
+
+    workload["validate_config"](config)
+
+    assert config["total_pods"] == 80
+    assert workload["cluster_vip"](0, 4) == "90.0.0.1"
+    assert workload["cluster_vip"](15, 4) == "90.0.0.16"
+    assert workload["cluster_vip"](0, 6) == "9::1"
+    worker = {
+        "name": "worker-0",
+        "external": {"ipv4": "172.16.0.0/24", "ipv6": "fd20::/80"},
+    }
+    assert workload["worker_vip"](worker, 4) == "172.16.0.254"
+    assert workload["worker_vip"](worker, 6) == "fd20::ffff:ffff:fffe"
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    (
+        ("iterations", 0),
+        ("backends", 0),
+        ("base_pods", -1),
+        ("protocols", []),
+        ("ipv4", "true"),
+        ("mtu", 1279),
+        ("workers", 0),
+    ),
+)
+def test_service_route_rejects_invalid_configuration(
+    tree: Path,
+    name: str,
+    value: Any,
+) -> None:
+    workload = runpy.run_path(str(tree / "tests/scale/service-route/test.py"))
+    config = service_route_config()
     config[name] = value
 
     with pytest.raises(ValueError, match=r".+"):

@@ -1,3 +1,4 @@
+import runpy
 import subprocess
 from pathlib import Path
 from typing import Any, Optional
@@ -824,6 +825,100 @@ def test_workload_reproduces_scale_background_load_balancers(tmp_path: Path) -> 
         command for command in commands if 'name="lb-gwrouter-worker-06-tcp"' in command
     )
     assert not [argument for argument in gateway if argument.startswith("vips:")]
+
+
+def test_workload_reproduces_service_route_load_balancers(
+    tree: Path, tmp_path: Path
+) -> None:
+    runner = FakeRunner()
+    topology = {
+        "load_balancer_group": "cluster-lb-group",
+        "workers": [
+            {
+                "name": "worker-0",
+                "chassis": "compute-1",
+                "switch": "switch-0",
+                "gateway_router": "gwrouter-worker-0",
+                "internal": {"ipv4": "10.0.0.0/24", "ipv6": "fd10::/80"},
+                "external": {"ipv4": "172.16.0.0/24", "ipv6": "fd20::/80"},
+            },
+            {
+                "name": "worker-1",
+                "chassis": "compute-2",
+                "switch": "switch-1",
+                "gateway_router": "gwrouter-worker-1",
+                "internal": {
+                    "ipv4": "10.0.1.0/24",
+                    "ipv6": "fd10:0:0:1::/80",
+                },
+                "external": {
+                    "ipv4": "172.16.1.0/24",
+                    "ipv6": "fd20:0:0:1::/80",
+                },
+            },
+        ],
+    }
+    workload = Workload(
+        runner,
+        ["compute-1", "compute-2"],
+        "service-route",
+        "sr",
+        tmp_path / "metrics.csv",
+        scale_topology=topology,
+    )
+    service_route = runpy.run_path(str(tree / "tests/scale/service-route/test.py"))
+    endpoints = [workload.endpoint(index) for index in range(3)]
+
+    workload.create_namespace()
+    service_route["add_service_routes"](workload, 0, endpoints, ["tcp"])
+    service_route["add_service_routes"](workload, 0, endpoints, ["tcp"])
+
+    commands = [call[1] for call in runner.calls]
+    created = [
+        command for command in commands if contains(command, "create", "Load_Balancer")
+    ]
+    assert len(created) == 12
+    assert len(workload.load_balancers) == 6
+    cluster = next(
+        command for command in created if 'name="slb-cluster-0-tcp"' in command
+    )
+    assert 'vips:"90.0.0.1:80"="10.0.1.1:8080,10.0.0.2:8080"' in cluster
+    assert contains(
+        cluster,
+        "add",
+        "Load_Balancer_Group",
+        "load-balancer-group-uuid",
+        "load_balancer",
+        "@lb",
+    )
+    node = next(
+        command for command in created if 'name="slb-node-0-worker-0-tcp"' in command
+    )
+    assert 'vips:"172.16.0.254:80"="10.0.1.1:8080,10.0.0.2:8080"' in node
+    assert contains(
+        node,
+        "add",
+        "Logical_Switch",
+        "switch-0",
+        "load_balancer",
+        "@lb",
+    )
+    assert contains(
+        node,
+        "add",
+        "Logical_Router",
+        "gwrouter-worker-0",
+        "load_balancer",
+        "@lb",
+    )
+    assert any(
+        'name="slb6-cluster-0-tcp"' in command
+        and 'vips:"[9::1]:80"="[fd10:0:0:1::1]:8080,[fd10::2]:8080"' in command
+        for command in created
+    )
+
+    workload.cleanup()
+    workload.verify_cleanup()
 
 
 def test_ovn_namespace_reproduces_cluster_density_state() -> None:

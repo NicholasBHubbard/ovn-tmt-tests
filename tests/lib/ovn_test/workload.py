@@ -469,7 +469,7 @@ class Workload:
             "sync",
         )
 
-    def _replace_load_balancer(
+    def replace_load_balancer(
         self,
         name: str,
         protocol: str,
@@ -478,7 +478,8 @@ class Workload:
         routers: Iterable[str] = (),
         group: Optional[str] = None,
     ) -> None:
-        self.load_balancers.append(name)
+        if name not in self.load_balancers:
+            self.load_balancers.append(name)
         replace(
             self.runner,
             self.name,
@@ -519,7 +520,7 @@ class Workload:
             )
             suffix = "" if family == 4 else "6"
             for protocol in protocols:
-                self._replace_load_balancer(
+                self.replace_load_balancer(
                     f"lb-cluster1{suffix}-{protocol}",
                     protocol,
                     vips,
@@ -527,7 +528,7 @@ class Workload:
                     routers=(worker["gateway_router"] for worker in self.workers),
                 )
                 for worker in self.workers:
-                    self._replace_load_balancer(
+                    self.replace_load_balancer(
                         f"lb-{worker['gateway_router']}{suffix}-{protocol}",
                         protocol,
                         routers=[worker["gateway_router"]],
@@ -551,7 +552,7 @@ class Workload:
                 if not enabled:
                     continue
                 name = self.service_name(service, protocol, family)
-                self._replace_load_balancer(
+                self.replace_load_balancer(
                     name,
                     protocol,
                     {
