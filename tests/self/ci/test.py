@@ -35,7 +35,7 @@ class TestResult:
         ("expected", "paths"),
         (
             ("true", ("plans/ovn-ci/main.fmf",)),
-            ("true", ("tests/build/make-check/test.py",)),
+            ("true", ("tests/ovn-ci/make-check/test.py",)),
             ("true", ("components/new/config.yml",)),
             ("true", ("README.md", "roles/ovn_install/tasks/main.yml")),
             (

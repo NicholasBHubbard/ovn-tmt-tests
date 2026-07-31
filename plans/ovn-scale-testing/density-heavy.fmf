@@ -1,6 +1,7 @@
-# Populate an OpenShift-like OVN cluster with policy-isolated namespaces,
-# allow each namespace to reach the next one, and verify the resulting ring.
-summary: Measure cross-namespace network-policy convergence
+# Build a Kubernetes-like OVN topology across the available compute chassis,
+# populate its workers with pods and load-balanced services, then measure
+# incremental convergence while verifying pod and external gateway traffic.
+summary: Measure incremental OVN pod and service convergence
 enabled: true
 
 environment+:
@@ -8,17 +9,15 @@ environment+:
   OTT_COMPUTE_PHYSICAL_BRIDGE: br-ex
   OTT_COMPUTE_PHYSICAL_NETWORK: physnet
   OTT_MONITOR_ALL: "true"
-  OTT_SCALE_BASE_PODS_PER_WORKER: "2"
-  OTT_SCALE_DURATION: 1h
-  OTT_SCALE_IPV6: "true"
+  OTT_SCALE_BASE_PODS_PER_WORKER: "10"
+  OTT_SCALE_DURATION: 6h
+  OTT_SCALE_INITIAL_PODS: "11000"
+  OTT_SCALE_IPV6: "false"
+  OTT_SCALE_PODS_PER_SERVICE: "2"
   OTT_SCALE_LB_PROTOCOLS: tcp,udp,sctp
-  OTT_SCALE_NAMESPACES: "10"
-  OTT_SCALE_PODS_PER_NAMESPACE: "5"
-  OTT_SCALE_POLICY_ALLOW_PRIORITY: "3"
-  OTT_SCALE_POLICY_CONTROL_PRIORITY: "2"
-  OTT_SCALE_POLICY_DENY_PRIORITY: "1"
+  OTT_SCALE_TOTAL_PODS: "11250"
   OTT_SCALE_TOPOLOGY_PATH: /run/ovn-tmt-tests/scale-topology.json
-  OTT_SCALE_WORKERS: "2"
+  OTT_SCALE_WORKERS: "250"
 
 provision+:
   - name: central-2
@@ -33,7 +32,7 @@ provision+:
     connection: system
 
 prepare+:
-  - name: Prepare np-cross-namespace scale topology
+  - name: Prepare density-heavy scale topology
     how: ansible
     order: 70
     where: [central]
@@ -53,4 +52,4 @@ discover:
   adjust-tests:
     - duration: $OTT_SCALE_DURATION
   test:
-    - /tests/scale/np-cross-namespace
+    - /tests/ovn-scale-testing/density-heavy

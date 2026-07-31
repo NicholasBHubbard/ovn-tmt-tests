@@ -51,4 +51,4 @@ discover:
   adjust-tests:
     - duration: $OTT_SCALE_DURATION
   test:
-    - /tests/scale/np-labels
+    - /tests/ovn-scale-testing/np-labels

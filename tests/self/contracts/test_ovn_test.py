@@ -866,7 +866,9 @@ def test_workload_reproduces_service_route_load_balancers(
         tmp_path / "metrics.csv",
         scale_topology=topology,
     )
-    service_route = runpy.run_path(str(tree / "tests/scale/service-route/test.py"))
+    service_route = runpy.run_path(
+        str(tree / "tests/ovn-scale-testing/service-route/test.py")
+    )
     endpoints = [workload.endpoint(index) for index in range(3)]
 
     workload.create_namespace()

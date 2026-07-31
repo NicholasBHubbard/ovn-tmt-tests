@@ -1,3 +1,6 @@
+/:
+  inherit: false
+
 enabled: false
 
 adjust:

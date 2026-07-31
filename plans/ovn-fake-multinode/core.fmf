@@ -32,17 +32,17 @@ prepare+:
   - name: Set up shared provider network
     how: ansible
     order: 70
-    playbook: plans/ovn-multihost/ovn-fake-multinode/core/setup.yml
+    playbook: plans/ovn-fake-multinode/core/setup.yml
 
 discover:
   how: fmf
   where: [central]
   test:
-    - /tests/multihost/redirect-bridged
-    - /tests/multihost/migration
-    - /tests/multihost/provider-nat
-    - /tests/multihost/always-tunnel
-    - /tests/multihost/pmtu
-    - /tests/multihost/load-balancer
-    - /tests/multihost/ipv6-na
-    - /tests/multihost/stateless-nat-pmtu
+    - /tests/ovn-fake-multinode/redirect-bridged
+    - /tests/ovn-fake-multinode/migration
+    - /tests/ovn-fake-multinode/provider-nat
+    - /tests/ovn-fake-multinode/always-tunnel
+    - /tests/ovn-fake-multinode/pmtu
+    - /tests/ovn-fake-multinode/load-balancer
+    - /tests/ovn-fake-multinode/ipv6-na
+    - /tests/ovn-fake-multinode/stateless-nat-pmtu

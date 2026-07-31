@@ -15,4 +15,4 @@ prepare+:
 discover:
   how: fmf
   test:
-    - /tests/build/make-check
+    - /tests/ovn-ci/make-check

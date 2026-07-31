@@ -169,7 +169,7 @@ def test_ovn_ci_children_inherit_execution(tree: Path) -> None:
 def test_plan_role_configuration_is_top_down(tree: Path) -> None:
     for path, default in (
         ("plans/ovn-ci/main.fmf", "git"),
-        ("plans/ovn-multihost/main.fmf", "artifact"),
+        ("plans/main.fmf", "artifact"),
     ):
         text = content(tree, path)
         assert f"OTT_INSTALL_METHOD: {default}" in text
@@ -193,7 +193,7 @@ def test_plan_role_configuration_is_top_down(tree: Path) -> None:
     ("path", "phase"),
     (
         ("plans/ovn-ci/main.fmf", None),
-        ("plans/ovn-multihost/main.fmf", "Set up OVN topology"),
+        ("plans/main.fmf", "Set up OVN topology"),
     ),
 )
 def test_install_configuration_is_complete(tree: Path, path: Path, phase: str) -> None:
@@ -224,7 +224,7 @@ def test_install_configuration_is_complete(tree: Path, path: Path, phase: str) -
 
 
 def test_multihost_parent_propagates_configuration(tree: Path) -> None:
-    path = "plans/ovn-multihost/main.fmf"
+    path = "plans/main.fmf"
     expected = (
         "playbook: playbooks/ovn-build-artifact.yml",
         "playbook: playbooks/multihost-driver.yml",
@@ -260,7 +260,7 @@ def test_multihost_parent_propagates_configuration(tree: Path) -> None:
 
 
 def test_multihost_diagnostics_are_general_and_top_down(tree: Path) -> None:
-    path = "plans/ovn-multihost/main.fmf"
+    path = "plans/main.fmf"
     metadata = yaml.safe_load(content(tree, path))
     start = prepare_phase(tree, path, "Start guest diagnostics")
     collect = metadata["finish"][0]
@@ -304,7 +304,7 @@ def test_multihost_tls_contract(tree: Path) -> None:
 
 
 def test_multihost_runtime_configuration_is_complete(tree: Path) -> None:
-    path = "plans/ovn-multihost/main.fmf"
+    path = "plans/main.fmf"
     driver = extra_variables(
         prepare_phase(tree, path, "Set up cross-guest test driver")
     )
@@ -380,19 +380,35 @@ def test_dpdk_plan_configuration_is_complete(tree: Path) -> None:
 
 
 def test_multihost_children_inherit_base(tree: Path) -> None:
-    parent = tree / "plans/ovn-multihost/main.fmf"
-    for plan in parent.parent.rglob("*.fmf"):
-        if plan.name == "main.fmf":
+    for family in ("ovn-fake-multinode", "ovn-scale-testing"):
+        for plan in (tree / "plans" / family).rglob("*.fmf"):
+            if plan.name == "main.fmf":
+                continue
+            assert "playbook: playbooks/multihost.yml" not in plan.read_text()
+            assert "enabled: true" in plan.read_text()
+
+
+def test_top_level_plan_inheritance_is_explicit(tree: Path) -> None:
+    plans = tree / "plans"
+    shared = {"ovn-fake-multinode", "ovn-scale-testing"}
+    assert {path.name for path in plans.iterdir() if path.is_dir()} >= shared
+
+    for family in (path for path in plans.iterdir() if path.is_dir()):
+        parent = family / "main.fmf"
+        if family.name in shared:
+            if parent.is_file():
+                assert "inherit: false" not in parent.read_text()
             continue
-        assert "playbook: playbooks/multihost.yml" not in plan.read_text()
-        assert "enabled: true" in plan.read_text()
+        assert parent.is_file(), family
+        metadata = yaml.safe_load(parent.read_text()) or {}
+        assert metadata.get("/", {}).get("inherit") is False, family
 
 
 def test_multihost_setup_is_test_scoped(tree: Path) -> None:
     plans = "\n".join(
-        path.read_text() for path in (tree / "plans/ovn-multihost").rglob("*.fmf")
+        path.read_text() for path in (tree / "plans/ovn-fake-multinode").rglob("*.fmf")
     )
-    for setup in (tree / "tests/multihost").glob("*/setup.yml"):
+    for setup in (tree / "tests/ovn-fake-multinode").glob("*/setup.yml"):
         if setup.parent.name == "gateway-nat":
             continue
         test = setup.with_name("test.py")
@@ -548,14 +564,14 @@ def test_artifact_role_contract(tree: Path) -> None:
 def test_scale_workload_contract(
     tree: Path, plan: Any, test: Any, settings: Any
 ) -> None:
-    plan_path = tree / "plans/ovn-multihost/ovn-scale-testing" / plan
-    test_dir = tree / "tests/scale" / test
+    plan_path = tree / "plans/ovn-scale-testing" / plan
+    test_dir = tree / "tests/ovn-scale-testing" / test
     assert plan_path.is_file()
     assert (test_dir / "main.fmf").is_file()
     assert (test_dir / "test.py").is_file()
     for setting in settings:
         assert setting in plan_path.read_text()
-    assert f"/tests/scale/{test}" in plan_path.read_text()
+    assert f"/tests/ovn-scale-testing/{test}" in plan_path.read_text()
     assert "duration: $OTT_SCALE_DURATION" in plan_path.read_text()
     assert "python3 -m pytest" in (test_dir / "main.fmf").read_text()
     assert "duration:" not in (test_dir / "main.fmf").read_text()
@@ -579,7 +595,7 @@ def test_scale_workload_contract(
 
 @pytest.mark.parametrize("mode", ("small", "large"))
 def test_label_policy_plans_share_one_workload(tree: Path, mode: str) -> None:
-    path = tree / "plans/ovn-multihost/ovn-scale-testing/np-labels" / f"{mode}.fmf"
+    path = tree / "plans/ovn-scale-testing/np-labels" / f"{mode}.fmf"
     metadata = yaml.safe_load(path.read_text())
 
     assert metadata["enabled"] is True
@@ -587,7 +603,7 @@ def test_label_policy_plans_share_one_workload(tree: Path, mode: str) -> None:
 
 
 def test_scale_workloads_inherit_common_configuration(tree: Path) -> None:
-    parent = content(tree, "plans/ovn-multihost/ovn-scale-testing/main.fmf")
+    parent = content(tree, "plans/ovn-scale-testing/main.fmf")
     for setting in (
         "OTT_SCALE_DURATION:",
         "OTT_SCALE_TIMEOUT:",

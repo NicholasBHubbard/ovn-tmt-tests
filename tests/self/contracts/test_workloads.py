@@ -43,7 +43,7 @@ def service_route_config() -> dict[str, Any]:
 
 
 def test_dpdk_version_line_need_not_be_first(tree: Path) -> None:
-    workload = runpy.run_path(str(tree / "tests/build/dpdk/test.py"))
+    workload = runpy.run_path(str(tree / "tests/ovn-ci/dpdk/test.py"))
 
     assert workload["supports_dpdk"](
         "ovs-vswitchd (Open vSwitch) 3.6.0\nDPDK 24.11.1\n"
@@ -52,7 +52,9 @@ def test_dpdk_version_line_need_not_be_first(tree: Path) -> None:
 
 
 def test_np_multitenant_reproduces_original_workload_shape(tree: Path) -> None:
-    workload = runpy.run_path(str(tree / "tests/scale/np-multitenant/test.py"))
+    workload = runpy.run_path(
+        str(tree / "tests/ovn-scale-testing/np-multitenant/test.py")
+    )
     ranges = workload["parse_ranges"]("200:5,480:20,495:100")
     config = {
         "namespaces": 500,
@@ -99,7 +101,9 @@ def test_np_multitenant_reproduces_original_workload_shape(tree: Path) -> None:
     ),
 )
 def test_np_multitenant_rejects_invalid_ranges(tree: Path, ranges: str) -> None:
-    workload = runpy.run_path(str(tree / "tests/scale/np-multitenant/test.py"))
+    workload = runpy.run_path(
+        str(tree / "tests/ovn-scale-testing/np-multitenant/test.py")
+    )
     config = {
         "namespaces": 2,
         "base_pods": 0,
@@ -127,7 +131,9 @@ def test_np_multitenant_rejects_invalid_ranges(tree: Path, ranges: str) -> None:
 
 
 def test_np_cross_namespace_reproduces_original_workload_shape(tree: Path) -> None:
-    workload = runpy.run_path(str(tree / "tests/scale/np-cross-namespace/test.py"))
+    workload = runpy.run_path(
+        str(tree / "tests/ovn-scale-testing/np-cross-namespace/test.py")
+    )
     config = {
         "namespaces": 10,
         "pods_per_namespace": 5,
@@ -167,7 +173,9 @@ def test_np_cross_namespace_rejects_invalid_configuration(
     name: str,
     value: Any,
 ) -> None:
-    workload = runpy.run_path(str(tree / "tests/scale/np-cross-namespace/test.py"))
+    workload = runpy.run_path(
+        str(tree / "tests/ovn-scale-testing/np-cross-namespace/test.py")
+    )
     config = {
         "namespaces": 10,
         "pods_per_namespace": 5,
@@ -192,7 +200,7 @@ def test_np_cross_namespace_rejects_invalid_configuration(
 
 @pytest.mark.parametrize("mode", ("small", "large"))
 def test_np_labels_reproduces_original_workload_shape(tree: Path, mode: str) -> None:
-    workload = runpy.run_path(str(tree / "tests/scale/np-labels/test.py"))
+    workload = runpy.run_path(str(tree / "tests/ovn-scale-testing/np-labels/test.py"))
     config = np_labels_config(mode)
 
     workload["validate_config"](config)
@@ -227,7 +235,7 @@ def test_np_labels_rejects_invalid_configuration(
     name: str,
     value: Any,
 ) -> None:
-    workload = runpy.run_path(str(tree / "tests/scale/np-labels/test.py"))
+    workload = runpy.run_path(str(tree / "tests/ovn-scale-testing/np-labels/test.py"))
     config = np_labels_config()
     config[name] = value
 
@@ -236,7 +244,9 @@ def test_np_labels_rejects_invalid_configuration(
 
 
 def test_service_route_reproduces_original_workload_shape(tree: Path) -> None:
-    workload = runpy.run_path(str(tree / "tests/scale/service-route/test.py"))
+    workload = runpy.run_path(
+        str(tree / "tests/ovn-scale-testing/service-route/test.py")
+    )
     config = service_route_config()
 
     workload["validate_config"](config)
@@ -270,7 +280,9 @@ def test_service_route_rejects_invalid_configuration(
     name: str,
     value: Any,
 ) -> None:
-    workload = runpy.run_path(str(tree / "tests/scale/service-route/test.py"))
+    workload = runpy.run_path(
+        str(tree / "tests/ovn-scale-testing/service-route/test.py")
+    )
     config = service_route_config()
     config[name] = value
 

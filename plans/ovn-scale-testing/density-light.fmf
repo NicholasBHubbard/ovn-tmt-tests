@@ -13,4 +13,4 @@ discover:
   adjust-tests:
     - duration: $OTT_SCALE_DURATION
   test:
-    - /tests/scale/density-light
+    - /tests/ovn-scale-testing/density-light

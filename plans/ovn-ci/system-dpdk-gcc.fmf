@@ -31,5 +31,5 @@ prepare+:
 discover:
   how: fmf
   test:
-    - /tests/build/make-check
-    - /tests/build/dpdk
+    - /tests/ovn-ci/make-check
+    - /tests/ovn-ci/dpdk

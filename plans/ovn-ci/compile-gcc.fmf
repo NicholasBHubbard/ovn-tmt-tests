@@ -10,4 +10,4 @@ provision:
 discover:
   how: fmf
   test:
-    - /tests/build/compile
+    - /tests/ovn-ci/compile

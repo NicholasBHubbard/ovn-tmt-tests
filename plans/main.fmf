@@ -1,4 +1,6 @@
-summary: Base configuration for OVN multihost tests
+# Shared only by the ovn-fake-multinode and ovn-scale-testing plan families.
+# Every other top-level family must disable inheritance in its main.fmf.
+summary: Base configuration for multihost replacement plans
 enabled: false
 
 environment:
@@ -146,7 +148,7 @@ discover:
   where:
     - compute
   test:
-    - /tests/multihost/connectivity
+    - /tests/ovn-fake-multinode/connectivity
 
 execute:
   how: tmt

@@ -1,3 +1,6 @@
+/:
+  inherit: false
+
 summary: Base configuration for OVN CI plans
 
 environment:

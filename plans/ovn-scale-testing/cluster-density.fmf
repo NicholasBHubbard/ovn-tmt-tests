@@ -50,4 +50,4 @@ discover:
   adjust-tests:
     - duration: $OTT_SCALE_DURATION
   test:
-    - /tests/scale/cluster-density
+    - /tests/ovn-scale-testing/cluster-density

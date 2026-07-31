@@ -1,7 +1,6 @@
-# Populate an OpenShift-like OVN cluster with namespaces of increasing pod
-# density, apply per-namespace default-deny and allow policies, and verify
-# permitted namespace and external-gateway traffic.
-summary: Measure multitenant OVN network-policy convergence
+# Create cluster-wide and per-worker load balancers backed by pod endpoints,
+# then measure their creation and verify the endpoint network paths.
+summary: Measure OVN service-route convergence
 enabled: true
 
 environment+:
@@ -9,23 +8,14 @@ environment+:
   OTT_COMPUTE_PHYSICAL_BRIDGE: br-ex
   OTT_COMPUTE_PHYSICAL_NETWORK: physnet
   OTT_MONITOR_ALL: "true"
-  OTT_SCALE_BASE_PODS_PER_WORKER: "10"
-  OTT_SCALE_DURATION: 6h
-  OTT_SCALE_EXTERNAL_IPV4_LARGE_START: 43.43.43.1
-  OTT_SCALE_EXTERNAL_IPV4_SMALL_START: 42.42.42.1
-  OTT_SCALE_EXTERNAL_IPV6_LARGE_START: "43:43:43::1"
-  OTT_SCALE_EXTERNAL_IPV6_SMALL_START: "42:42:42::1"
-  OTT_SCALE_EXTERNAL_LARGE_COUNT: "20"
-  OTT_SCALE_EXTERNAL_SMALL_COUNT: "3"
-  OTT_SCALE_IPV6: "false"
+  OTT_SCALE_BASE_PODS_PER_WORKER: "2"
+  OTT_SCALE_DURATION: 1h
+  OTT_SCALE_IPV6: "true"
   OTT_SCALE_LB_PROTOCOLS: tcp,udp,sctp
-  OTT_SCALE_NAMESPACES: "500"
-  OTT_SCALE_NAMESPACE_RANGES: 200:5,480:20,495:100
-  OTT_SCALE_POLICY_ALLOW_PRIORITY: "3"
-  OTT_SCALE_POLICY_CONTROL_PRIORITY: "2"
-  OTT_SCALE_POLICY_DENY_PRIORITY: "1"
+  OTT_SCALE_SERVICE_BACKENDS: "4"
+  OTT_SCALE_SERVICE_LOAD_BALANCERS: "16"
   OTT_SCALE_TOPOLOGY_PATH: /run/ovn-tmt-tests/scale-topology.json
-  OTT_SCALE_WORKERS: "250"
+  OTT_SCALE_WORKERS: "2"
 
 provision+:
   - name: central-2
@@ -40,7 +30,7 @@ provision+:
     connection: system
 
 prepare+:
-  - name: Prepare np-multitenant scale topology
+  - name: Prepare service-route scale topology
     how: ansible
     order: 70
     where: [central]
@@ -60,4 +50,4 @@ discover:
   adjust-tests:
     - duration: $OTT_SCALE_DURATION
   test:
-    - /tests/scale/np-multitenant
+    - /tests/ovn-scale-testing/service-route
