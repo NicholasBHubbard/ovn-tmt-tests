@@ -39,11 +39,16 @@
     OTT_INSTALL_METHOD: artifact
     OTT_MAKE_FLAGS: ""
     OTT_MONITOR_ALL: "false"
+    OTT_CENTRAL_LISTEN_ADDRESS: 0.0.0.0
+    OTT_CENTRAL_LOG_LEVEL: info
     OTT_NB_PORT: "6641"
+    OTT_NB_RAFT_PORT: "6643"
     OTT_PACKAGE_DIR: ""
     OTT_PACKAGE_FILES: "[]"
     OTT_PKI_REMOTE_DIR: /run/ovn-test-pki
+    OTT_RECONCILE_CLUSTER_MEMBERS: "true"
     OTT_SB_PORT: "6642"
+    OTT_SB_RAFT_PORT: "6644"
     OTT_SB_WAIT_TIMEOUT: "2700"
     OTT_SOURCE_DIR: /usr/src/ovn
     OTT_SSL_ENABLED: "false"
@@ -145,7 +150,12 @@
         -e ovn_multihost_clustered=$OTT_CLUSTERED
         -e ovn_multihost_monitor_all=$OTT_MONITOR_ALL
         -e ovn_multihost_nb_port=$OTT_NB_PORT
+        -e ovn_multihost_nb_raft_port=$OTT_NB_RAFT_PORT
         -e ovn_multihost_sb_port=$OTT_SB_PORT
+        -e ovn_multihost_sb_raft_port=$OTT_SB_RAFT_PORT
+        -e 'ovn_multihost_central_listen_address=$OTT_CENTRAL_LISTEN_ADDRESS'
+        -e ovn_multihost_central_log_level=$OTT_CENTRAL_LOG_LEVEL
+        -e ovn_multihost_reconcile_cluster_members=$OTT_RECONCILE_CLUSTER_MEMBERS
         -e ovn_multihost_sb_wait_timeout=$OTT_SB_WAIT_TIMEOUT
         -e 'ovn_compute_physical_bridge=$OTT_COMPUTE_PHYSICAL_BRIDGE'
         -e 'ovn_compute_physical_network=$OTT_COMPUTE_PHYSICAL_NETWORK'

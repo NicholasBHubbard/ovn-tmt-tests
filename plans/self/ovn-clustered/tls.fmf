@@ -1,0 +1,100 @@
+summary: OVN cluster with TLS and custom ports on Fedora
+
+environment:
+  OTT_TEST_CLUSTER_PROTOCOL: ssl
+  OTT_TEST_LISTEN_ADDRESS: "[::]"
+  OTT_TEST_NB_PORT: "16641"
+  OTT_TEST_NB_RAFT_PORT: "16643"
+  OTT_TEST_SB_PORT: "16642"
+  OTT_TEST_SB_RAFT_PORT: "16644"
+
+provision:
+  - name: central-1
+    role: leader
+    how: virtual
+    image: fedora
+    connection: system
+  - name: central-2
+    role: follower
+    how: virtual
+    image: fedora
+    connection: system
+  - name: central-3
+    role: follower
+    how: virtual
+    image: fedora
+    connection: system
+
+prepare+:
+  - name: Check preconditions on all nodes
+    how: shell
+    where: [leader, follower]
+    order: 80
+    script: python3 -m pytest ./tests/self/ovn-clustered/test.py::TestPreconditions
+
+  - name: Create OVN test PKI
+    how: ansible
+    where: [leader]
+    order: 85
+    playbook: playbooks/ovn-test-pki-create.yml
+    extra-args: >-
+      -e ovn_test_pki_enabled=true
+      -e ovn_test_pki_builder_hosts=leader
+
+  - name: Install OVN test PKI
+    how: ansible
+    order: 86
+    playbook: playbooks/ovn-test-pki-install.yml
+    extra-args: '-e ovn_test_pki_enabled=true'
+
+  - name: Set up TLS cluster leader
+    how: ansible
+    order: 90
+    playbook: playbooks/ovn-clustered.yml
+    extra-args: &cluster_args >-
+      -e ovn_install_method=distro
+      -e ovs_setup_install_method=distro
+      -e ovn_central_ssl_enabled=true
+      -e ovn_central_ssl_private_key=/run/ovn-test-pki/private-key.pem
+      -e ovn_central_ssl_certificate=/run/ovn-test-pki/certificate.pem
+      -e ovn_central_ssl_ca_cert=/run/ovn-test-pki/ca-cert.pem
+      -e ovn_central_listen_address=::
+      -e ovn_central_nb_port=$OTT_TEST_NB_PORT
+      -e ovn_central_sb_port=$OTT_TEST_SB_PORT
+      -e ovn_central_nb_raft_port=$OTT_TEST_NB_RAFT_PORT
+      -e ovn_central_sb_raft_port=$OTT_TEST_SB_RAFT_PORT
+    where: [leader]
+
+  - name: Set up TLS cluster followers
+    how: ansible
+    order: 100
+    playbook: playbooks/ovn-clustered.yml
+    extra-args: *cluster_args
+    where: [follower]
+
+  - name: Reapply TLS cluster leader configuration
+    how: ansible
+    order: 105
+    playbook: playbooks/ovn-clustered.yml
+    extra-args: *cluster_args
+    where: [leader]
+
+  - name: Reapply TLS cluster follower configuration
+    how: ansible
+    order: 106
+    playbook: playbooks/ovn-clustered.yml
+    extra-args: *cluster_args
+    where: [follower]
+
+  - name: Verify northd connections on all nodes
+    how: shell
+    where: [leader, follower]
+    order: 110
+    script: python3 -m pytest ./tests/self/ovn-clustered/test.py::TestNorthdConnections
+
+discover:
+  - how: fmf
+    where:
+      - leader
+    test:
+      - /tests/self/ovn-clustered

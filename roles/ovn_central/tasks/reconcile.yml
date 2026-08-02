@@ -1,0 +1,116 @@
+- name: Read OVN NB cluster status
+  ansible.builtin.command:
+    cmd: >-
+      ovn-appctl -t {{ ovn_central_nb_control_socket_resolved }}
+      cluster/status OVN_Northbound
+  register: ovn_central_nb_cluster_status
+  changed_when: false
+
+- name: Read OVN SB cluster status
+  ansible.builtin.command:
+    cmd: >-
+      ovn-appctl -t {{ ovn_central_sb_control_socket_resolved }}
+      cluster/status OVN_Southbound
+  register: ovn_central_sb_cluster_status
+  changed_when: false
+
+- name: Verify local OVN cluster addresses
+  ansible.builtin.assert:
+    that:
+      - >-
+        'Address: ' ~ ovn_central_raft_protocol ~ ':'
+        ~ ovn_central_rendered_address ~ ':'
+        ~ (ovn_central_nb_raft_port | string)
+        in ovn_central_nb_cluster_status.stdout
+      - >-
+        'Address: ' ~ ovn_central_raft_protocol ~ ':'
+        ~ ovn_central_rendered_address ~ ':'
+        ~ (ovn_central_sb_raft_port | string)
+        in ovn_central_sb_cluster_status.stdout
+    fail_msg: >-
+      An existing OVN database uses a different local Raft address, port, or
+      protocol. Reprovision this cluster member before applying the new identity.
+
+- name: Resolve obsolete OVN cluster members
+  when:
+    - ovn_central_reconcile_cluster_members | bool
+    - ovn_central_resolved_address == ovn_central_cluster_members[0]
+  ansible.builtin.set_fact:
+    ovn_central_obsolete_nb_members: >-
+      {{ (ovn_central_nb_cluster_status.stdout
+          | regex_findall(' at ([^ )]+)'))
+         | difference(ovn_central_nb_raft_remotes) }}
+    ovn_central_obsolete_sb_members: >-
+      {{ (ovn_central_sb_cluster_status.stdout
+          | regex_findall(' at ([^ )]+)'))
+         | difference(ovn_central_sb_raft_remotes) }}
+
+- name: Remove obsolete OVN NB cluster members
+  when:
+    - ovn_central_reconcile_cluster_members | bool
+    - ovn_central_resolved_address == ovn_central_cluster_members[0]
+  ansible.builtin.command:
+    argv:
+      - ovn-appctl
+      - -t
+      - "{{ ovn_central_nb_control_socket_resolved }}"
+      - cluster/kick
+      - OVN_Northbound
+      - "{{ item }}"
+  loop: "{{ ovn_central_obsolete_nb_members }}"
+  loop_control:
+    label: "{{ item }}"
+  changed_when: true
+
+- name: Remove obsolete OVN SB cluster members
+  when:
+    - ovn_central_reconcile_cluster_members | bool
+    - ovn_central_resolved_address == ovn_central_cluster_members[0]
+  ansible.builtin.command:
+    argv:
+      - ovn-appctl
+      - -t
+      - "{{ ovn_central_sb_control_socket_resolved }}"
+      - cluster/kick
+      - OVN_Southbound
+      - "{{ item }}"
+  loop: "{{ ovn_central_obsolete_sb_members }}"
+  loop_control:
+    label: "{{ item }}"
+  changed_when: true
+
+- name: Wait for OVN NB cluster membership reconciliation
+  when:
+    - ovn_central_reconcile_cluster_members | bool
+    - ovn_central_resolved_address == ovn_central_cluster_members[0]
+  ansible.builtin.command:
+    cmd: >-
+      ovn-appctl -t {{ ovn_central_nb_control_socket_resolved }}
+      cluster/status OVN_Northbound
+  register: ovn_central_reconciled_nb_status
+  until: >-
+    (ovn_central_reconciled_nb_status.stdout
+     | regex_findall(' at ([^ )]+)')
+     | difference(ovn_central_nb_raft_remotes)
+     | length) == 0
+  retries: "{{ ovn_central_ready_retries }}"
+  delay: "{{ ovn_central_ready_delay }}"
+  changed_when: false
+
+- name: Wait for OVN SB cluster membership reconciliation
+  when:
+    - ovn_central_reconcile_cluster_members | bool
+    - ovn_central_resolved_address == ovn_central_cluster_members[0]
+  ansible.builtin.command:
+    cmd: >-
+      ovn-appctl -t {{ ovn_central_sb_control_socket_resolved }}
+      cluster/status OVN_Southbound
+  register: ovn_central_reconciled_sb_status
+  until: >-
+    (ovn_central_reconciled_sb_status.stdout
+     | regex_findall(' at ([^ )]+)')
+     | difference(ovn_central_sb_raft_remotes)
+     | length) == 0
+  retries: "{{ ovn_central_ready_retries }}"
+  delay: "{{ ovn_central_ready_delay }}"
+  changed_when: false

@@ -1,10 +1,18 @@
 ovn_central_nb_port: 6641
 ovn_central_sb_port: 6642
+ovn_central_nb_raft_port: 6643
+ovn_central_sb_raft_port: 6644
+ovn_central_listen_address: 0.0.0.0
 ovn_central_cluster_members: []
 ovn_central_cluster_join_timeout: 2700
+ovn_central_ready_timeout: "{{ ovn_central_cluster_join_timeout }}"
+ovn_central_ready_delay: 2
+ovn_central_reconcile_cluster_members: true
 ovn_central_ssl_enabled: false
 ovn_central_log_level: info
-ovn_central_db_dir: /var/lib/openvswitch
+ovn_central_ovn_ctl_path: ""
+ovn_central_nb_control_socket: ""
+ovn_central_sb_control_socket: ""
 
 ovn_central_ssl_private_key: /etc/openvswitch/ovn-privkey.pem
 ovn_central_ssl_certificate: /etc/openvswitch/ovn-cert.pem

@@ -31,3 +31,14 @@ prepare:
       -e ovn_central_ssl_private_key=/run/ovn-test-pki/private-key.pem
       -e ovn_central_ssl_certificate=/run/ovn-test-pki/certificate.pem
       -e ovn_central_ssl_ca_cert=/run/ovn-test-pki/ca-cert.pem
+  - name: Reapply SSL OVN central configuration
+    how: ansible
+    order: 120
+    playbook: playbooks/ovn-central.yml
+    extra-args: >-
+      -e ovn_install_method=distro
+      -e ovs_setup_install_method=distro
+      -e ovn_central_ssl_enabled=true
+      -e ovn_central_ssl_private_key=/run/ovn-test-pki/private-key.pem
+      -e ovn_central_ssl_certificate=/run/ovn-test-pki/certificate.pem
+      -e ovn_central_ssl_ca_cert=/run/ovn-test-pki/ca-cert.pem

@@ -291,6 +291,11 @@ def test_multihost_parent_propagates_configuration(tree: Path) -> None:
         "-e ovn_multihost_clustered=$OTT_CLUSTERED",
         "-e ovn_multihost_monitor_all=$OTT_MONITOR_ALL",
         "-e ovn_multihost_nb_port=$OTT_NB_PORT",
+        "-e ovn_multihost_nb_raft_port=$OTT_NB_RAFT_PORT",
+        "-e ovn_multihost_sb_raft_port=$OTT_SB_RAFT_PORT",
+        "-e 'ovn_multihost_central_listen_address=$OTT_CENTRAL_LISTEN_ADDRESS'",
+        "-e ovn_multihost_central_log_level=$OTT_CENTRAL_LOG_LEVEL",
+        "-e ovn_multihost_reconcile_cluster_members=$OTT_RECONCILE_CLUSTER_MEMBERS",
     )
     for value in expected:
         assert_contains(tree, path, value)
@@ -334,7 +339,7 @@ def test_multihost_tls_contract(tree: Path) -> None:
         "if ovn_multihost_ssl_enabled | default(false) | bool",
     )
     assert_contains(tree, "playbooks/multihost.yml", "ovn_multihost_pki_dir")
-    assert_contains(tree, "roles/ovn_central/tasks/main.yml", "del-ssl")
+    assert_contains(tree, "roles/ovn_central/tasks/listeners.yml", "del-ssl")
     assert_contains(tree, "roles/ovs_setup/tasks/configure.yml", "del-ssl")
     assert_contains(
         tree,
@@ -375,6 +380,11 @@ def test_multihost_runtime_configuration_is_complete(tree: Path) -> None:
             "ovn_multihost_clustered": "$OTT_CLUSTERED",
             "ovn_multihost_monitor_all": "$OTT_MONITOR_ALL",
             "ovn_multihost_nb_port": "$OTT_NB_PORT",
+            "ovn_multihost_nb_raft_port": "$OTT_NB_RAFT_PORT",
+            "ovn_multihost_sb_raft_port": "$OTT_SB_RAFT_PORT",
+            "ovn_multihost_central_listen_address": "$OTT_CENTRAL_LISTEN_ADDRESS",
+            "ovn_multihost_central_log_level": "$OTT_CENTRAL_LOG_LEVEL",
+            "ovn_multihost_reconcile_cluster_members": "$OTT_RECONCILE_CLUSTER_MEMBERS",
             "ovn_compute_physical_bridge": "$OTT_COMPUTE_PHYSICAL_BRIDGE",
             "ovn_compute_physical_network": "$OTT_COMPUTE_PHYSICAL_NETWORK",
             "ovn_gateway_chassis_name": "$OTT_GATEWAY_CHASSIS_NAME",

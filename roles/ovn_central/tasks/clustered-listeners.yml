@@ -1,0 +1,57 @@
+- name: Read clustered OVN database remotes
+  ansible.builtin.command:
+    argv:
+      - ovn-appctl
+      - -t
+      - "{{ item }}"
+      - ovsdb-server/list-remotes
+  loop:
+    - "{{ ovn_central_nb_control_socket_resolved }}"
+    - "{{ ovn_central_sb_control_socket_resolved }}"
+  register: ovn_central_database_remotes
+  changed_when: false
+
+- name: Remove obsolete clustered OVN database remotes
+  when:
+    - item.1 is not match('^punix:')
+    - item.1 != ovn_central_desired_listener
+  ansible.builtin.command:
+    argv:
+      - ovn-appctl
+      - -t
+      - "{{ item.0.item }}"
+      - ovsdb-server/remove-remote
+      - "{{ item.1 }}"
+  loop: >-
+    {{ ovn_central_database_remotes.results
+       | subelements('stdout_lines', skip_missing=true) }}
+  loop_control:
+    label: "{{ item.1 }}"
+  vars:
+    ovn_central_desired_listener: >-
+      {{ ovn_central_nb_listener
+         if item.0.item == ovn_central_nb_control_socket_resolved
+         else ovn_central_sb_listener }}
+  changed_when: true
+
+- name: Add clustered OVN database listeners
+  when: item.listener not in ovn_central_existing_remotes.stdout_lines
+  ansible.builtin.command:
+    argv:
+      - ovn-appctl
+      - -t
+      - "{{ item.daemon }}"
+      - ovsdb-server/add-remote
+      - "{{ item.listener }}"
+  loop:
+    - daemon: "{{ ovn_central_nb_control_socket_resolved }}"
+      listener: "{{ ovn_central_nb_listener }}"
+    - daemon: "{{ ovn_central_sb_control_socket_resolved }}"
+      listener: "{{ ovn_central_sb_listener }}"
+  loop_control:
+    label: "{{ item.listener }}"
+  vars:
+    ovn_central_existing_remotes: >-
+      {{ ovn_central_database_remotes.results
+         | selectattr('item', 'equalto', item.daemon) | first }}
+  changed_when: true

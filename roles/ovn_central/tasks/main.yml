@@ -1,36 +1,125 @@
+- name: Verify OVN central configuration
+  ansible.builtin.assert:
+    that:
+      - (ovn_central_nb_port | int) in range(1, 65536)
+      - (ovn_central_sb_port | int) in range(1, 65536)
+      - (ovn_central_nb_raft_port | int) in range(1, 65536)
+      - (ovn_central_sb_raft_port | int) in range(1, 65536)
+      - (ovn_central_cluster_join_timeout | int) > 0
+      - (ovn_central_ready_timeout | int) > 0
+      - (ovn_central_ready_delay | int) > 0
+      - >-
+        [ovn_central_nb_port | int, ovn_central_sb_port | int,
+         ovn_central_nb_raft_port | int, ovn_central_sb_raft_port | int]
+        | unique | length == 4
+      - >-
+        ovn_central_cluster_members | unique | length
+        == ovn_central_cluster_members | length
+    fail_msg: "OVN central ports, timeouts, and cluster members must be valid."
+
 - name: Verify OVN binaries are installed
   ansible.builtin.command:
     cmd: which ovn-northd
   changed_when: false
 
-- name: Resolve OVN central address
+- name: Resolve OVN central addresses
   ansible.builtin.set_fact:
-    ovn_central_address: "{{ ansible_host | default(inventory_hostname) }}"
-  changed_when: false
+    ovn_central_resolved_address: >-
+      {{ (ovn_central_address
+          | default(ansible_host | default(inventory_hostname))) | string }}
+    ovn_central_ready_retries: >-
+      {{ [(((ovn_central_ready_timeout | int)
+            + (ovn_central_ready_delay | int) - 1)
+           // (ovn_central_ready_delay | int)), 1] | max }}
+    ovn_central_raft_protocol: >-
+      {{ 'ssl' if ovn_central_ssl_enabled | bool else 'tcp' }}
+  tags: topology-resolution
+
+- name: Render OVN central addresses
+  ansible.builtin.set_fact:
+    ovn_central_rendered_address: >-
+      {{ '[' ~ ovn_central_resolved_address ~ ']'
+         if ':' in ovn_central_resolved_address
+            and ovn_central_resolved_address[0] != '['
+         else ovn_central_resolved_address }}
+    ovn_central_rendered_listen_address: >-
+      {{ '[' ~ ovn_central_listen_address ~ ']'
+         if ':' in ovn_central_listen_address
+            and ovn_central_listen_address[0] != '['
+         else ovn_central_listen_address }}
+    ovn_central_cluster_leader_address: >-
+      {{ '[' ~ (ovn_central_cluster_members[0] | string) ~ ']'
+         if ovn_central_cluster_members | length > 0
+            and ':' in (ovn_central_cluster_members[0] | string)
+            and (ovn_central_cluster_members[0] | string)[0] != '['
+         else (ovn_central_cluster_members[0] | default('') | string) }}
+    ovn_central_northd_nb_remotes: []
+    ovn_central_northd_sb_remotes: []
+    ovn_central_nb_raft_remotes: []
+    ovn_central_sb_raft_remotes: []
+  tags: topology-resolution
+
+- name: Build OVN central remote lists
+  when: ovn_central_cluster_members | length > 0
+  ansible.builtin.set_fact:
+    ovn_central_northd_nb_remotes: >-
+      {{ ovn_central_northd_nb_remotes
+         + [('ssl' if ovn_central_ssl_enabled | bool else 'tcp')
+            ~ ':' ~ ovn_central_member_address ~ ':'
+            ~ (ovn_central_nb_port | string)] }}
+    ovn_central_northd_sb_remotes: >-
+      {{ ovn_central_northd_sb_remotes
+         + [('ssl' if ovn_central_ssl_enabled | bool else 'tcp')
+            ~ ':' ~ ovn_central_member_address ~ ':'
+            ~ (ovn_central_sb_port | string)] }}
+    ovn_central_nb_raft_remotes: >-
+      {{ ovn_central_nb_raft_remotes
+         + [ovn_central_raft_protocol ~ ':' ~ ovn_central_member_address
+            ~ ':' ~ (ovn_central_nb_raft_port | string)] }}
+    ovn_central_sb_raft_remotes: >-
+      {{ ovn_central_sb_raft_remotes
+         + [ovn_central_raft_protocol ~ ':' ~ ovn_central_member_address
+            ~ ':' ~ (ovn_central_sb_raft_port | string)] }}
+  loop: "{{ ovn_central_cluster_members }}"
+  vars:
+    ovn_central_member_address: >-
+      {{ '[' ~ (item | string) ~ ']'
+         if ':' in (item | string) and (item | string)[0] != '['
+         else (item | string) }}
+  tags: topology-resolution
+
+- name: Verify this host belongs to the requested cluster
+  when: ovn_central_cluster_members | length > 0
+  ansible.builtin.assert:
+    that:
+      - ovn_central_resolved_address in ovn_central_cluster_members
+    fail_msg: >-
+      This host's ovn_central_address must appear in
+      ovn_central_cluster_members.
 
 - name: Verify OVS is running
   ansible.builtin.command:
     cmd: ovs-vsctl show
   changed_when: false
 
-- name: Ensure OVN database directory exists
-  ansible.builtin.file:
-    path: "{{ ovn_central_db_dir }}"
-    state: directory
-    mode: "0755"
-
 - name: Gather service facts
-  when: ansible_facts["service_mgr"] == 'systemd'
   ansible.builtin.service_facts:
 
-- name: Set ovn-northd service availability
+- name: Select OVN central service
   ansible.builtin.set_fact:
-    ovn_has_northd_service: >-
-      {{ ansible_facts["service_mgr"] == 'systemd'
-         and 'ovn-northd.service' in (ansible_facts.services | default({})) }}
+    ovn_central_service_name: >-
+      {{ 'ovn-northd'
+         if 'ovn-northd.service' in (ansible_facts.services | default({}))
+         else 'ovn-central'
+         if 'ovn-central.service' in (ansible_facts.services | default({}))
+         else '' }}
 
 - name: Find ovn-ctl script
-  when: not ovn_has_northd_service or (ovn_central_cluster_members | length > 0)
+  when:
+    - ovn_central_ovn_ctl_path | length == 0
+    - >-
+      ovn_central_service_name | length == 0
+      or ovn_central_cluster_members | length > 0
   ansible.builtin.find:
     paths:
       - /usr
@@ -38,153 +127,36 @@
     patterns: ovn-ctl
     file_type: file
     recurse: true
-  register: ovn_ctl_find
+  register: ovn_central_ovn_ctl_find
 
 - name: Select ovn-ctl script
-  when: not ovn_has_northd_service or (ovn_central_cluster_members | length > 0)
+  when: >-
+    ovn_central_service_name | length == 0
+    or ovn_central_cluster_members | length > 0
   ansible.builtin.set_fact:
-    ovn_ctl_path: "{{ (ovn_ctl_find.files | map(attribute='path') | list | first) | default('') }}"
+    ovn_central_ovn_ctl_resolved_path: >-
+      {{ ovn_central_ovn_ctl_path
+         if ovn_central_ovn_ctl_path | length > 0
+         else ((ovn_central_ovn_ctl_find.files
+                | default([]) | sort(attribute='path')
+                | map(attribute='path') | first) | default('')) }}
 
 - name: Verify ovn-ctl script exists
-  when: not ovn_has_northd_service or (ovn_central_cluster_members | length > 0)
+  when: >-
+    ovn_central_service_name | length == 0
+    or ovn_central_cluster_members | length > 0
   ansible.builtin.assert:
     that:
-      - ovn_ctl_path | length > 0
-    fail_msg: "Could not find ovn-ctl under /usr or /usr/local."
+      - ovn_central_ovn_ctl_resolved_path | length > 0
+    fail_msg: "Set ovn_central_ovn_ctl_path to the installed ovn-ctl script."
 
-# --- Standalone mode ---
+- name: Configure standalone OVN central services
+  when: ovn_central_cluster_members | length == 0
+  ansible.builtin.include_tasks: standalone.yml
 
-- name: Start OVN central via systemd
-  when:
-    - ovn_has_northd_service
-    - ovn_central_cluster_members | length == 0
-  ansible.builtin.service:
-    name: ovn-northd
-    state: started
-    enabled: true
-
-- name: Start OVN central via ovn-ctl
-  when:
-    - not ovn_has_northd_service
-    - ovn_central_cluster_members | length == 0
-  ansible.builtin.command:
-    cmd: >-
-      {{ ovn_ctl_path }}
-      --db-nb-create-insecure-remote=yes
-      --db-sb-create-insecure-remote=yes
-      --ovn-northd-log="-vfile:{{ ovn_central_log_level }}"
-      start_northd
-  changed_when: true
-
-# --- Open Raft ports before cluster start ---
-
-- name: Open OVN Raft ports in firewall
-  when:
-    - ovn_central_cluster_members | length > 0
-    - "'firewalld.service' in (ansible_facts.services | default({}))"
-    - "(ansible_facts.services['firewalld.service'].state | default('')) == 'running'"
-  ansible.posix.firewalld:
-    port: "{{ item }}/tcp"
-    state: enabled
-    immediate: true
-  loop:
-    - "6643"
-    - "6644"
-
-# --- Clustered mode ---
-
-- name: Start OVN NB cluster (leader)
-  when:
-    - ovn_central_cluster_members | length > 0
-    - ovn_central_address == ovn_central_cluster_members[0]
-  ansible.builtin.command:
-    cmd: >-
-      {{ ovn_ctl_path }}
-      --db-nb-cluster-local-addr={{ ovn_central_address }}
-      start_nb_ovsdb
-  changed_when: true
-
-- name: Start OVN SB cluster (leader)
-  when:
-    - ovn_central_cluster_members | length > 0
-    - ovn_central_address == ovn_central_cluster_members[0]
-  ansible.builtin.command:
-    cmd: >-
-      {{ ovn_ctl_path }}
-      --db-sb-cluster-local-addr={{ ovn_central_address }}
-      start_sb_ovsdb
-  changed_when: true
-
-- name: Wait for OVN cluster leader
-  when:
-    - ovn_central_cluster_members | length > 0
-    - ovn_central_address != ovn_central_cluster_members[0]
-  ansible.builtin.wait_for:
-    host: "{{ ovn_central_cluster_members[0] }}"
-    port: "{{ item }}"
-    timeout: "{{ ovn_central_cluster_join_timeout }}"
-  loop:
-    - 6643
-    - 6644
-
-- name: Start OVN NB cluster (follower)
-  when:
-    - ovn_central_cluster_members | length > 0
-    - ovn_central_address != ovn_central_cluster_members[0]
-  ansible.builtin.command:
-    cmd: >-
-      {{ ovn_ctl_path }}
-      --db-nb-cluster-local-addr={{ ovn_central_address }}
-      --db-nb-cluster-remote-addr={{ ovn_central_cluster_members[0] }}
-      start_nb_ovsdb
-  changed_when: true
-
-- name: Start OVN SB cluster (follower)
-  when:
-    - ovn_central_cluster_members | length > 0
-    - ovn_central_address != ovn_central_cluster_members[0]
-  ansible.builtin.command:
-    cmd: >-
-      {{ ovn_ctl_path }}
-      --db-sb-cluster-local-addr={{ ovn_central_address }}
-      --db-sb-cluster-remote-addr={{ ovn_central_cluster_members[0] }}
-      start_sb_ovsdb
-  changed_when: true
-
-- name: Resolve clustered ovn-northd database connections
+- name: Configure clustered OVN databases
   when: ovn_central_cluster_members | length > 0
-  vars:
-    ovn_central_northd_protocol: >-
-      {{ 'ssl' if ovn_central_ssl_enabled | bool else 'tcp' }}
-  ansible.builtin.set_fact:
-    ovn_central_northd_nb_db: >-
-      {{ ovn_central_cluster_members
-         | map('regex_replace', '^', ovn_central_northd_protocol ~ ':')
-         | map('regex_replace', '$', ':' ~ (ovn_central_nb_port | string))
-         | join(',') }}
-    ovn_central_northd_sb_db: >-
-      {{ ovn_central_cluster_members
-         | map('regex_replace', '^', ovn_central_northd_protocol ~ ':')
-         | map('regex_replace', '$', ':' ~ (ovn_central_sb_port | string))
-         | join(',') }}
-
-- name: Start ovn-northd (clustered)
-  when: ovn_central_cluster_members | length > 0
-  ansible.builtin.command:
-    cmd: >-
-      ovn-northd
-      --ovnnb-db={{ ovn_central_northd_nb_db }}
-      --ovnsb-db={{ ovn_central_northd_sb_db }}
-      {% if ovn_central_ssl_enabled | bool %}
-      --private-key={{ ovn_central_ssl_private_key }}
-      --certificate={{ ovn_central_ssl_certificate }}
-      --ca-cert={{ ovn_central_ssl_ca_cert }}
-      {% endif %}
-      --pidfile --detach --log-file
-      -vconsole:off -vfile:{{ ovn_central_log_level }}
-  changed_when: true
-
-# --- Wait for databases ---
+  ansible.builtin.include_tasks: cluster.yml
 
 - name: Wait for NB database to be ready
   ansible.builtin.command:
@@ -192,10 +164,10 @@
       ovn-nbctl
       {% if ovn_central_cluster_members | length > 0 %}--no-leader-only{% endif %}
       show
-  retries: 10
-  delay: 2
-  register: nb_ready
-  until: nb_ready.rc == 0
+  retries: "{{ ovn_central_ready_retries }}"
+  delay: "{{ ovn_central_ready_delay }}"
+  register: ovn_central_nb_ready
+  until: ovn_central_nb_ready.rc == 0
   changed_when: false
 
 - name: Wait for SB database to be ready
@@ -204,92 +176,72 @@
       ovn-sbctl
       {% if ovn_central_cluster_members | length > 0 %}--no-leader-only{% endif %}
       show
-  retries: 10
-  delay: 2
-  register: sb_ready
-  until: sb_ready.rc == 0
+  retries: "{{ ovn_central_ready_retries }}"
+  delay: "{{ ovn_central_ready_delay }}"
+  register: ovn_central_sb_ready
+  until: ovn_central_sb_ready.rc == 0
   changed_when: false
 
-# --- Open firewall ports ---
+- name: Read OVN database process arguments
+  when: ovn_central_cluster_members | length > 0
+  ansible.builtin.command:
+    argv:
+      - pgrep
+      - -a
+      - -x
+      - ovsdb-server
+  register: ovn_central_database_processes
+  changed_when: false
 
-- name: Gather service facts
-  ansible.builtin.service_facts:
-
-- name: Open OVN database ports in firewall
-  when:
-    - "'firewalld.service' in ansible_facts.services"
-    - "ansible_facts.services['firewalld.service'].state == 'running'"
-  ansible.posix.firewalld:
-    port: "{{ item }}/tcp"
-    state: enabled
-    immediate: true
-  loop:
-    - "{{ ovn_central_nb_port }}"
-    - "{{ ovn_central_sb_port }}"
-
-# --- Configure listeners ---
-
-- name: Set ovn-nbctl/sbctl cluster args
+- name: Resolve OVN database control sockets
   when: ovn_central_cluster_members | length > 0
   ansible.builtin.set_fact:
-    ovn_ctl_cluster_args: "--no-leader-only"
+    ovn_central_nb_control_socket_resolved: >-
+      {{ ovn_central_nb_control_socket
+         if ovn_central_nb_control_socket | length > 0
+         else (ovn_central_database_processes.stdout
+               | regex_findall('--unixctl=([^ ]*/ovnnb_db[.]ctl)(?: |$)')
+               | first | default('')) }}
+    ovn_central_sb_control_socket_resolved: >-
+      {{ ovn_central_sb_control_socket
+         if ovn_central_sb_control_socket | length > 0
+         else (ovn_central_database_processes.stdout
+               | regex_findall('--unixctl=([^ ]*/ovnsb_db[.]ctl)(?: |$)')
+               | first | default('')) }}
 
-- name: Configure NB TCP listener
-  when: not (ovn_central_ssl_enabled | bool)
-  ansible.builtin.command:
-    cmd: "ovn-nbctl {{ ovn_ctl_cluster_args | default('') }} set-connection ptcp:{{ ovn_central_nb_port }}:0.0.0.0"
-  changed_when: true
-
-- name: Configure SB TCP listener
-  when: not (ovn_central_ssl_enabled | bool)
-  ansible.builtin.command:
-    cmd: "ovn-sbctl {{ ovn_ctl_cluster_args | default('') }} set-connection ptcp:{{ ovn_central_sb_port }}:0.0.0.0"
-  changed_when: true
-
-- name: Clear NB SSL configuration
-  when: not (ovn_central_ssl_enabled | bool)
-  ansible.builtin.command:
-    cmd: "ovn-nbctl {{ ovn_ctl_cluster_args | default('') }} del-ssl"
-  changed_when: true
-
-- name: Clear SB SSL configuration
-  when: not (ovn_central_ssl_enabled | bool)
-  ansible.builtin.command:
-    cmd: "ovn-sbctl {{ ovn_ctl_cluster_args | default('') }} del-ssl"
-  changed_when: true
-
-# --- TLS configuration ---
-
-- name: Configure NB SSL certificates
-  when: ovn_central_ssl_enabled | bool
-  ansible.builtin.command:
-    cmd: >-
-      ovn-nbctl {{ ovn_ctl_cluster_args | default('') }}
-      set-ssl {{ ovn_central_ssl_private_key }} {{ ovn_central_ssl_certificate }} {{ ovn_central_ssl_ca_cert }}
-  changed_when: true
-
-- name: Configure SB SSL certificates
-  when: ovn_central_ssl_enabled | bool
-  ansible.builtin.command:
-    cmd: >-
-      ovn-sbctl {{ ovn_ctl_cluster_args | default('') }}
-      set-ssl {{ ovn_central_ssl_private_key }} {{ ovn_central_ssl_certificate }} {{ ovn_central_ssl_ca_cert }}
-  changed_when: true
-
-- name: Configure NB SSL listener
-  when: ovn_central_ssl_enabled | bool
-  ansible.builtin.command:
-    cmd: "ovn-nbctl {{ ovn_ctl_cluster_args | default('') }} set-connection pssl:{{ ovn_central_nb_port }}:0.0.0.0"
-  changed_when: true
-
-- name: Configure SB SSL listener
-  when: ovn_central_ssl_enabled | bool
-  ansible.builtin.command:
-    cmd: "ovn-sbctl {{ ovn_ctl_cluster_args | default('') }} set-connection pssl:{{ ovn_central_sb_port }}:0.0.0.0"
-  changed_when: true
-
-- name: Wait for clustered ovn-northd database connections
+- name: Verify OVN database control sockets exist
   when: ovn_central_cluster_members | length > 0
+  ansible.builtin.assert:
+    that:
+      - ovn_central_nb_control_socket_resolved | length > 0
+      - ovn_central_sb_control_socket_resolved | length > 0
+    fail_msg: "Could not find the OVN database control sockets."
+
+- name: Configure OVN database listeners
+  ansible.builtin.include_tasks: listeners.yml
+
+- name: Reconcile OVN database cluster membership
+  when: ovn_central_cluster_members | length > 0
+  ansible.builtin.include_tasks: reconcile.yml
+
+- name: Start clustered ovn-northd
+  when: ovn_central_cluster_members | length > 0
+  ansible.builtin.command:
+    cmd: >-
+      {{ ovn_central_ovn_ctl_resolved_path }}
+      --ovn-manage-ovsdb=no
+      --ovn-northd-nb-db={{ ovn_central_northd_nb_remotes | join(',') }}
+      --ovn-northd-sb-db={{ ovn_central_northd_sb_remotes | join(',') }}
+      --ovn-northd-log="-vconsole:off -vfile:{{ ovn_central_log_level }}"
+      {% if ovn_central_ssl_enabled | bool %}
+      --ovn-northd-ssl-key={{ ovn_central_ssl_private_key }}
+      --ovn-northd-ssl-cert={{ ovn_central_ssl_certificate }}
+      --ovn-northd-ssl-ca-cert={{ ovn_central_ssl_ca_cert }}
+      {% endif %}
+      restart_northd
+  changed_when: true
+
+- name: Wait for ovn-northd database connections
   ansible.builtin.command:
     cmd: "ovn-appctl -t ovn-northd {{ item }}-connection-status"
   loop:
@@ -297,6 +249,16 @@
     - sb
   register: ovn_central_northd_connection
   until: ovn_central_northd_connection.stdout | trim == 'connected'
-  retries: 10
-  delay: 2
+  retries: "{{ ovn_central_ready_retries }}"
+  delay: "{{ ovn_central_ready_delay }}"
+  changed_when: false
+
+- name: Apply ovn-northd log level
+  ansible.builtin.command:
+    argv:
+      - ovn-appctl
+      - -t
+      - ovn-northd
+      - vlog/set
+      - "file:{{ ovn_central_log_level }}"
   changed_when: false

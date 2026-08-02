@@ -18,7 +18,8 @@
       ansible.builtin.set_fact:
         ovn_central_cluster_members: >-
           {{ ovn_central_cluster_members
-             + [hostvars[item]['ansible_host'] | default(item)] }}
+             + [hostvars[item]['ovn_central_address']
+                | default(hostvars[item]['ansible_host'] | default(item))] }}
       loop: >-
         {{ groups['central'] | default([])
            + (groups['central-follower'] | default([])
@@ -31,8 +32,20 @@
     - role: ovn_central
       ovn_central_nb_port: "{{ ovn_multihost_nb_port | default(6641) }}"
       ovn_central_sb_port: "{{ ovn_multihost_sb_port | default(6642) }}"
+      ovn_central_nb_raft_port: >-
+        {{ ovn_multihost_nb_raft_port | default(6643) }}
+      ovn_central_sb_raft_port: >-
+        {{ ovn_multihost_sb_raft_port | default(6644) }}
+      ovn_central_listen_address: >-
+        {{ ovn_multihost_central_listen_address | default('0.0.0.0') }}
       ovn_central_cluster_join_timeout: >-
         {{ ovn_multihost_sb_wait_timeout | default(2700) }}
+      ovn_central_ready_timeout: >-
+        {{ ovn_multihost_sb_wait_timeout | default(2700) }}
+      ovn_central_reconcile_cluster_members: >-
+        {{ ovn_multihost_reconcile_cluster_members | default(true) | bool }}
+      ovn_central_log_level: >-
+        {{ ovn_multihost_central_log_level | default('info') }}
       ovn_central_ssl_enabled: >-
         {{ ovn_multihost_ssl_enabled | default(false) | bool }}
       ovn_central_ssl_private_key: >-
@@ -62,7 +75,8 @@
       ansible.builtin.set_fact:
         ovn_central_addresses: >-
           {{ ovn_central_addresses
-             + [hostvars[item]['ansible_host'] | default(item)] }}
+             + [hostvars[item]['ovn_central_address']
+                | default(hostvars[item]['ansible_host'] | default(item))] }}
       loop: >-
         {{ groups['central'] | default([])
            + (groups['central-follower'] | default([])
@@ -79,13 +93,17 @@
       ansible.builtin.set_fact:
         ovn_central_sb_remotes: >-
           {{ ovn_central_sb_remotes
-             + [ovn_central_protocol ~ ':' ~ item ~ ':'
+             + [ovn_central_protocol ~ ':' ~ ovn_central_remote_address ~ ':'
                 ~ (ovn_multihost_sb_port | default(6642) | string)] }}
       vars:
         ovn_central_protocol: >-
           {{ 'ssl'
              if ovn_multihost_ssl_enabled | default(false) | bool
              else 'tcp' }}
+        ovn_central_remote_address: >-
+          {{ '[' ~ (item | string) ~ ']'
+             if ':' in (item | string) and (item | string)[0] != '['
+             else (item | string) }}
       loop: "{{ ovn_central_addresses }}"
       tags: topology-resolution
 

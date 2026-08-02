@@ -1,5 +1,8 @@
 summary: Minimal OVN cluster (3 central nodes) on Fedora
 
+environment:
+  OTT_TEST_CLUSTER_MEMBERS: "2"
+
 provision:
   - name: central-1
     role: leader
@@ -37,6 +40,26 @@ prepare+:
     playbook: playbooks/ovn-clustered.yml
     extra-args: '-e ovn_install_method=distro -e ovs_setup_install_method=distro'
     where: [follower]
+
+  - name: Reapply cluster leader configuration
+    how: ansible
+    order: 105
+    playbook: playbooks/ovn-clustered.yml
+    extra-args: '-e ovn_install_method=distro -e ovs_setup_install_method=distro'
+    where: [leader]
+
+  - name: Reapply cluster follower configuration
+    how: ansible
+    order: 106
+    playbook: playbooks/ovn-clustered.yml
+    extra-args: '-e ovn_install_method=distro -e ovs_setup_install_method=distro'
+    where: [follower]
+
+  - name: Remove obsolete cluster member
+    how: ansible
+    order: 107
+    playbook: tests/self/ovn-clustered/remove-member.yml
+    where: [leader]
 
   - name: Verify northd connections on all nodes
     how: shell

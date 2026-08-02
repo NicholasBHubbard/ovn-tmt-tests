@@ -1,0 +1,13 @@
+- name: Remove one OVN cluster member
+  hosts: leader
+  become: true
+  roles:
+    - role: ovn_central
+      ovn_central_cluster_members:
+        - >-
+          {{ ovn_central_address
+             | default(ansible_host | default(inventory_hostname)) }}
+        - >-
+          {{ hostvars[groups['follower'][0]]['ovn_central_address']
+             | default(hostvars[groups['follower'][0]]['ansible_host']
+             | default(groups['follower'][0])) }}

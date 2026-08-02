@@ -11,7 +11,8 @@
       ansible.builtin.set_fact:
         ovn_central_cluster_members: >-
           {{ ovn_central_cluster_members
-             + [hostvars[item]['ansible_host'] | default(item)] }}
+             + [hostvars[item]['ovn_central_address']
+                | default(hostvars[item]['ansible_host'] | default(item))] }}
       loop: "{{ groups['leader'] | default([]) + groups['follower'] | default([]) }}"
       tags: topology-resolution
   roles:

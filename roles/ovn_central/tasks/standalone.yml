@@ -1,0 +1,15 @@
+- name: Start OVN central via service manager
+  when: ovn_central_service_name | length > 0
+  ansible.builtin.service:
+    name: "{{ ovn_central_service_name }}"
+    state: started
+    enabled: true
+
+- name: Start OVN central via ovn-ctl
+  when: ovn_central_service_name | length == 0
+  ansible.builtin.command:
+    cmd: >-
+      {{ ovn_central_ovn_ctl_resolved_path }}
+      --ovn-northd-log="-vfile:{{ ovn_central_log_level }}"
+      start_northd
+  changed_when: true
