@@ -1,0 +1,31 @@
+- name: Require rejection of {{ ovn_router_negative_case.name }}
+  block:
+    - name: Apply invalid logical router configuration
+      ansible.builtin.include_role:
+        name: ovn_routers
+      vars:
+        ovn_routers: "{{ ovn_router_negative_case.routers }}"
+
+    - name: Fail if invalid configuration was accepted
+      ansible.builtin.fail:
+        msg: >-
+          Invalid configuration was accepted:
+          {{ ovn_router_negative_case.name }}
+  rescue:
+    - name: Verify expected validation failure
+      ansible.builtin.assert:
+        that:
+          - >-
+            ansible_failed_result.msg
+            == 'Logical router configuration is invalid.'
+            or
+            ansible_failed_result.results | default([])
+            | selectattr(
+                'msg',
+                'equalto',
+                'Logical router configuration is invalid.'
+              )
+            | list | length == 1
+        fail_msg: >-
+          {{ ovn_router_negative_case.name }} failed unexpectedly:
+          {{ ansible_failed_result.msg }}

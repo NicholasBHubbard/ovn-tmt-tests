@@ -1,12 +1,49 @@
-- name: Verify logical router states
+- name: Verify logical router configuration
+  ansible.builtin.assert:
+    that:
+      - ovn_routers is sequence
+      - ovn_routers is not string
+      - ovn_routers is not mapping
+    fail_msg: "Logical router configuration is invalid."
+
+- name: Verify logical router definitions
+  ansible.builtin.assert:
+    that:
+      - ovn_router is mapping
+      - ovn_router.name is defined
+      - ovn_router.name is string
+      - ovn_router.name | length > 0
+      - ovn_router.state | default('present') in ['present', 'absent']
+      - >-
+        ovn_router.state | default('present') == 'absent'
+        or (ovn_router.options | default({}) is mapping
+            and (ovn_router.enabled is undefined
+                 or ovn_router.enabled is boolean))
+    fail_msg: "Logical router configuration is invalid."
+  loop: "{{ ovn_routers }}"
+  loop_control:
+    loop_var: ovn_router
+    label: "{{ ovn_router.name | default('unnamed') }}"
+
+- name: Verify logical router names are unique
   ansible.builtin.assert:
     that:
       - >-
-        ovn_routers
-        | map(attribute='state', default='present')
-        | difference(['present', 'absent'])
-        | length == 0
-    fail_msg: "Logical router states must be present or absent."
+        ovn_routers | map(attribute='name') | unique | length
+        == ovn_routers | length
+    fail_msg: "Logical router configuration is invalid."
+
+- name: Verify logical router options
+  when: ovn_router.state | default('present') == 'present'
+  ansible.builtin.include_tasks: validate.yml
+  loop: "{{ ovn_routers }}"
+  loop_control:
+    loop_var: ovn_router
+    label: "{{ ovn_router.name }}"
+
+- name: Initialize logical router update state
+  ansible.builtin.set_fact:
+    ovn_routers_updated: false
 
 - name: Configure OVN logical routers
   ansible.builtin.include_tasks: router.yml

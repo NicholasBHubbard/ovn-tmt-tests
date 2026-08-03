@@ -68,12 +68,14 @@
         network: self-provider-delete
     ovn_routers:
       - name: self-r1
+        enabled: false
         options:
           chassis: self-chassis
           dynamic_neigh_routers: true
           mac_binding_age_threshold: 5
-      - name: self-r2
+      - name: 'self-r2 "delete"'
       - name: self-r3
+        enabled: true
         options:
           chassis: clear-me
     ovn_router_ports:

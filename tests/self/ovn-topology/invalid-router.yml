@@ -1,0 +1,92 @@
+- name: Reject invalid logical router configuration
+  hosts: all
+  become: true
+  tasks:
+    - name: Verify invalid logical router configurations are rejected
+      ansible.builtin.include_tasks: invalid-router-case.yml
+      loop:
+        - name: non-list configuration
+          routers: invalid
+        - name: missing name
+          routers:
+            - state: absent
+        - name: empty name
+          routers:
+            - name: ""
+              state: absent
+        - name: invalid state
+          routers:
+            - name: self-invalid
+              state: invalid
+        - name: non-mapping options
+          routers:
+            - name: self-invalid
+              options: []
+        - name: invalid enabled state
+          routers:
+            - name: self-invalid
+              enabled: invalid
+        - name: invalid option value
+          routers:
+            - name: self-invalid
+              options:
+                invalid:
+                  - value
+        - name: invalid option key
+          routers:
+            - name: self-invalid
+              options:
+                bad=key: value
+        - name: duplicate names
+          routers:
+            - name: self-duplicate
+              state: absent
+            - name: self-duplicate
+              state: absent
+      loop_control:
+        loop_var: ovn_router_negative_case
+        label: "{{ ovn_router_negative_case.name }}"
+
+    - name: Create duplicate logical router rows
+      ansible.builtin.command:
+        argv:
+          - ovn-nbctl
+          - create
+          - Logical_Router
+          - 'name="self-ambiguous-router"'
+      loop: "{{ range(2) }}"
+      register: ovn_router_duplicate_rows
+      changed_when: true
+
+    - name: Require rejection of ambiguous logical router state
+      block:
+        - name: Remove ambiguous logical router
+          ansible.builtin.include_role:
+            name: ovn_routers
+          vars:
+            ovn_routers:
+              - name: self-ambiguous-router
+                state: absent
+
+        - name: Fail if ambiguous logical router was accepted
+          ansible.builtin.fail:
+            msg: "Ambiguous logical router state was accepted."
+      rescue:
+        - name: Verify ambiguous logical router failure
+          ansible.builtin.assert:
+            that:
+              - >-
+                ansible_failed_result.msg
+                == 'Logical router self-ambiguous-router is not unique.'
+      always:
+        - name: Remove duplicate logical router rows
+          ansible.builtin.command:
+            argv:
+              - ovn-nbctl
+              - destroy
+              - Logical_Router
+              - "{{ ovn_router_duplicate_row.stdout }}"
+          loop: "{{ ovn_router_duplicate_rows.results }}"
+          loop_control:
+            loop_var: ovn_router_duplicate_row
+          changed_when: true

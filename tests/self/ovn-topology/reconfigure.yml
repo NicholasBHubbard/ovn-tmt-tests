@@ -30,10 +30,11 @@
         state: absent
     ovn_routers:
       - name: self-r1
+        enabled: true
         options:
           chassis: moved-chassis
           mac_binding_age_threshold: 10
-      - name: self-r2
+      - name: 'self-r2 "delete"'
         state: absent
       - name: self-r3
     ovn_router_ports:

@@ -1,0 +1,38 @@
+- name: Verify failed logical router updates preserve state
+  hosts: all
+  become: true
+  tasks:
+    - name: Require rejection before changing any router
+      block:
+        - name: Apply partially invalid logical router configuration
+          ansible.builtin.include_role:
+            name: ovn_routers
+          vars:
+            ovn_routers:
+              - name: self-r1
+                enabled: true
+                options:
+                  chassis: should-not-change
+              - name: self-invalid
+                options:
+                  invalid:
+                    - value
+
+        - name: Fail if invalid update was accepted
+          ansible.builtin.fail:
+            msg: "Partially invalid logical router configuration was accepted."
+      rescue:
+        - name: Verify validation failure
+          ansible.builtin.assert:
+            that:
+              - >-
+                ansible_failed_result.msg
+                == 'Logical router configuration is invalid.'
+                or
+                ansible_failed_result.results | default([])
+                | selectattr(
+                    'msg',
+                    'equalto',
+                    'Logical router configuration is invalid.'
+                  )
+                | list | length == 1

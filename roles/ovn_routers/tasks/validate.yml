@@ -1,0 +1,16 @@
+- name: Verify options for logical router {{ ovn_router.name }}
+  ansible.builtin.assert:
+    that:
+      - ovn_router_option.key is string
+      - ovn_router_option.key | length > 0
+      - "'=' not in ovn_router_option.key"
+      - >-
+        ovn_router_option.value is string
+        or ovn_router_option.value is boolean
+        or (ovn_router_option.value is integer
+            and ovn_router_option.value is not boolean)
+    fail_msg: "Logical router configuration is invalid."
+  loop: "{{ ovn_router.options | default({}) | dict2items }}"
+  loop_control:
+    loop_var: ovn_router_option
+    label: "{{ ovn_router_option.key }}"

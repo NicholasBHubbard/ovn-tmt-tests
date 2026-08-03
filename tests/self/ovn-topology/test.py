@@ -12,6 +12,7 @@ SPECIAL_NAT_ID = 'self-nat "delete"'
 SPECIAL_NAT_GATEWAY_PORT = 'self-rp "nat"'
 SPECIAL_NAT_EXEMPTED_SET = 'self-nat "exempted"'
 SPECIAL_ROUTER_SWITCH_PORT = 'self-rp-sw "nat"'
+SPECIAL_ROUTER = 'self-r2 "delete"'
 
 
 @pytest.fixture
@@ -32,7 +33,7 @@ class TestPreconditions:
 class TestInitial:
     def test_switches_and_routers(self, nb: Ovsdb, snapshots: Snapshots) -> None:
         switch = nb.by_name("Logical_Switch", "self-moved", "_uuid", "other_config")
-        router = nb.by_name("Logical_Router", "self-r1", "_uuid", "options")
+        router = nb.by_name("Logical_Router", "self-r1", "_uuid", "enabled", "options")
 
         assert switch["other_config"] == {
             "subnet": "203.0.113.0/24",
@@ -44,6 +45,7 @@ class TestInitial:
             "dynamic_neigh_routers": "true",
             "mac_binding_age_threshold": "5",
         }
+        assert router["enabled"] is False
         assert nb.by_name("Logical_Switch", "self-sw", "other_config")[
             "other_config"
         ] == {
@@ -51,11 +53,12 @@ class TestInitial:
             "exclude_ips": "192.0.2.1..192.0.2.2",
         }
         assert nb.exists("Logical_Switch", "name=self-unused")
-        assert nb.exists("Logical_Router", "name=self-r2")
-        assert nb.by_name("Logical_Router", "self-r3", "options")["options"] == {
-            "chassis": "clear-me"
-        }
+        assert nb.exists("Logical_Router", f"name={json.dumps(SPECIAL_ROUTER)}")
+        third_router = nb.by_name("Logical_Router", "self-r3", "enabled", "options")
+        assert third_router["enabled"] is True
+        assert third_router["options"] == {"chassis": "clear-me"}
         snapshots.save("switch", switch["_uuid"])
+        snapshots.save("router", router["_uuid"])
 
     def test_router_ports(self, nb: Ovsdb, snapshots: Snapshots) -> None:
         port = nb.by_name(
@@ -389,7 +392,7 @@ class TestReconfigured:
 class TestResult:
     def test_switches_and_routers(self, nb: Ovsdb, snapshots: Snapshots) -> None:
         switch = nb.by_name("Logical_Switch", "self-moved", "_uuid", "other_config")
-        router = nb.by_name("Logical_Router", "self-r1", "options")
+        router = nb.by_name("Logical_Router", "self-r1", "_uuid", "enabled", "options")
 
         assert switch["other_config"] == {
             "subnet": "198.51.100.0/24",
@@ -407,8 +410,12 @@ class TestResult:
             "chassis": "moved-chassis",
             "mac_binding_age_threshold": "10",
         }
-        assert not nb.exists("Logical_Router", "name=self-r2")
-        assert nb.by_name("Logical_Router", "self-r3", "options")["options"] == {}
+        assert router["enabled"] is True
+        assert router["_uuid"] == snapshots.load("router")
+        assert not nb.exists("Logical_Router", f"name={json.dumps(SPECIAL_ROUTER)}")
+        third_router = nb.by_name("Logical_Router", "self-r3", "enabled", "options")
+        assert third_router["enabled"] == []
+        assert third_router["options"] == {}
 
     def test_router_port_moved_without_recreation(
         self, nb: Ovsdb, snapshots: Snapshots

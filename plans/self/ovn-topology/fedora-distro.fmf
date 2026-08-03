@@ -13,6 +13,10 @@ prepare:
     how: shell
     order: 80
     script: python3 -m pytest ./tests/self/ovn-topology/test.py::TestPreconditions
+  - name: Verify invalid router configurations are rejected
+    how: ansible
+    order: 84
+    playbook: tests/self/ovn-topology/invalid-router.yml
   - name: Verify invalid gateway chassis configurations are rejected
     how: ansible
     order: 85
@@ -37,6 +41,10 @@ prepare:
     how: ansible
     order: 90
     playbook: tests/self/ovn-topology/initial.yml
+  - name: Verify failed router updates preserve state
+    how: ansible
+    order: 94
+    playbook: tests/self/ovn-topology/invalid-router-update.yml
   - name: Verify failed localnet port updates are atomic
     how: ansible
     order: 95

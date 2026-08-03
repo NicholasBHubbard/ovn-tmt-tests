@@ -1,17 +1,75 @@
-- name: Create logical router and reset options {{ ovn_router.name }}
-  when: ovn_router.state | default('present') == 'present'
+- name: Find logical router {{ ovn_router.name }}
   ansible.builtin.command:
-    cmd: >-
-      ovn-nbctl --may-exist lr-add {{ ovn_router.name | quote }}
-      -- clear Logical_Router {{ ovn_router.name | quote }} options
+    argv:
+      - ovn-nbctl
+      - --bare
+      - --columns=_uuid
+      - find
+      - Logical_Router
+      - "name={{ ovn_router.name | to_json }}"
+  register: ovn_router_row
+  changed_when: false
+
+- name: Verify logical router is unambiguous {{ ovn_router.name }}
+  ansible.builtin.assert:
+    that:
+      - ovn_router_row.stdout_lines | length <= 1
+    fail_msg: "Logical router {{ ovn_router.name }} is not unique."
+
+- name: Delete logical router {{ ovn_router.name }}
+  when:
+    - ovn_router.state | default('present') == 'absent'
+    - ovn_router_row.stdout_lines | length == 1
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - lr-del
+      - "{{ ovn_router_row.stdout }}"
   changed_when: true
 
-- name: Configure options for logical router {{ ovn_router.name }}
+- name: Record logical router deletion {{ ovn_router.name }}
+  when:
+    - ovn_router.state | default('present') == 'absent'
+    - ovn_router_row.stdout_lines | length == 1
+  ansible.builtin.set_fact:
+    ovn_routers_updated: true
+  changed_when: false
+
+- name: Read current logical router {{ ovn_router.name }}
   when: ovn_router.state | default('present') == 'present'
   ansible.builtin.command:
-    cmd: >-
-      ovn-nbctl set Logical_Router {{ ovn_router.name | quote }}
-      {{ ('options:' ~ ovn_router_option.key ~ '=' ~ ovn_router_option_value) | quote }}
+    argv:
+      - ovn-nbctl
+      - --format=json
+      - --columns=enabled,options
+      - find
+      - Logical_Router
+      - "name={{ ovn_router.name | to_json }}"
+  register: ovn_router_before
+  changed_when: false
+
+- name: Initialize logical router update {{ ovn_router.name }}
+  when: ovn_router.state | default('present') == 'present'
+  ansible.builtin.set_fact:
+    ovn_router_update_argv: >-
+      {{ ['ovn-nbctl', 'set', 'Logical_Router', ovn_router_row.stdout,
+          'enabled=' ~ (ovn_router.enabled | default([]) | to_json),
+          'options={}']
+         if ovn_router_row.stdout_lines | length == 1
+         else ['ovn-nbctl', 'create', 'Logical_Router',
+               'name=' ~ (ovn_router.name | to_json),
+               'enabled=' ~ (ovn_router.enabled | default([]) | to_json),
+               'options={}'] }}
+
+- name: Add options to logical router update {{ ovn_router.name }}
+  when: ovn_router.state | default('present') == 'present'
+  ansible.builtin.set_fact:
+    ovn_router_update_argv: >-
+      {{ ovn_router_update_argv
+         + ((['--', 'set', 'Logical_Router', ovn_router_row.stdout]
+             if ovn_router_row.stdout_lines | length == 1 else [])
+            + ['options:' ~ (ovn_router_option.key | to_json)
+               ~ '=' ~ (ovn_router_option_value | to_json)]) }}
   loop: "{{ ovn_router.options | default({}) | dict2items }}"
   loop_control:
     loop_var: ovn_router_option
@@ -21,10 +79,37 @@
       {{ (ovn_router_option.value | string | lower)
          if ovn_router_option.value is boolean
          else (ovn_router_option.value | string) }}
-  changed_when: true
 
-- name: Delete logical router {{ ovn_router.name }}
-  when: ovn_router.state | default('present') == 'absent'
+- name: Update logical router atomically {{ ovn_router.name }}
+  when: ovn_router.state | default('present') == 'present'
   ansible.builtin.command:
-    cmd: "ovn-nbctl --if-exists lr-del {{ ovn_router.name | quote }}"
-  changed_when: true
+    argv: "{{ ovn_router_update_argv }}"
+  changed_when: false
+
+- name: Read updated logical router {{ ovn_router.name }}
+  when: ovn_router.state | default('present') == 'present'
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - --format=json
+      - --columns=enabled,options
+      - find
+      - Logical_Router
+      - "name={{ ovn_router.name | to_json }}"
+  register: ovn_router_after
+  changed_when: false
+
+- name: Verify configured logical router {{ ovn_router.name }}
+  when: ovn_router.state | default('present') == 'present'
+  ansible.builtin.assert:
+    that:
+      - (ovn_router_after.stdout | from_json).data | length == 1
+    fail_msg: "Logical router {{ ovn_router.name }} was not configured."
+
+- name: Record logical router update {{ ovn_router.name }}
+  when: ovn_router.state | default('present') == 'present'
+  vars:
+    ovn_router_changed: "{{ ovn_router_before.stdout != ovn_router_after.stdout }}"
+  ansible.builtin.set_fact:
+    ovn_routers_updated: "{{ ovn_routers_updated or ovn_router_changed }}"
+  changed_when: ovn_router_changed
