@@ -1,8 +1,10 @@
 # ovn-tmt-tests
 
+DISCLAIMER: This project is currently under development and is not ready for real use!
+
 This project provides reusable and configurable [tmt](https://tmt.readthedocs.io/) plans, tests, and [Ansible](https://docs.ansible.com/) automation, for creating [OVN](https://www.ovn.org/en/) test deployments.
 
-DISCLAIMER: This project is currently under development and is not ready for real use!
+This project currently targets Linux test systems only.
 
 ## Requirements
 
