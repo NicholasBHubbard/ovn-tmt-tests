@@ -1,0 +1,34 @@
+- name: Verify router-side options for {{ ovn_router_port.name }}
+  ansible.builtin.assert:
+    that:
+      - ovn_router_port_option.key is string
+      - ovn_router_port_option.key | length > 0
+      - "'=' not in ovn_router_port_option.key"
+      - >-
+        ovn_router_port_option.value is string
+        or ovn_router_port_option.value is boolean
+        or (ovn_router_port_option.value is integer
+            and ovn_router_port_option.value is not boolean)
+    fail_msg: "Logical router port configuration is invalid."
+  loop: "{{ ovn_router_port.options | default({}) | dict2items }}"
+  loop_control:
+    loop_var: ovn_router_port_option
+    label: "{{ ovn_router_port_option.key }}"
+
+- name: Verify switch-side options for {{ ovn_router_port.name }}
+  ansible.builtin.assert:
+    that:
+      - ovn_router_switch_option.key is string
+      - ovn_router_switch_option.key | length > 0
+      - "'=' not in ovn_router_switch_option.key"
+      - ovn_router_switch_option.key != 'router-port'
+      - >-
+        ovn_router_switch_option.value is string
+        or ovn_router_switch_option.value is boolean
+        or (ovn_router_switch_option.value is integer
+            and ovn_router_switch_option.value is not boolean)
+    fail_msg: "Logical router port configuration is invalid."
+  loop: "{{ ovn_router_port.switch_options | default({}) | dict2items }}"
+  loop_control:
+    loop_var: ovn_router_switch_option
+    label: "{{ ovn_router_switch_option.key }}"

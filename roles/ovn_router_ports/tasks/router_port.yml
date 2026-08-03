@@ -1,30 +1,84 @@
-- name: Delete logical switch port {{ ovn_router_port.switch_port }}
-  when: ovn_router_port.state | default('present') == 'absent'
-  ansible.builtin.command:
-    cmd: >-
-      ovn-nbctl --if-exists lsp-del
-      {{ ovn_router_port.switch_port | quote }}
-  changed_when: true
-
-- name: Delete logical router port {{ ovn_router_port.name }}
-  when: ovn_router_port.state | default('present') == 'absent'
-  ansible.builtin.command:
-    cmd: "ovn-nbctl --if-exists lrp-del {{ ovn_router_port.name | quote }}"
-  changed_when: true
-
 - name: Find logical router port {{ ovn_router_port.name }}
-  when: ovn_router_port.state | default('present') == 'present'
   ansible.builtin.command:
-    cmd: >-
-      ovn-nbctl --bare --columns=_uuid find Logical_Router_Port
-      name={{ ovn_router_port.name | quote }}
+    argv:
+      - ovn-nbctl
+      - --bare
+      - --columns=_uuid
+      - find
+      - Logical_Router_Port
+      - "name={{ ovn_router_port.name | to_json }}"
   register: ovn_router_port_row
+  changed_when: false
+
+- name: Verify logical router port is unambiguous {{ ovn_router_port.name }}
+  ansible.builtin.assert:
+    that:
+      - ovn_router_port_row.stdout_lines | length <= 1
+    fail_msg: "Logical router port {{ ovn_router_port.name }} is not unique."
+
+- name: Find logical switch port {{ ovn_router_port.switch_port }}
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - --bare
+      - --columns=_uuid
+      - find
+      - Logical_Switch_Port
+      - "name={{ ovn_router_port.switch_port | to_json }}"
+  register: ovn_router_switch_port_row
+  changed_when: false
+
+- name: Verify logical switch port is unambiguous {{ ovn_router_port.switch_port }}
+  ansible.builtin.assert:
+    that:
+      - ovn_router_switch_port_row.stdout_lines | length <= 1
+    fail_msg: "Logical switch port {{ ovn_router_port.switch_port }} is not unique."
+
+- name: Initialize attachment deletion {{ ovn_router_port.name }}
+  when: ovn_router_port.state | default('present') == 'absent'
+  ansible.builtin.set_fact:
+    ovn_router_port_update_argv:
+      - ovn-nbctl
+
+- name: Add logical switch port deletion {{ ovn_router_port.switch_port }}
+  when:
+    - ovn_router_port.state | default('present') == 'absent'
+    - ovn_router_switch_port_row.stdout_lines | length == 1
+  ansible.builtin.set_fact:
+    ovn_router_port_update_argv: >-
+      {{ ovn_router_port_update_argv
+         + ['lsp-del', ovn_router_switch_port_row.stdout] }}
+
+- name: Add logical router port deletion {{ ovn_router_port.name }}
+  when:
+    - ovn_router_port.state | default('present') == 'absent'
+    - ovn_router_port_row.stdout_lines | length == 1
+  ansible.builtin.set_fact:
+    ovn_router_port_update_argv: >-
+      {{ ovn_router_port_update_argv
+         + (['--'] if ovn_router_port_update_argv | length > 1 else [])
+         + ['lrp-del', ovn_router_port_row.stdout] }}
+
+- name: Delete router attachment atomically {{ ovn_router_port.name }}
+  when:
+    - ovn_router_port.state | default('present') == 'absent'
+    - ovn_router_port_update_argv | length > 1
+  ansible.builtin.command:
+    argv: "{{ ovn_router_port_update_argv }}"
+  changed_when: true
+
+- name: Record router attachment deletion {{ ovn_router_port.name }}
+  when:
+    - ovn_router_port.state | default('present') == 'absent'
+    - ovn_router_port_update_argv | length > 1
+  ansible.builtin.set_fact:
+    ovn_router_ports_updated: true
   changed_when: false
 
 - name: Find current router for {{ ovn_router_port.name }}
   when:
     - ovn_router_port.state | default('present') == 'present'
-    - ovn_router_port_row.stdout | length > 0
+    - ovn_router_port_row.stdout_lines | length == 1
   ansible.builtin.command:
     argv:
       - ovn-nbctl
@@ -36,88 +90,19 @@
   register: ovn_router_port_current_router
   changed_when: false
 
-- name: Move logical router port {{ ovn_router_port.name }}
+- name: Verify current router for {{ ovn_router_port.name }}
   when:
     - ovn_router_port.state | default('present') == 'present'
-    - ovn_router_port_row.stdout | length > 0
-    - ovn_router_port_current_router.stdout != ovn_router_port.router
-  ansible.builtin.command:
-    argv:
-      - ovn-nbctl
-      - remove
-      - Logical_Router
-      - "{{ ovn_router_port_current_router.stdout }}"
-      - ports
-      - "{{ ovn_router_port_row.stdout }}"
-      - --
-      - add
-      - Logical_Router
-      - "{{ ovn_router_port.router }}"
-      - ports
-      - "{{ ovn_router_port_row.stdout }}"
-  changed_when: true
-
-- name: Create logical router port {{ ovn_router_port.name }}
-  when:
-    - ovn_router_port.state | default('present') == 'present'
-    - ovn_router_port_row.stdout | length == 0
-  ansible.builtin.command:
-    argv: >-
-      {{ ['ovn-nbctl', 'lrp-add', ovn_router_port.router,
-          ovn_router_port.name, ovn_router_port.mac]
-         + (ovn_router_port.networks | default([])) }}
-  changed_when: true
-
-- name: Configure logical router port {{ ovn_router_port.name }}
-  when: ovn_router_port.state | default('present') == 'present'
-  ansible.builtin.command:
-    argv:
-      - ovn-nbctl
-      - set
-      - Logical_Router_Port
-      - "{{ ovn_router_port.name }}"
-      - "mac={{ ovn_router_port.mac | to_json }}"
-      - "networks={{ ovn_router_port.networks | default([]) | to_json }}"
-      - --
-      - clear
-      - Logical_Router_Port
-      - "{{ ovn_router_port.name }}"
-      - options
-  changed_when: true
-
-- name: Configure options for logical router port {{ ovn_router_port.name }}
-  when: ovn_router_port.state | default('present') == 'present'
-  ansible.builtin.command:
-    argv:
-      - ovn-nbctl
-      - set
-      - Logical_Router_Port
-      - "{{ ovn_router_port.name }}"
-      - "options:{{ ovn_router_port_option.key }}={{ ovn_router_port_option_value }}"
-  loop: "{{ ovn_router_port.options | default({}) | dict2items }}"
-  loop_control:
-    loop_var: ovn_router_port_option
-    label: "{{ ovn_router_port_option.key }}"
-  vars:
-    ovn_router_port_option_value: >-
-      {{ (ovn_router_port_option.value | string | lower)
-         if ovn_router_port_option.value is boolean
-         else (ovn_router_port_option.value | string) }}
-  changed_when: true
-
-- name: Find logical switch port {{ ovn_router_port.switch_port }}
-  when: ovn_router_port.state | default('present') == 'present'
-  ansible.builtin.command:
-    cmd: >-
-      ovn-nbctl --bare --columns=_uuid find Logical_Switch_Port
-      name={{ ovn_router_port.switch_port | quote }}
-  register: ovn_router_switch_port_row
-  changed_when: false
+    - ovn_router_port_row.stdout_lines | length == 1
+  ansible.builtin.assert:
+    that:
+      - ovn_router_port_current_router.stdout_lines | length == 1
+    fail_msg: "Logical router port {{ ovn_router_port.name }} has no unique router."
 
 - name: Find current switch for {{ ovn_router_port.switch_port }}
   when:
     - ovn_router_port.state | default('present') == 'present'
-    - ovn_router_switch_port_row.stdout | length > 0
+    - ovn_router_switch_port_row.stdout_lines | length == 1
   ansible.builtin.command:
     argv:
       - ovn-nbctl
@@ -129,53 +114,226 @@
   register: ovn_router_port_current_switch
   changed_when: false
 
-- name: Move logical switch port {{ ovn_router_port.switch_port }}
+- name: Verify current switch for {{ ovn_router_port.switch_port }}
   when:
     - ovn_router_port.state | default('present') == 'present'
-    - ovn_router_switch_port_row.stdout | length > 0
-    - ovn_router_port_current_switch.stdout != ovn_router_port.switch
-  ansible.builtin.command:
-    argv:
-      - ovn-nbctl
-      - remove
-      - Logical_Switch
-      - "{{ ovn_router_port_current_switch.stdout }}"
-      - ports
-      - "{{ ovn_router_switch_port_row.stdout }}"
-      - --
-      - add
-      - Logical_Switch
-      - "{{ ovn_router_port.switch }}"
-      - ports
-      - "{{ ovn_router_switch_port_row.stdout }}"
-  changed_when: true
+    - ovn_router_switch_port_row.stdout_lines | length == 1
+  ansible.builtin.assert:
+    that:
+      - ovn_router_port_current_switch.stdout_lines | length == 1
+    fail_msg: "Logical switch port {{ ovn_router_port.switch_port }} has no unique switch."
 
-- name: Create logical switch port {{ ovn_router_port.switch_port }}
-  when:
-    - ovn_router_port.state | default('present') == 'present'
-    - ovn_router_switch_port_row.stdout | length == 0
-  ansible.builtin.command:
-    argv:
-      - ovn-nbctl
-      - lsp-add
-      - "{{ ovn_router_port.switch }}"
-      - "{{ ovn_router_port.switch_port }}"
-  changed_when: true
-
-- name: Configure logical switch port {{ ovn_router_port.switch_port }}
+- name: Read current logical router port {{ ovn_router_port.name }}
   when: ovn_router_port.state | default('present') == 'present'
   ansible.builtin.command:
     argv:
       - ovn-nbctl
-      - lsp-set-type
-      - "{{ ovn_router_port.switch_port }}"
-      - router
-      - --
-      - lsp-set-addresses
-      - "{{ ovn_router_port.switch_port }}"
-      - router
-      - --
-      - lsp-set-options
-      - "{{ ovn_router_port.switch_port }}"
-      - "router-port={{ ovn_router_port.name }}"
-  changed_when: true
+      - --format=json
+      - --columns=mac,networks,options,peer
+      - find
+      - Logical_Router_Port
+      - "name={{ ovn_router_port.name | to_json }}"
+  register: ovn_router_port_before
+  changed_when: false
+
+- name: Read current logical switch port {{ ovn_router_port.switch_port }}
+  when: ovn_router_port.state | default('present') == 'present'
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - --format=json
+      - --columns=type,addresses,options
+      - find
+      - Logical_Switch_Port
+      - "name={{ ovn_router_port.switch_port | to_json }}"
+  register: ovn_router_switch_port_before
+  changed_when: false
+
+- name: Initialize router attachment update {{ ovn_router_port.name }}
+  when: ovn_router_port.state | default('present') == 'present'
+  ansible.builtin.set_fact:
+    ovn_router_port_update_argv:
+      - ovn-nbctl
+    ovn_router_port_update_row: >-
+      {{ ovn_router_port_row.stdout
+         if ovn_router_port_row.stdout_lines | length == 1
+         else '@router_port' }}
+    ovn_router_switch_port_update_row: >-
+      {{ ovn_router_switch_port_row.stdout
+         if ovn_router_switch_port_row.stdout_lines | length == 1
+         else '@switch_port' }}
+    ovn_router_switch_options: >-
+      {{ {'router-port': ovn_router_port.name}
+         | combine(ovn_router_port.switch_options | default({})) }}
+
+- name: Add logical router port configuration {{ ovn_router_port.name }}
+  when: ovn_router_port.state | default('present') == 'present'
+  ansible.builtin.set_fact:
+    ovn_router_port_update_argv: >-
+      {{ ovn_router_port_update_argv
+         + ((['set', 'Logical_Router_Port', ovn_router_port_update_row,
+              'mac=' ~ (ovn_router_port.mac | to_json),
+              'networks=' ~ (ovn_router_port.networks | default([]) | to_json),
+              'peer=[]', 'options={}'])
+            if ovn_router_port_row.stdout_lines | length == 1
+            else ['--id=@router_port', 'create', 'Logical_Router_Port',
+                  'name=' ~ (ovn_router_port.name | to_json),
+                  'mac=' ~ (ovn_router_port.mac | to_json),
+                  'networks=' ~ (ovn_router_port.networks | default([]) | to_json),
+                  'peer=[]']) }}
+
+- name: Add logical router port options {{ ovn_router_port.name }}
+  when: ovn_router_port.state | default('present') == 'present'
+  ansible.builtin.set_fact:
+    ovn_router_port_update_argv: >-
+      {{ ovn_router_port_update_argv
+         + ((['--', 'set', 'Logical_Router_Port', ovn_router_port_update_row]
+             if ovn_router_port_row.stdout_lines | length == 1 else [])
+            + ['options:' ~ (ovn_router_port_option.key | to_json)
+               ~ '=' ~ (ovn_router_port_option_value | to_json)]) }}
+  loop: "{{ ovn_router_port.options | default({}) | dict2items }}"
+  loop_control:
+    loop_var: ovn_router_port_option
+    label: "{{ ovn_router_port_option.key }}"
+  vars:
+    ovn_router_port_option_value: >-
+      {{ (ovn_router_port_option.value | string | lower)
+         if ovn_router_port_option.value is boolean
+         else (ovn_router_port_option.value | string) }}
+
+- name: Add removal from old router {{ ovn_router_port.name }}
+  when:
+    - ovn_router_port.state | default('present') == 'present'
+    - ovn_router_port_row.stdout_lines | length == 1
+    - ovn_router_port_current_router.stdout != ovn_router_port.router
+  ansible.builtin.set_fact:
+    ovn_router_port_update_argv: >-
+      {{ ovn_router_port_update_argv
+         + ['--', 'remove', 'Logical_Router',
+            ovn_router_port_current_router.stdout, 'ports',
+            ovn_router_port_update_row] }}
+
+- name: Add attachment to router {{ ovn_router_port.name }}
+  when:
+    - ovn_router_port.state | default('present') == 'present'
+    - >-
+      ovn_router_port_row.stdout_lines | length == 0
+      or ovn_router_port_current_router.stdout != ovn_router_port.router
+  ansible.builtin.set_fact:
+    ovn_router_port_update_argv: >-
+      {{ ovn_router_port_update_argv
+         + ['--', 'add', 'Logical_Router', ovn_router_port.router,
+            'ports', ovn_router_port_update_row] }}
+
+- name: Add logical switch port configuration {{ ovn_router_port.switch_port }}
+  when: ovn_router_port.state | default('present') == 'present'
+  ansible.builtin.set_fact:
+    ovn_router_port_update_argv: >-
+      {{ ovn_router_port_update_argv
+         + ((['--', 'set', 'Logical_Switch_Port',
+              ovn_router_switch_port_update_row, 'type="router"',
+              'addresses=["router"]', 'options={}'])
+            if ovn_router_switch_port_row.stdout_lines | length == 1
+            else ['--', '--id=@switch_port', 'create', 'Logical_Switch_Port',
+                  'name=' ~ (ovn_router_port.switch_port | to_json),
+                  'type="router"', 'addresses=["router"]']) }}
+
+- name: Add logical switch port options {{ ovn_router_port.switch_port }}
+  when: ovn_router_port.state | default('present') == 'present'
+  ansible.builtin.set_fact:
+    ovn_router_port_update_argv: >-
+      {{ ovn_router_port_update_argv
+         + ((['--', 'set', 'Logical_Switch_Port',
+              ovn_router_switch_port_update_row]
+             if ovn_router_switch_port_row.stdout_lines | length == 1 else [])
+            + ['options:' ~ (ovn_router_switch_option.key | to_json)
+               ~ '=' ~ (ovn_router_switch_option_value | to_json)]) }}
+  loop: "{{ ovn_router_switch_options | dict2items }}"
+  loop_control:
+    loop_var: ovn_router_switch_option
+    label: "{{ ovn_router_switch_option.key }}"
+  vars:
+    ovn_router_switch_option_value: >-
+      {{ (ovn_router_switch_option.value | string | lower)
+         if ovn_router_switch_option.value is boolean
+         else (ovn_router_switch_option.value | string) }}
+
+- name: Add removal from old switch {{ ovn_router_port.switch_port }}
+  when:
+    - ovn_router_port.state | default('present') == 'present'
+    - ovn_router_switch_port_row.stdout_lines | length == 1
+    - ovn_router_port_current_switch.stdout != ovn_router_port.switch
+  ansible.builtin.set_fact:
+    ovn_router_port_update_argv: >-
+      {{ ovn_router_port_update_argv
+         + ['--', 'remove', 'Logical_Switch',
+            ovn_router_port_current_switch.stdout, 'ports',
+            ovn_router_switch_port_update_row] }}
+
+- name: Add attachment to switch {{ ovn_router_port.switch_port }}
+  when:
+    - ovn_router_port.state | default('present') == 'present'
+    - >-
+      ovn_router_switch_port_row.stdout_lines | length == 0
+      or ovn_router_port_current_switch.stdout != ovn_router_port.switch
+  ansible.builtin.set_fact:
+    ovn_router_port_update_argv: >-
+      {{ ovn_router_port_update_argv
+         + ['--', 'add', 'Logical_Switch', ovn_router_port.switch,
+            'ports', ovn_router_switch_port_update_row] }}
+
+- name: Update router attachment atomically {{ ovn_router_port.name }}
+  when: ovn_router_port.state | default('present') == 'present'
+  ansible.builtin.command:
+    argv: "{{ ovn_router_port_update_argv }}"
+  changed_when: false
+
+- name: Read updated logical router port {{ ovn_router_port.name }}
+  when: ovn_router_port.state | default('present') == 'present'
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - --format=json
+      - --columns=mac,networks,options,peer
+      - find
+      - Logical_Router_Port
+      - "name={{ ovn_router_port.name | to_json }}"
+  register: ovn_router_port_after
+  changed_when: false
+
+- name: Read updated logical switch port {{ ovn_router_port.switch_port }}
+  when: ovn_router_port.state | default('present') == 'present'
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - --format=json
+      - --columns=type,addresses,options
+      - find
+      - Logical_Switch_Port
+      - "name={{ ovn_router_port.switch_port | to_json }}"
+  register: ovn_router_switch_port_after
+  changed_when: false
+
+- name: Verify configured router attachment {{ ovn_router_port.name }}
+  when: ovn_router_port.state | default('present') == 'present'
+  ansible.builtin.assert:
+    that:
+      - (ovn_router_port_after.stdout | from_json).data | length == 1
+      - (ovn_router_switch_port_after.stdout | from_json).data | length == 1
+    fail_msg: "Router attachment {{ ovn_router_port.name }} was not configured."
+
+- name: Record router attachment update {{ ovn_router_port.name }}
+  when: ovn_router_port.state | default('present') == 'present'
+  vars:
+    ovn_router_port_changed: >-
+      {{ ovn_router_port_before.stdout != ovn_router_port_after.stdout
+         or ovn_router_switch_port_before.stdout
+            != ovn_router_switch_port_after.stdout
+         or ovn_router_port_current_router.stdout | default('')
+            != ovn_router_port.router
+         or ovn_router_port_current_switch.stdout | default('')
+            != ovn_router_port.switch }}
+  ansible.builtin.set_fact:
+    ovn_router_ports_updated: >-
+      {{ ovn_router_ports_updated or ovn_router_port_changed }}
+  changed_when: ovn_router_port_changed

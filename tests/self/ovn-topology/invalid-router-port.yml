@@ -1,0 +1,112 @@
+- name: Reject invalid logical router port configuration
+  hosts: all
+  become: true
+  tasks:
+    - name: Verify invalid logical router port configurations are rejected
+      ansible.builtin.include_tasks: invalid-router-port-case.yml
+      loop:
+        - name: non-list configuration
+          router_ports: invalid
+        - name: missing name
+          router_ports:
+            - switch_port: self-invalid-sw
+              state: absent
+        - name: missing switch port
+          router_ports:
+            - name: self-invalid
+              state: absent
+        - name: matching router and switch port names
+          router_ports:
+            - name: self-invalid
+              switch_port: self-invalid
+              state: absent
+        - name: missing present fields
+          router_ports:
+            - name: self-invalid
+              switch_port: self-invalid-sw
+        - name: invalid MAC address
+          router_ports:
+            - name: self-invalid
+              router: self-router
+              switch: self-switch
+              switch_port: self-invalid-sw
+              mac: invalid
+        - name: non-list networks
+          router_ports:
+            - name: self-invalid
+              router: self-router
+              switch: self-switch
+              switch_port: self-invalid-sw
+              mac: "02:00:00:00:00:01"
+              networks: invalid
+        - name: invalid network value
+          router_ports:
+            - name: self-invalid
+              router: self-router
+              switch: self-switch
+              switch_port: self-invalid-sw
+              mac: "02:00:00:00:00:01"
+              networks:
+                - 1
+        - name: non-mapping router options
+          router_ports:
+            - name: self-invalid
+              router: self-router
+              switch: self-switch
+              switch_port: self-invalid-sw
+              mac: "02:00:00:00:00:01"
+              options: []
+        - name: invalid router option value
+          router_ports:
+            - name: self-invalid
+              router: self-router
+              switch: self-switch
+              switch_port: self-invalid-sw
+              mac: "02:00:00:00:00:01"
+              options:
+                invalid:
+                  - value
+        - name: non-mapping switch options
+          router_ports:
+            - name: self-invalid
+              router: self-router
+              switch: self-switch
+              switch_port: self-invalid-sw
+              mac: "02:00:00:00:00:01"
+              switch_options: []
+        - name: reserved switch option
+          router_ports:
+            - name: self-invalid
+              router: self-router
+              switch: self-switch
+              switch_port: self-invalid-sw
+              mac: "02:00:00:00:00:01"
+              switch_options:
+                router-port: self-other
+        - name: duplicate router port names
+          router_ports:
+            - name: self-duplicate
+              switch_port: self-first
+              state: absent
+            - name: self-duplicate
+              switch_port: self-second
+              state: absent
+        - name: duplicate switch port names
+          router_ports:
+            - name: self-first
+              switch_port: self-duplicate
+              state: absent
+            - name: self-second
+              switch_port: self-duplicate
+              state: absent
+        - name: overlapping router and switch port names
+          router_ports:
+            - name: self-first
+              switch_port: self-second
+              state: absent
+            - name: self-second
+              switch_port: self-third
+              state: absent
+      loop_control:
+        loop_var: ovn_router_port_negative_case
+        label: "{{ ovn_router_port_negative_case.name }}"

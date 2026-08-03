@@ -47,9 +47,18 @@
           - 2001:db8:2::ff/64
         options:
           gateway_mtu: 1300
+        switch_options:
+          arp_proxy: 203.0.113.0/24
       - name: self-rp-delete
         switch_port: self-rp-delete-sw
         state: absent
+      - name: 'self-rp "nat"'
+        router: self-r1
+        switch: self-nat-gateway
+        switch_port: 'self-rp-sw "nat"'
+        mac: "02:00:00:00:10:05"
+        networks:
+          - 198.18.0.1/24
     ovn_gateway_chassis:
       - id: self-gateway
         router_port: self-rp

@@ -29,6 +29,10 @@ prepare:
     how: ansible
     order: 88
     playbook: tests/self/ovn-topology/invalid-nat-rule.yml
+  - name: Verify invalid router port configurations are rejected
+    how: ansible
+    order: 89
+    playbook: tests/self/ovn-topology/invalid-router-port.yml
   - name: Apply initial OVN topology
     how: ansible
     order: 90
@@ -41,6 +45,10 @@ prepare:
     how: ansible
     order: 96
     playbook: tests/self/ovn-topology/invalid-nat-rule-update.yml
+  - name: Verify failed router port updates are atomic
+    how: ansible
+    order: 97
+    playbook: tests/self/ovn-topology/invalid-router-port-update.yml
   - name: Verify initial OVN topology
     how: shell
     order: 100

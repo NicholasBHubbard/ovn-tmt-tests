@@ -22,25 +22,6 @@
         - 'self-nat "exempted"'
       changed_when: true
 
-    - name: Create router for special NAT gateway port
-      ansible.builtin.command:
-        argv:
-          - ovn-nbctl
-          - lr-add
-          - self-r1
-      changed_when: true
-
-    - name: Create special NAT gateway port
-      ansible.builtin.command:
-        argv:
-          - ovn-nbctl
-          - lrp-add
-          - self-r1
-          - 'self-rp "nat"'
-          - "02:00:00:00:10:05"
-          - 198.18.0.1/24
-      changed_when: true
-
 - name: Apply the top-down topology configuration
   ansible.builtin.import_playbook: ../../../playbooks/ovn-topology.yml
   vars:
@@ -51,6 +32,7 @@
           subnet: 192.0.2.0/24
           exclude_ips: 192.0.2.1..192.0.2.2
       - name: self-unused
+      - name: self-nat-gateway
       - name: self-moved
         other_config:
           subnet: 203.0.113.0/24
@@ -106,6 +88,9 @@
         options:
           redirect-type: bridged
           gateway_mtu: 1400
+        switch_options:
+          nat-addresses: router
+          enable_router_port_acl: true
       - name: self-rp-delete
         router: self-r3
         switch: self-sw
@@ -118,6 +103,13 @@
         mac: "02:00:00:00:10:04"
         networks:
           - 203.0.113.254/24
+      - name: 'self-rp "nat"'
+        router: self-r1
+        switch: self-nat-gateway
+        switch_port: 'self-rp-sw "nat"'
+        mac: "02:00:00:00:10:05"
+        networks:
+          - 198.18.0.1/24
     ovn_gateway_chassis:
       - id: self-gateway
         router_port: self-rp-gateway

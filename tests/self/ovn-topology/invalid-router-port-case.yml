@@ -1,0 +1,31 @@
+- name: Require rejection of {{ ovn_router_port_negative_case.name }}
+  block:
+    - name: Apply invalid router port configuration
+      ansible.builtin.include_role:
+        name: ovn_router_ports
+      vars:
+        ovn_router_ports: "{{ ovn_router_port_negative_case.router_ports }}"
+
+    - name: Fail if invalid configuration was accepted
+      ansible.builtin.fail:
+        msg: >-
+          Invalid configuration was accepted:
+          {{ ovn_router_port_negative_case.name }}
+  rescue:
+    - name: Verify expected validation failure
+      ansible.builtin.assert:
+        that:
+          - >-
+            ansible_failed_result.msg
+            == 'Logical router port configuration is invalid.'
+            or
+            ansible_failed_result.results | default([])
+            | selectattr(
+                'msg',
+                'equalto',
+                'Logical router port configuration is invalid.'
+              )
+            | list | length == 1
+        fail_msg: >-
+          {{ ovn_router_port_negative_case.name }} failed unexpectedly:
+          {{ ansible_failed_result.msg }}

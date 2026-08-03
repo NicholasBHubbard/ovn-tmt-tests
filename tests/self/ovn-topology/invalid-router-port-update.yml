@@ -1,0 +1,32 @@
+- name: Verify failed router port updates are atomic
+  hosts: all
+  become: true
+  tasks:
+    - name: Require rejection of missing attachment parents
+      block:
+        - name: Move router attachment to missing parents
+          ansible.builtin.include_role:
+            name: ovn_router_ports
+          vars:
+            ovn_router_ports:
+              - name: self-rp
+                router: self-missing-router
+                switch: self-missing-switch
+                switch_port: self-rp-sw
+                mac: "02:00:00:00:99:01"
+                networks:
+                  - 198.51.100.1/24
+                options:
+                  gateway_mtu: 1200
+
+        - name: Fail if missing parents were accepted
+          ansible.builtin.fail:
+            msg: "Missing router attachment parents were accepted."
+      rescue:
+        - name: Verify missing parent failure
+          ansible.builtin.assert:
+            that:
+              - >-
+                'self-missing'
+                in ((ansible_failed_result.stdout | default(''))
+                    ~ (ansible_failed_result.stderr | default('')))

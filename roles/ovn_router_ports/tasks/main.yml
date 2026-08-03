@@ -1,12 +1,75 @@
-- name: Verify logical router port states
+- name: Verify logical router port configuration
+  ansible.builtin.assert:
+    that:
+      - ovn_router_ports is sequence
+      - ovn_router_ports is not string
+      - ovn_router_ports is not mapping
+    fail_msg: "Logical router port configuration is invalid."
+
+- name: Verify logical router port definitions
+  ansible.builtin.assert:
+    that:
+      - ovn_router_port is mapping
+      - ovn_router_port.name is defined
+      - ovn_router_port.name is string
+      - ovn_router_port.name | length > 0
+      - ovn_router_port.switch_port is defined
+      - ovn_router_port.switch_port is string
+      - ovn_router_port.switch_port | length > 0
+      - ovn_router_port.name != ovn_router_port.switch_port
+      - ovn_router_port.state | default('present') in ['present', 'absent']
+      - >-
+        ovn_router_port.state | default('present') == 'absent'
+        or (ovn_router_port.router is defined
+            and ovn_router_port.router is string
+            and ovn_router_port.router | length > 0
+            and ovn_router_port.switch is defined
+            and ovn_router_port.switch is string
+            and ovn_router_port.switch | length > 0
+            and ovn_router_port.mac is defined
+            and ovn_router_port.mac is string
+            and ovn_router_port.mac
+                is regex('^(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$')
+            and ovn_router_port.networks | default([]) is sequence
+            and ovn_router_port.networks | default([]) is not string
+            and ovn_router_port.networks | default([]) is not mapping
+            and ovn_router_port.networks | default([])
+                | select('string') | list | length
+                == ovn_router_port.networks | default([]) | length
+            and ovn_router_port.options | default({}) is mapping
+            and ovn_router_port.switch_options | default({}) is mapping)
+    fail_msg: "Logical router port configuration is invalid."
+  loop: "{{ ovn_router_ports }}"
+  loop_control:
+    loop_var: ovn_router_port
+    label: "{{ ovn_router_port.name | default('unnamed') }}"
+
+- name: Verify logical router and switch port names are unique
   ansible.builtin.assert:
     that:
       - >-
-        ovn_router_ports
-        | map(attribute='state', default='present')
-        | difference(['present', 'absent'])
+        ovn_router_ports | map(attribute='name') | unique | length
+        == ovn_router_ports | length
+      - >-
+        ovn_router_ports | map(attribute='switch_port') | unique | length
+        == ovn_router_ports | length
+      - >-
+        ovn_router_ports | map(attribute='name')
+        | intersect(ovn_router_ports | map(attribute='switch_port'))
         | length == 0
-    fail_msg: "Logical router port states must be present or absent."
+    fail_msg: "Logical router port configuration is invalid."
+
+- name: Verify logical router port options
+  when: ovn_router_port.state | default('present') == 'present'
+  ansible.builtin.include_tasks: validate.yml
+  loop: "{{ ovn_router_ports }}"
+  loop_control:
+    loop_var: ovn_router_port
+    label: "{{ ovn_router_port.name }}"
+
+- name: Initialize logical router port update state
+  ansible.builtin.set_fact:
+    ovn_router_ports_updated: false
 
 - name: Configure OVN router attachments
   ansible.builtin.include_tasks: router_port.yml

@@ -11,6 +11,7 @@ SPECIAL_LOCALNET_PORT = 'self-localnet "delete"'
 SPECIAL_NAT_ID = 'self-nat "delete"'
 SPECIAL_NAT_GATEWAY_PORT = 'self-rp "nat"'
 SPECIAL_NAT_EXEMPTED_SET = 'self-nat "exempted"'
+SPECIAL_ROUTER_SWITCH_PORT = 'self-rp-sw "nat"'
 
 
 @pytest.fixture
@@ -84,7 +85,11 @@ class TestInitial:
             "redirect-type": "bridged",
         }
         assert switch_port["type"] == "router"
-        assert switch_port["options"]["router-port"] == "self-rp"
+        assert switch_port["options"] == {
+            "enable_router_port_acl": "true",
+            "nat-addresses": "router",
+            "router-port": "self-rp",
+        }
         assert switch_port["addresses"] == "router"
         assert nb.referring_names("Logical_Router", "ports", port["_uuid"]) == [
             "self-r1"
@@ -94,6 +99,27 @@ class TestInitial:
         ]
         assert nb.exists("Logical_Router_Port", "name=self-rp-delete")
         assert nb.exists("Logical_Switch_Port", "name=self-rp-delete-sw")
+
+        special_port = nb.by_name(
+            "Logical_Router_Port", SPECIAL_NAT_GATEWAY_PORT, "_uuid"
+        )
+        special_switch_port = nb.by_name(
+            "Logical_Switch_Port",
+            SPECIAL_ROUTER_SWITCH_PORT,
+            "_uuid",
+            "type",
+            "options",
+        )
+        assert special_switch_port["type"] == "router"
+        assert special_switch_port["options"] == {
+            "router-port": SPECIAL_NAT_GATEWAY_PORT
+        }
+        assert nb.referring_names("Logical_Router", "ports", special_port["_uuid"]) == [
+            "self-r1"
+        ]
+        assert nb.referring_names(
+            "Logical_Switch", "ports", special_switch_port["_uuid"]
+        ) == ["self-nat-gateway"]
         snapshots.save("router-port", port["_uuid"])
         snapshots.save("router-switch-port", switch_port["_uuid"])
 
@@ -413,7 +439,10 @@ class TestResult:
         ]
         assert port["options"] == {"gateway_mtu": "1300"}
         assert switch_port["type"] == "router"
-        assert switch_port["options"] == {"router-port": "self-rp"}
+        assert switch_port["options"] == {
+            "arp_proxy": "203.0.113.0/24",
+            "router-port": "self-rp",
+        }
         assert switch_port["addresses"] == "router"
         assert nb.referring_names("Logical_Router", "ports", port["_uuid"]) == [
             "self-r3"
