@@ -2,6 +2,7 @@
   hosts: leader
   become: true
   roles:
+    - ovn_install
     - role: ovn_central
       ovn_central_cluster_members:
         - >-

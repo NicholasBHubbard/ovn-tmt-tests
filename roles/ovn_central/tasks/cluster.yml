@@ -10,93 +10,26 @@
     - "'firewalld.service' in (ansible_facts.services | default({}))"
     - "(ansible_facts.services['firewalld.service'].state | default('')) == 'running'"
   ansible.posix.firewalld:
-    port: "{{ item }}/tcp"
+    port: "{{ item.raft_port }}/tcp"
     state: enabled
     immediate: true
-  loop:
-    - "{{ ovn_central_nb_raft_port }}"
-    - "{{ ovn_central_sb_raft_port }}"
-
-- name: Start OVN NB cluster leader
-  when: ovn_central_resolved_address == ovn_central_cluster_members[0]
-  ansible.builtin.command:
-    cmd: >-
-      {{ ovn_central_ovn_ctl_resolved_path }}
-      --db-nb-cluster-local-addr={{ ovn_central_rendered_address }}
-      --db-nb-cluster-local-port={{ ovn_central_nb_raft_port }}
-      --db-nb-cluster-local-proto={{ ovn_central_raft_protocol }}
-      --db-nb-use-remote-in-db=no
-      {% if ovn_central_ssl_enabled | bool %}
-      --ovn-nb-db-ssl-key={{ ovn_central_ssl_private_key }}
-      --ovn-nb-db-ssl-cert={{ ovn_central_ssl_certificate }}
-      --ovn-nb-db-ssl-ca-cert={{ ovn_central_ssl_ca_cert }}
-      {% endif %}
-      start_nb_ovsdb
-  changed_when: true
-
-- name: Start OVN SB cluster leader
-  when: ovn_central_resolved_address == ovn_central_cluster_members[0]
-  ansible.builtin.command:
-    cmd: >-
-      {{ ovn_central_ovn_ctl_resolved_path }}
-      --db-sb-cluster-local-addr={{ ovn_central_rendered_address }}
-      --db-sb-cluster-local-port={{ ovn_central_sb_raft_port }}
-      --db-sb-cluster-local-proto={{ ovn_central_raft_protocol }}
-      --db-sb-use-remote-in-db=no
-      {% if ovn_central_ssl_enabled | bool %}
-      --ovn-sb-db-ssl-key={{ ovn_central_ssl_private_key }}
-      --ovn-sb-db-ssl-cert={{ ovn_central_ssl_certificate }}
-      --ovn-sb-db-ssl-ca-cert={{ ovn_central_ssl_ca_cert }}
-      {% endif %}
-      start_sb_ovsdb
-  changed_when: true
+  loop: "{{ ovn_central_databases }}"
+  loop_control:
+    label: "{{ item.name }}"
 
 - name: Wait for OVN cluster leader
   when: ovn_central_resolved_address != ovn_central_cluster_members[0]
   ansible.builtin.wait_for:
     host: "{{ ovn_central_cluster_members[0] }}"
-    port: "{{ item }}"
+    port: "{{ item.raft_port }}"
     timeout: "{{ ovn_central_cluster_join_timeout }}"
-  loop:
-    - "{{ ovn_central_nb_raft_port }}"
-    - "{{ ovn_central_sb_raft_port }}"
+  loop: "{{ ovn_central_databases }}"
+  loop_control:
+    label: "{{ item.name }}"
 
-- name: Start OVN NB cluster follower
-  when: ovn_central_resolved_address != ovn_central_cluster_members[0]
-  ansible.builtin.command:
-    cmd: >-
-      {{ ovn_central_ovn_ctl_resolved_path }}
-      --db-nb-cluster-local-addr={{ ovn_central_rendered_address }}
-      --db-nb-cluster-local-port={{ ovn_central_nb_raft_port }}
-      --db-nb-cluster-local-proto={{ ovn_central_raft_protocol }}
-      --db-nb-cluster-remote-addr={{ ovn_central_cluster_leader_address }}
-      --db-nb-cluster-remote-port={{ ovn_central_nb_raft_port }}
-      --db-nb-cluster-remote-proto={{ ovn_central_raft_protocol }}
-      --db-nb-use-remote-in-db=no
-      {% if ovn_central_ssl_enabled | bool %}
-      --ovn-nb-db-ssl-key={{ ovn_central_ssl_private_key }}
-      --ovn-nb-db-ssl-cert={{ ovn_central_ssl_certificate }}
-      --ovn-nb-db-ssl-ca-cert={{ ovn_central_ssl_ca_cert }}
-      {% endif %}
-      start_nb_ovsdb
-  changed_when: true
-
-- name: Start OVN SB cluster follower
-  when: ovn_central_resolved_address != ovn_central_cluster_members[0]
-  ansible.builtin.command:
-    cmd: >-
-      {{ ovn_central_ovn_ctl_resolved_path }}
-      --db-sb-cluster-local-addr={{ ovn_central_rendered_address }}
-      --db-sb-cluster-local-port={{ ovn_central_sb_raft_port }}
-      --db-sb-cluster-local-proto={{ ovn_central_raft_protocol }}
-      --db-sb-cluster-remote-addr={{ ovn_central_cluster_leader_address }}
-      --db-sb-cluster-remote-port={{ ovn_central_sb_raft_port }}
-      --db-sb-cluster-remote-proto={{ ovn_central_raft_protocol }}
-      --db-sb-use-remote-in-db=no
-      {% if ovn_central_ssl_enabled | bool %}
-      --ovn-sb-db-ssl-key={{ ovn_central_ssl_private_key }}
-      --ovn-sb-db-ssl-cert={{ ovn_central_ssl_certificate }}
-      --ovn-sb-db-ssl-ca-cert={{ ovn_central_ssl_ca_cert }}
-      {% endif %}
-      start_sb_ovsdb
-  changed_when: true
+- name: Start OVN clustered databases
+  ansible.builtin.include_tasks: start-database.yml
+  loop: "{{ ovn_central_databases }}"
+  loop_control:
+    loop_var: ovn_central_database
+    label: "{{ ovn_central_database.name }}"

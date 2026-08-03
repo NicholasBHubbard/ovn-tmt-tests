@@ -1,0 +1,70 @@
+- name: Read OVN cluster status for {{ ovn_central_database.name }}
+  ansible.builtin.command:
+    argv:
+      - ovn-appctl
+      - -t
+      - "{{ ovn_central_database.socket }}"
+      - cluster/status
+      - "{{ ovn_central_database.schema }}"
+  register: ovn_central_cluster_status
+  changed_when: false
+
+- name: Verify local OVN cluster address for {{ ovn_central_database.name }}
+  ansible.builtin.assert:
+    that:
+      - >-
+        'Address: ' ~ ovn_central_raft_protocol ~ ':'
+        ~ ovn_central_rendered_address ~ ':'
+        ~ (ovn_central_database.raft_port | string)
+        in ovn_central_cluster_status.stdout
+    fail_msg: >-
+      An existing OVN database uses a different local Raft address, port, or
+      protocol. Reprovision this cluster member before applying the new identity.
+
+- name: Resolve obsolete OVN cluster members for {{ ovn_central_database.name }}
+  when:
+    - ovn_central_reconcile_cluster_members | bool
+    - ovn_central_resolved_address == ovn_central_cluster_members[0]
+  ansible.builtin.set_fact:
+    ovn_central_obsolete_members: >-
+      {{ (ovn_central_cluster_status.stdout
+          | regex_findall(' at ([^ )]+)'))
+         | difference(ovn_central_database.raft_remotes) }}
+
+- name: Remove obsolete OVN cluster members for {{ ovn_central_database.name }}
+  when:
+    - ovn_central_reconcile_cluster_members | bool
+    - ovn_central_resolved_address == ovn_central_cluster_members[0]
+  ansible.builtin.command:
+    argv:
+      - ovn-appctl
+      - -t
+      - "{{ ovn_central_database.socket }}"
+      - cluster/kick
+      - "{{ ovn_central_database.schema }}"
+      - "{{ item }}"
+  loop: "{{ ovn_central_obsolete_members }}"
+  loop_control:
+    label: "{{ item }}"
+  changed_when: true
+
+- name: Wait for OVN membership reconciliation for {{ ovn_central_database.name }}
+  when:
+    - ovn_central_reconcile_cluster_members | bool
+    - ovn_central_resolved_address == ovn_central_cluster_members[0]
+  ansible.builtin.command:
+    argv:
+      - ovn-appctl
+      - -t
+      - "{{ ovn_central_database.socket }}"
+      - cluster/status
+      - "{{ ovn_central_database.schema }}"
+  register: ovn_central_reconciled_status
+  until: >-
+    (ovn_central_reconciled_status.stdout
+     | regex_findall(' at ([^ )]+)')
+     | difference(ovn_central_database.raft_remotes)
+     | length) == 0
+  retries: "{{ ovn_central_ready_retries }}"
+  delay: "{{ ovn_central_ready_delay }}"
+  changed_when: false

@@ -40,3 +40,6 @@
   when: not (ovn_installed | default(false))
   ansible.builtin.set_fact:
     ovn_installed: true
+
+- name: Resolve installed OVN paths
+  ansible.builtin.include_tasks: paths.yml

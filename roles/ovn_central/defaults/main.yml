@@ -10,9 +10,6 @@ ovn_central_ready_delay: 2
 ovn_central_reconcile_cluster_members: true
 ovn_central_ssl_enabled: false
 ovn_central_log_level: info
-ovn_central_ovn_ctl_path: ""
-ovn_central_nb_control_socket: ""
-ovn_central_sb_control_socket: ""
 
 ovn_central_ssl_private_key: /etc/openvswitch/ovn-privkey.pem
 ovn_central_ssl_certificate: /etc/openvswitch/ovn-cert.pem

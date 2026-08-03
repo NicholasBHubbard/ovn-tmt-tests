@@ -1,0 +1,20 @@
+- name: Start OVN clustered database for {{ ovn_central_database.name }}
+  ansible.builtin.command:
+    cmd: >-
+      {{ ovn_install_ovn_ctl_path }}
+      --db-{{ ovn_central_database.id }}-cluster-local-addr={{ ovn_central_rendered_address }}
+      --db-{{ ovn_central_database.id }}-cluster-local-port={{ ovn_central_database.raft_port }}
+      --db-{{ ovn_central_database.id }}-cluster-local-proto={{ ovn_central_raft_protocol }}
+      --db-{{ ovn_central_database.id }}-use-remote-in-db=no
+      {% if ovn_central_resolved_address != ovn_central_cluster_members[0] %}
+      --db-{{ ovn_central_database.id }}-cluster-remote-addr={{ ovn_central_cluster_leader_address }}
+      --db-{{ ovn_central_database.id }}-cluster-remote-port={{ ovn_central_database.raft_port }}
+      --db-{{ ovn_central_database.id }}-cluster-remote-proto={{ ovn_central_raft_protocol }}
+      {% endif %}
+      {% if ovn_central_ssl_enabled | bool %}
+      --ovn-{{ ovn_central_database.id }}-db-ssl-key={{ ovn_central_ssl_private_key }}
+      --ovn-{{ ovn_central_database.id }}-db-ssl-cert={{ ovn_central_ssl_certificate }}
+      --ovn-{{ ovn_central_database.id }}-db-ssl-ca-cert={{ ovn_central_ssl_ca_cert }}
+      {% endif %}
+      start_{{ ovn_central_database.id }}_ovsdb
+  changed_when: true

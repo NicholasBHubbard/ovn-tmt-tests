@@ -1,0 +1,52 @@
+- name: Find installed ovn-ctl
+  when: ovn_install_ovn_ctl_path | length == 0
+  ansible.builtin.find:
+    paths: "{{ ovn_install_destdir }}/usr"
+    patterns: ovn-ctl
+    file_type: file
+    recurse: true
+  register: ovn_install_ovn_ctl_files
+
+- name: Select installed ovn-ctl
+  when: ovn_install_ovn_ctl_path | length == 0
+  ansible.builtin.set_fact:
+    ovn_install_ovn_ctl_path: >-
+      {{ (ovn_install_ovn_ctl_files.files | sort(attribute='path')
+          | map(attribute='path') | first) | default('') }}
+
+- name: Verify installed ovn-ctl
+  ansible.builtin.assert:
+    that:
+      - ovn_install_ovn_ctl_path | length > 0
+    fail_msg: "Set ovn_install_ovn_ctl_path to the installed ovn-ctl script."
+
+- name: Read installed OVN paths
+  ansible.builtin.command:
+    argv:
+      - "{{ ovn_install_ovn_ctl_path }}"
+      - --help
+  register: ovn_install_ovn_ctl_help
+  failed_when: false
+  changed_when: false
+
+- name: Publish installed OVN paths
+  ansible.builtin.set_fact:
+    ovn_install_nb_control_socket: >-
+      {{ ovn_install_nb_control_socket
+         or (ovn_install_ovn_ctl_help.stdout
+             | regex_findall('--db-nb-ctrl-sock=SOCKET[^\n]*default: ([^)]+)')
+             | first | default('')) }}
+    ovn_install_sb_control_socket: >-
+      {{ ovn_install_sb_control_socket
+         or (ovn_install_ovn_ctl_help.stdout
+             | regex_findall('--db-sb-ctrl-sock=SOCKET[^\n]*default: ([^)]+)')
+             | first | default('')) }}
+
+- name: Verify installed OVN paths
+  ansible.builtin.assert:
+    that:
+      - ovn_install_nb_control_socket | length > 0
+      - ovn_install_sb_control_socket | length > 0
+    fail_msg: >-
+      Set ovn_install_nb_control_socket and ovn_install_sb_control_socket to
+      the installed OVN database control sockets.

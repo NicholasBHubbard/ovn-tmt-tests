@@ -1,5 +1,8 @@
 ovn_install_method: distro
 ovn_install_cc: ""
+ovn_install_ovn_ctl_path: ""
+ovn_install_nb_control_socket: ""
+ovn_install_sb_control_socket: ""
 
 # source: build from local source directory
 ovn_install_source_dir: /usr/src/ovn

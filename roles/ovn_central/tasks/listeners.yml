@@ -3,76 +3,50 @@
     - "'firewalld.service' in (ansible_facts.services | default({}))"
     - "(ansible_facts.services['firewalld.service'].state | default('')) == 'running'"
   ansible.posix.firewalld:
-    port: "{{ item }}/tcp"
+    port: "{{ item.client_port }}/tcp"
     state: enabled
     immediate: true
-  loop:
-    - "{{ ovn_central_nb_port }}"
-    - "{{ ovn_central_sb_port }}"
+  loop: "{{ ovn_central_databases }}"
+  loop_control:
+    label: "{{ item.name }}"
 
-- name: Configure NB SSL certificates
+- name: Configure OVN database SSL certificates
   when: ovn_central_ssl_enabled | bool
   ansible.builtin.command:
     cmd: >-
-      ovn-nbctl {{ '--no-leader-only' if ovn_central_cluster_members | length > 0 else '' }}
+      {{ item.control }}
+      {% if ovn_central_cluster_members | length > 0 %}--no-leader-only{% endif %}
       set-ssl {{ ovn_central_ssl_private_key }}
       {{ ovn_central_ssl_certificate }} {{ ovn_central_ssl_ca_cert }}
+  loop: "{{ ovn_central_databases }}"
+  loop_control:
+    label: "{{ item.name }}"
   changed_when: true
 
-- name: Configure SB SSL certificates
-  when: ovn_central_ssl_enabled | bool
-  ansible.builtin.command:
-    cmd: >-
-      ovn-sbctl {{ '--no-leader-only' if ovn_central_cluster_members | length > 0 else '' }}
-      set-ssl {{ ovn_central_ssl_private_key }}
-      {{ ovn_central_ssl_certificate }} {{ ovn_central_ssl_ca_cert }}
-  changed_when: true
-
-- name: Resolve OVN database listeners
-  ansible.builtin.set_fact:
-    ovn_central_nb_listener: >-
-      {{ ('pssl' if ovn_central_ssl_enabled | bool else 'ptcp')
-         ~ ':' ~ (ovn_central_nb_port | string)
-         ~ ':' ~ ovn_central_rendered_listen_address }}
-    ovn_central_sb_listener: >-
-      {{ ('pssl' if ovn_central_ssl_enabled | bool else 'ptcp')
-         ~ ':' ~ (ovn_central_sb_port | string)
-         ~ ':' ~ ovn_central_rendered_listen_address }}
-
-- name: Configure standalone NB database listener
+- name: Configure standalone OVN database listeners
   when: ovn_central_cluster_members | length == 0
   ansible.builtin.command:
     argv:
-      - ovn-nbctl
+      - "{{ item.control }}"
       - set-connection
-      - "{{ ovn_central_nb_listener }}"
-  changed_when: true
-
-- name: Configure standalone SB database listener
-  when: ovn_central_cluster_members | length == 0
-  ansible.builtin.command:
-    argv:
-      - ovn-sbctl
-      - set-connection
-      - "{{ ovn_central_sb_listener }}"
+      - "{{ item.listener }}"
+  loop: "{{ ovn_central_databases }}"
+  loop_control:
+    label: "{{ item.name }}"
   changed_when: true
 
 - name: Configure clustered OVN database listeners
   when: ovn_central_cluster_members | length > 0
   ansible.builtin.include_tasks: clustered-listeners.yml
 
-- name: Clear NB SSL configuration
+- name: Clear OVN database SSL configuration
   when: not (ovn_central_ssl_enabled | bool)
   ansible.builtin.command:
     cmd: >-
-      ovn-nbctl {{ '--no-leader-only' if ovn_central_cluster_members | length > 0 else '' }}
+      {{ item.control }}
+      {% if ovn_central_cluster_members | length > 0 %}--no-leader-only{% endif %}
       del-ssl
-  changed_when: true
-
-- name: Clear SB SSL configuration
-  when: not (ovn_central_ssl_enabled | bool)
-  ansible.builtin.command:
-    cmd: >-
-      ovn-sbctl {{ '--no-leader-only' if ovn_central_cluster_members | length > 0 else '' }}
-      del-ssl
+  loop: "{{ ovn_central_databases }}"
+  loop_control:
+    label: "{{ item.name }}"
   changed_when: true
