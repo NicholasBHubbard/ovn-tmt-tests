@@ -106,24 +106,6 @@ def validate_heavy(
     )
 
 
-def load_scale_topology(
-    path: Union[str, os.PathLike[str]], computes: Sequence[str]
-) -> dict[str, Any]:
-    topology = json.loads(Path(path).read_text())
-    workers = topology.get("workers", [])
-    if not workers:
-        raise ValueError("scale topology does not contain workers")
-    required = {"name", "chassis", "switch", "internal"}
-    if any(required - worker.keys() for worker in workers):
-        raise ValueError("scale topology worker is incomplete")
-    unknown = {worker["chassis"] for worker in workers} - set(computes)
-    if unknown:
-        raise ValueError(f"scale topology uses unknown chassis: {sorted(unknown)}")
-    if not topology.get("load_balancer_group"):
-        raise ValueError("scale topology does not contain a load balancer group")
-    return topology
-
-
 class Workload:
     def __init__(
         self,

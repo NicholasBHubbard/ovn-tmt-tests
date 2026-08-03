@@ -13,7 +13,6 @@ environment+:
   OTT_SCALE_IPV6: "false"
   OTT_SCALE_LB_PROTOCOLS: tcp,udp,sctp
   OTT_SCALE_TEST_PODS_PER_NAMESPACE: "4"
-  OTT_SCALE_TOPOLOGY_PATH: /run/ovn-tmt-tests/scale-topology.json
   OTT_SCALE_TOTAL_NAMESPACES: "4000"
   OTT_SCALE_WORKERS: "250"
 
@@ -28,21 +27,6 @@ provision+:
     how: virtual
     image: fedora
     connection: system
-
-prepare+:
-  - name: Prepare cluster-density scale topology
-    how: ansible
-    order: 70
-    where: [central]
-    playbook: playbooks/ovn-scale-topology.yml
-    extra-args: >-
-      -e ovn_scale_topology_worker_count=$OTT_SCALE_WORKERS
-      -e ovn_scale_topology_ipv4=$OTT_SCALE_IPV4
-      -e ovn_scale_topology_ipv6=$OTT_SCALE_IPV6
-      -e ovn_scale_topology_physical_bridge=$OTT_COMPUTE_PHYSICAL_BRIDGE
-      -e ovn_scale_topology_physical_network=$OTT_COMPUTE_PHYSICAL_NETWORK
-      -e 'ovn_scale_topology_snat_ct_zone=$OTT_SCALE_SNAT_CT_ZONE'
-      -e 'ovn_scale_topology_manifest_path=$OTT_SCALE_TOPOLOGY_PATH'
 
 discover:
   how: fmf

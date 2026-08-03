@@ -7,23 +7,19 @@ import pytest
 from ovn_test.command import Runner
 from ovn_test.config import read_bool, read_int, read_list
 from ovn_test.scale import ScaleBaseline, verify_scale_environment
+from ovn_test.scale_topology import ScaleTopology
 from ovn_test.topology import Topology
-from ovn_test.workload import (
-    Workload,
-    load_scale_topology,
-    validate_heavy,
-)
+from ovn_test.workload import Workload, validate_heavy
 
 
 @pytest.fixture
-def workload() -> Iterator[Any]:
+def workload(request: pytest.FixtureRequest) -> Iterator[Any]:
     topology = Topology.from_environment()
     runner = Runner(topology)
     computes = verify_scale_environment(runner, topology)
-    scale_topology = load_scale_topology(
-        os.environ["OTT_SCALE_TOPOLOGY_PATH"],
-        computes,
-    )
+    scale = ScaleTopology.from_environment(runner, computes, os.environ)
+    request.addfinalizer(scale.cleanup)  # noqa: PT021
+    scale_topology = scale.create()
     initial = read_int(os.environ, "OTT_SCALE_INITIAL_PODS", 11000)
     total = read_int(os.environ, "OTT_SCALE_TOTAL_PODS", 11250)
     base_per_worker = read_int(os.environ, "OTT_SCALE_BASE_PODS_PER_WORKER", 10)

@@ -21,7 +21,6 @@ INHERITED_SELF_PLANS = (
     "ovn-chassis",
     "ovn-install",
     "ovn-sb-convergence",
-    "ovn-scale-ports",
     "ovn-scale-topology",
     "ovn-system-test-deps",
     "ovn-topology",
@@ -170,17 +169,9 @@ def test_disabled_self_test_parents_use_main_metadata(tree: Path) -> None:
         assert "\nenabled: false\n" not in f"\n{path.read_text()}\n"
 
 
-@pytest.mark.parametrize(
-    ("family", "role_reference"),
-    (
-        ("ovn-scale-topology", "ovn-scale-topology.yml"),
-        ("ovn-scale-ports", "ovn-scale-ports.yml"),
-        ("ovn-sb-convergence", "role: ovn_sb_convergence"),
-    ),
-)
-def test_scale_roles_have_focused_self_tests(
-    tree: Path, family: str, role_reference: str
-) -> None:
+def test_sb_convergence_has_a_focused_self_test(tree: Path) -> None:
+    family = "ovn-sb-convergence"
+    role_reference = "role: ovn_sb_convergence"
     assert find_text(tree / "tests/self" / family, role_reference)
     assert find_text(tree / "plans/self" / family, f"/tests/self/{family}")
 

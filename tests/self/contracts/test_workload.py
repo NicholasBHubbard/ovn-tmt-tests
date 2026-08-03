@@ -6,7 +6,6 @@ from typing import Any
 import pytest
 from ovn_test.workload import (
     Workload,
-    load_scale_topology,
     validate_heavy,
     validate_light,
 )
@@ -39,30 +38,7 @@ def test_workload_identity_is_deterministic(tmp_path: Path) -> None:
     assert workload.vip(3, 6) == "100::4"
 
 
-def test_loads_scale_topology_for_provisioned_guests(tmp_path: Path) -> None:
-    path = tmp_path / "scale.json"
-    path.write_text(
-        """{
-          "load_balancer_group": "cluster-lb-group",
-          "workers": [
-            {
-              "name": "worker-0",
-              "chassis": "compute-1",
-              "switch": "switch-0",
-              "internal": {"ipv4": "10.0.0.0/24"}
-            }
-          ]
-        }"""
-    )
-
-    topology = load_scale_topology(path, ["compute-1", "compute-2"])
-
-    assert topology["workers"][0]["switch"] == "switch-0"
-    with pytest.raises(ValueError, match="unknown chassis"):
-        load_scale_topology(path, ["compute-2"])
-
-
-def test_workload_uses_prepared_scale_topology(tmp_path: Path) -> None:
+def test_workload_uses_scale_topology(tmp_path: Path) -> None:
     runner = FakeRunner()
     topology = {
         "load_balancer_group": "cluster-lb-group",

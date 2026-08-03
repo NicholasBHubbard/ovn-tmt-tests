@@ -1,7 +1,0 @@
-- name: Apply the scale topology configuration
-  ansible.builtin.import_playbook: ../../../playbooks/ovn-scale-topology.yml
-  vars:
-    ovn_scale_topology_central_hosts: all
-    ovn_scale_topology_id: self-scale
-    ovn_scale_topology_chassis_names:
-      - ovn-scale-0

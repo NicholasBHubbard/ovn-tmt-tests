@@ -1,20 +1,38 @@
 import os
 import time
+from collections.abc import Iterator
 from typing import Any
 
 import pytest
 from ovn_test.command import Runner
 from ovn_test.config import read_int
 from ovn_test.ovsdb import Ovsdb
+from ovn_test.scale_topology import ScaleTopology
 from ovn_test.state import Snapshots
 
 OWNER = "external_ids:ovn-tmt-tests-owner="
 SCOPE = "external_ids:ovn-tmt-tests-scope="
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def runner() -> Runner:
     return Runner()
+
+
+@pytest.fixture(scope="session")
+def scale(runner: Runner) -> Iterator[ScaleTopology]:
+    environment = {
+        **os.environ,
+        "OTT_SCALE_ID": "self-scale",
+        "OTT_SCALE_WORKERS": "3",
+    }
+    instance = ScaleTopology.from_environment(
+        runner,
+        [SCALE_CHASSIS],
+        environment,
+    )
+    yield instance
+    instance.cleanup()
 
 
 @pytest.fixture
@@ -192,7 +210,17 @@ class TestPreconditions:
 
 
 class TestInitial:
-    def test_three_workers_are_complete(self, nb: Ovsdb, sb: Ovsdb) -> None:
+    @pytest.fixture(scope="class", autouse=True)
+    def apply_topology(self, scale: ScaleTopology) -> None:
+        scale.create(3)
+
+    def test_three_workers_are_complete(
+        self,
+        runner: Runner,
+        nb: Ovsdb,
+        sb: Ovsdb,
+        snapshots: Snapshots,
+    ) -> None:
         assert_scale_counts(nb, 3)
         assert_scale_group_attachments(nb, 3)
         assert_scale_external_vlans(nb, 3)
@@ -243,6 +271,7 @@ class TestInitial:
             "external_ip": "30.0.255.253",
             "logical_ip": "16.0.0.0/4",
         }
+        snapshots.save("scale-chassis", assert_scale_chassis(runner, nb, sb))
 
     @pytest.mark.parametrize(
         ("table", "name", "snapshot"),
@@ -263,8 +292,16 @@ class TestInitial:
 
 
 class TestExpanded:
+    @pytest.fixture(scope="class", autouse=True)
+    def apply_topology(self, scale: ScaleTopology) -> None:
+        scale.create(500)
+
     def test_500_workers_are_complete(
-        self, nb: Ovsdb, sb: Ovsdb, snapshots: Snapshots
+        self,
+        runner: Runner,
+        nb: Ovsdb,
+        sb: Ovsdb,
+        snapshots: Snapshots,
     ) -> None:
         assert_scale_counts(nb, 500)
         assert_scale_group_attachments(nb, 500)
@@ -291,25 +328,20 @@ class TestExpanded:
             "16::1f3:ffff:ffff:ffff:fffe/64",
             "17.243.255.254/16",
         ]
-
-
-class TestChassisInitial:
-    def test_chassis_guest_is_connected(
-        self, runner: Runner, nb: Ovsdb, sb: Ovsdb, snapshots: Snapshots
-    ) -> None:
-        snapshots.save("scale-chassis", assert_scale_chassis(runner, nb, sb))
-
-
-class TestChassisExpanded:
-    def test_chassis_guest_processes_500_worker_topology(
-        self, runner: Runner, nb: Ovsdb, sb: Ovsdb, snapshots: Snapshots
-    ) -> None:
         assert assert_scale_chassis(runner, nb, sb) == snapshots.load("scale-chassis")
 
 
 class TestResult:
+    @pytest.fixture(scope="class", autouse=True)
+    def apply_topology(self, scale: ScaleTopology) -> None:
+        scale.create(2)
+
     def test_contracted_topology_is_complete(
-        self, nb: Ovsdb, sb: Ovsdb, snapshots: Snapshots
+        self,
+        runner: Runner,
+        nb: Ovsdb,
+        sb: Ovsdb,
+        snapshots: Snapshots,
     ) -> None:
         assert_scale_counts(nb, 2)
         assert_scale_group_attachments(nb, 2)
@@ -326,6 +358,7 @@ class TestResult:
             "rtr-to-node-ovn-scale-0",
             "_uuid",
         )["_uuid"] == snapshots.load("scale-worker-port")
+        assert assert_scale_chassis(runner, nb, sb) == snapshots.load("scale-chassis")
 
     def test_removed_workers_leave_no_southbound_topology(self, sb: Ovsdb) -> None:
         current_datapaths, current_ports = scale_southbound_names(2)
@@ -353,8 +386,28 @@ class TestResult:
         )
 
 
-class TestChassisResult:
-    def test_chassis_guest_processes_contracted_topology(
-        self, runner: Runner, nb: Ovsdb, sb: Ovsdb, snapshots: Snapshots
-    ) -> None:
-        assert assert_scale_chassis(runner, nb, sb) == snapshots.load("scale-chassis")
+class TestCleanup:
+    @pytest.fixture(scope="class", autouse=True)
+    def remove_topology(self, scale: ScaleTopology) -> None:
+        scale.cleanup()
+
+    def test_all_managed_state_is_removed(self, nb: Ovsdb, sb: Ovsdb) -> None:
+        for table in (
+            "Logical_Switch",
+            "Logical_Router",
+            "Logical_Router_Port",
+        ):
+            assert not scale_rows(nb, table)
+        assert not scale_gateway_rows(nb)
+        assert not scale_managed_rows(nb, "NAT")
+        assert not nb.find(
+            "Logical_Router_Static_Route",
+            f"{SCOPE}self-scale",
+            columns=("_uuid",),
+        )
+        assert not nb.exists("Load_Balancer_Group", 'name="cluster-lb-group1"')
+
+        expected_datapaths, expected_ports = scale_southbound_names(2)
+        datapaths, ports = southbound_names(sb)
+        assert not expected_datapaths & datapaths
+        assert not expected_ports & ports

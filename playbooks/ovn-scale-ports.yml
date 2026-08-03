@@ -1,5 +1,0 @@
-- name: Configure OVN scale ports
-  hosts: "{{ ovn_scale_ports_hosts | default('compute') }}"
-  become: true
-  roles:
-    - ovn_scale_ports

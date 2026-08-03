@@ -10,8 +10,9 @@ from ovn_test.command import Runner
 from ovn_test.config import read_bool, read_int, read_list
 from ovn_test.load_balancer import socket
 from ovn_test.scale import ScaleBaseline, verify_scale_environment
+from ovn_test.scale_topology import ScaleTopology
 from ovn_test.topology import Topology
-from ovn_test.workload import Workload, load_scale_topology
+from ovn_test.workload import Workload
 
 
 def cluster_vip(iteration: int, family: int) -> str:
@@ -98,14 +99,13 @@ def add_service_routes(
 
 
 @pytest.fixture
-def workload() -> Iterator[Any]:
+def workload(request: pytest.FixtureRequest) -> Iterator[Any]:
     topology = Topology.from_environment()
     runner = Runner(topology)
     computes = verify_scale_environment(runner, topology)
-    scale_topology = load_scale_topology(
-        os.environ["OTT_SCALE_TOPOLOGY_PATH"],
-        computes,
-    )
+    scale = ScaleTopology.from_environment(runner, computes, os.environ)
+    request.addfinalizer(scale.cleanup)  # noqa: PT021
+    scale_topology = scale.create()
     config: dict[str, Any] = {
         "iterations": read_int(os.environ, "OTT_SCALE_SERVICE_LOAD_BALANCERS", 16),
         "backends": read_int(os.environ, "OTT_SCALE_SERVICE_BACKENDS", 4),

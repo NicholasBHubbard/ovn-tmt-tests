@@ -1,9 +1,13 @@
 import ipaddress
-import json
-import os
 from collections import Counter
-from pathlib import Path
-from typing import Any, TypedDict, Union
+from collections.abc import Mapping, Sequence
+from typing import Any, Optional, TypedDict, Union
+
+from ovn_test._scale_topology import apply as apply_database
+from ovn_test._scale_topology import apply_load_balancer_group
+from ovn_test.command import Runner
+from ovn_test.config import read_bool, read_int
+from ovn_test.ovsdb import Ovsdb
 
 Network = Union[ipaddress.IPv4Network, ipaddress.IPv6Network]
 
@@ -277,14 +281,144 @@ def generate(config: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-def main() -> None:
-    output = json.dumps(generate(json.loads(os.environ["OVN_SCALE_TOPOLOGY_CONFIG"])))
-    path = os.environ.get("OVN_SCALE_TOPOLOGY_OUTPUT")
-    if path:
-        Path(path).write_text(output)
-    else:
-        print(output)
+def _names(value: str) -> list[str]:
+    return [item.strip() for item in value.split(",") if item.strip()]
 
 
-if __name__ == "__main__":
-    main()
+def configuration(
+    computes: Sequence[str],
+    environment: Mapping[str, str],
+) -> dict[str, Any]:
+    return {
+        "id": environment.get("OTT_SCALE_ID", "ovn-scale"),
+        "worker_count": read_int(environment, "OTT_SCALE_WORKERS", 2),
+        "worker_prefix": environment.get("OTT_SCALE_WORKER_PREFIX", "ovn-scale"),
+        "workers": _names(environment.get("OTT_SCALE_WORKER_NAMES", "")),
+        "chassis": list(computes),
+        "ipv4": read_bool(environment, "OTT_SCALE_IPV4", True),
+        "ipv6": read_bool(environment, "OTT_SCALE_IPV6", True),
+        "internal_ipv4": environment.get("OTT_SCALE_INTERNAL_IPV4", "16.0.0.0/16"),
+        "internal_ipv6": environment.get("OTT_SCALE_INTERNAL_IPV6", "16::/64"),
+        "external_ipv4": environment.get("OTT_SCALE_EXTERNAL_IPV4", "20.0.0.0/16"),
+        "external_ipv6": environment.get("OTT_SCALE_EXTERNAL_IPV6", "20::/64"),
+        "join_ipv4": environment.get("OTT_SCALE_JOIN_IPV4", "30.0.0.0/16"),
+        "join_ipv6": environment.get("OTT_SCALE_JOIN_IPV6", "30::/64"),
+        "cluster_ipv4": environment.get("OTT_SCALE_CLUSTER_IPV4", "16.0.0.0/4"),
+        "cluster_ipv6": environment.get("OTT_SCALE_CLUSTER_IPV6", "16::/32"),
+        "cluster_router": environment.get("OTT_SCALE_CLUSTER_ROUTER", "lr-cluster1"),
+        "join_switch": environment.get("OTT_SCALE_JOIN_SWITCH", "ls-join1"),
+        "load_balancer_group": environment.get(
+            "OTT_SCALE_LOAD_BALANCER_GROUP", "cluster-lb-group1"
+        ),
+        "snat_ct_zone": environment.get("OTT_SCALE_SNAT_CT_ZONE", ""),
+        "physical_network": environment.get("OTT_COMPUTE_PHYSICAL_NETWORK", "physnet"),
+        "physical_bridge": environment.get("OTT_COMPUTE_PHYSICAL_BRIDGE", "br-ex"),
+    }
+
+
+class ScaleTopology:
+    def __init__(
+        self,
+        runner: Runner,
+        config: dict[str, Any],
+        *,
+        wait: bool = True,
+        timeout: int = 120,
+    ) -> None:
+        if timeout < 1:
+            raise ValueError("scale topology timeout must be positive")
+        self.runner = runner
+        self.config = config
+        self.wait = wait
+        self.timeout = timeout
+        self.data: Optional[dict[str, Any]] = None
+
+    @classmethod
+    def from_environment(
+        cls,
+        runner: Runner,
+        computes: Sequence[str],
+        environment: Mapping[str, str],
+    ) -> "ScaleTopology":
+        timeout = read_int(
+            environment,
+            "OTT_SCALE_TOPOLOGY_TIMEOUT",
+            environment.get("OTT_SCALE_SYNC_TIMEOUT", 120),
+        )
+        return cls(
+            runner,
+            configuration(computes, environment),
+            wait=read_bool(environment, "OTT_SCALE_WAIT_FOR_SB", True),
+            timeout=timeout,
+        )
+
+    def create(self, worker_count: Optional[int] = None) -> dict[str, Any]:
+        config = self.config
+        if worker_count is not None:
+            config = {**config, "worker_count": worker_count, "workers": []}
+        data = generate(config)
+        self.data = data
+        apply_database(self.runner, data)
+        group = data["load_balancer_groups"][0]
+        apply_load_balancer_group(
+            self.runner,
+            group["id"],
+            group["switches"],
+            group["routers"],
+        )
+        if self.wait:
+            self._converge(data["southbound"])
+        return data
+
+    def cleanup(self) -> None:
+        if self.data is None:
+            return
+        group = self.data["load_balancer_group"]
+        empty = {
+            "owner": self.data["owner"],
+            "workers": [],
+            "switches": [],
+            "routers": [],
+            "router_ports": [],
+            "localnet_ports": [],
+            "gateway_chassis": [],
+            "static_routes": [],
+            "nat_rules": [],
+            "managed": {"switches": [], "routers": [], "router_ports": []},
+            "southbound": {
+                "datapaths": [],
+                "ports": [],
+                "absent_datapaths": [],
+                "absent_ports": [],
+            },
+        }
+        apply_database(self.runner, empty)
+        apply_load_balancer_group(self.runner, group, [], [], present=False)
+        if self.wait:
+            self._converge(empty["southbound"])
+        self.data = None
+
+    def _converge(self, expected: dict[str, Any]) -> None:
+        self.runner.run(
+            "ovn-nbctl",
+            "--wait=sb",
+            f"--timeout={self.timeout}",
+            "sync",
+        )
+        sb = Ovsdb(self.runner, "ovn-sbctl")
+        actual = {
+            "datapaths": {
+                item.get("name")
+                for item in sb.values("Datapath_Binding", "external_ids")
+            }
+            - {None},
+            "ports": set(sb.values("Port_Binding", "logical_port")),
+        }
+        problems = {}
+        for kind in ("datapaths", "ports"):
+            if missing := set(expected[kind]) - actual[kind]:
+                problems[f"missing_{kind}"] = sorted(missing)
+            if stale := set(expected[f"absent_{kind}"]) & actual[kind]:
+                problems[f"stale_{kind}"] = sorted(stale)
+        if problems:
+            raise RuntimeError(f"Southbound topology did not converge: {problems}")

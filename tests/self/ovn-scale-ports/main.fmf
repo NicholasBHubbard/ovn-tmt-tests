@@ -1,3 +1,0 @@
-summary: Verify OVN scale port lifecycle
-test: python3 -m pytest ./test.py::TestResult
-duration: 5m

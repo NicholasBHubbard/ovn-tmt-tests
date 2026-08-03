@@ -1,6 +1,5 @@
 summary: Verify OVN scale topology lifecycle
 test: >-
   python3 -m pytest
-  ./test.py::TestResult
-  ./test.py::TestChassisResult
-duration: 5m
+  ./test.py
+duration: 15m

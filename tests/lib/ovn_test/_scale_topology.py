@@ -1,55 +1,37 @@
 import json
-import os
-import subprocess
 import time
 from collections.abc import Mapping, Sequence
-from pathlib import Path
 from typing import Any
+
+from ovn_test.command import Runner
+from ovn_test.ovsdb import Ovsdb
 
 OWNER = "ovn-tmt-tests-owner"
 IDENTIFIER = "ovn-tmt-tests-id"
 SCOPE = "ovn-tmt-tests-scope"
 
 
-def _decode(value: Any) -> Any:
-    if not isinstance(value, list) or len(value) != 2:
-        return value
-    kind, contents = value
-    if kind in {"uuid", "named-uuid"}:
-        return contents
-    if kind == "set":
-        return [_decode(item) for item in contents]
-    if kind == "map":
-        return {_decode(key): _decode(item) for key, item in contents}
-    return value
+class _Database:
+    def __init__(self, runner: Runner) -> None:
+        self.runner = runner
+        self.ovsdb = Ovsdb(runner, "ovn-nbctl")
 
+    def run(self, *args: object) -> str:
+        return self.runner.output("ovn-nbctl", *args)
 
-def _run(*args: object) -> str:
-    return subprocess.run(
-        ["ovn-nbctl", *map(str, args)],
-        check=True,
-        text=True,
-        stdout=subprocess.PIPE,
-    ).stdout.strip()
+    def rows(self, table: str, *columns: str) -> list[dict[str, Any]]:
+        return self.ovsdb.find(table, columns=columns)
 
-
-def _rows(table: str, *columns: str) -> list[dict[str, Any]]:
-    result = json.loads(
-        _run(
-            "--format=json",
-            "--data=json",
-            f"--columns={','.join(columns)}",
-            "find",
-            table,
-        )
-    )
-    return [
-        {
-            heading: _decode(value)
-            for heading, value in zip(result["headings"], row, strict=True)
-        }
-        for row in result["data"]
-    ]
+    def batch(self, groups: Sequence[Any], size: int = 50) -> None:
+        for offset in range(0, len(groups), size):
+            arguments = []
+            for group in groups[offset : offset + size]:
+                for command in group:
+                    if arguments:
+                        arguments.append("--")
+                    arguments.extend(command)
+            if arguments:
+                self.run(*arguments)
 
 
 def _references(rows: Sequence[dict[str, Any]], column: str) -> dict[str, str]:
@@ -59,18 +41,6 @@ def _references(rows: Sequence[dict[str, Any]], column: str) -> dict[str, str]:
         values = values if isinstance(values, list) else [values]
         result.update({value: row["name"] for value in values if value})
     return result
-
-
-def _batch(groups: Sequence[Any], size: int = 50) -> None:
-    for offset in range(0, len(groups), size):
-        arguments = []
-        for group in groups[offset : offset + size]:
-            for command in group:
-                if arguments:
-                    arguments.append("--")
-                arguments.extend(command)
-        if arguments:
-            _run(*arguments)
 
 
 def _quoted(value: Any) -> str:
@@ -104,7 +74,7 @@ def _identified(rows: Sequence[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     }
 
 
-def _configure_roots(topology: dict[str, Any], owner: str) -> None:
+def _configure_roots(db: _Database, topology: dict[str, Any], owner: str) -> None:
     groups = []
     for switch in topology["switches"]:
         name = switch["name"]
@@ -134,10 +104,11 @@ def _configure_roots(topology: dict[str, Any], owner: str) -> None:
                 ),
             ]
         )
-    _batch(groups)
+    db.batch(groups)
 
 
 def _configure_ports(
+    db: _Database,
     topology: dict[str, Any],
     owner: str,
     routers: Sequence[dict[str, Any]],
@@ -291,10 +262,11 @@ def _configure_ports(
         )
         groups.append(commands)
 
-    _batch(groups)
+    db.batch(groups)
 
 
 def _configure_gateway_chassis(
+    db: _Database,
     topology: dict[str, Any],
     router_ports: Sequence[dict[str, Any]],
     gateway_chassis: Sequence[dict[str, Any]],
@@ -361,10 +333,11 @@ def _configure_gateway_chassis(
                 ]
             )
         groups.append(commands)
-    _batch(groups)
+    db.batch(groups)
 
 
 def _configure_routes(
+    db: _Database,
     topology: dict[str, Any],
     routers: Sequence[dict[str, Any]],
     routes: Sequence[dict[str, Any]],
@@ -439,10 +412,11 @@ def _configure_routes(
                 ]
             )
         groups.append(commands)
-    _batch(groups)
+    db.batch(groups)
 
 
 def _configure_nat(
+    db: _Database,
     topology: dict[str, Any],
     routers: Sequence[dict[str, Any]],
     rules: Sequence[dict[str, Any]],
@@ -495,10 +469,12 @@ def _configure_nat(
                 ]
             )
         groups.append(commands)
-    _batch(groups)
+    db.batch(groups)
 
 
-def _cleanup(topology: dict[str, Any], owner: str, state: dict[str, Any]) -> None:
+def _cleanup(
+    db: _Database, topology: dict[str, Any], owner: str, state: dict[str, Any]
+) -> None:
     desired = topology["managed"]
     desired_switch_ports = {
         port["switch_port"] for port in topology["router_ports"]
@@ -570,7 +546,7 @@ def _cleanup(topology: dict[str, Any], owner: str, state: dict[str, Any]) -> Non
     for row in _managed(state["routers"], owner):
         if row["name"] not in desired["routers"]:
             groups.append([["--if-exists", "lr-del", row["name"]]])
-    _batch(groups)
+    db.batch(groups)
 
 
 def _record_removed(topology: dict[str, Any], state: dict[str, Any]) -> None:
@@ -589,13 +565,82 @@ def _record_removed(topology: dict[str, Any], state: dict[str, Any]) -> None:
     expected["absent_ports"] = sorted(previous_ports - set(expected["ports"]))
 
 
-def apply(topology: dict[str, Any]) -> None:
+def apply_load_balancer_group(
+    runner: Runner,
+    name: str,
+    switches: Sequence[str],
+    routers: Sequence[str],
+    *,
+    present: bool = True,
+) -> None:
+    db = _Database(runner)
+    matches = [
+        row
+        for row in db.rows("Load_Balancer_Group", "_uuid", "name")
+        if row["name"] == name
+    ]
+    if len(matches) > 1:
+        raise RuntimeError(f"load balancer group {name!r} is not unique")
+    if not matches and not present:
+        return
+
+    commands = []
+    if matches:
+        target = matches[0]["_uuid"]
+        current_switches = {
+            row["name"]
+            for row in db.rows("Logical_Switch", "name", "load_balancer_group")
+            if target in row["load_balancer_group"]
+        }
+        current_routers = {
+            row["name"]
+            for row in db.rows("Logical_Router", "name", "load_balancer_group")
+            if target in row["load_balancer_group"]
+        }
+    else:
+        target = "@group"
+        current_switches = set()
+        current_routers = set()
+        commands.append(
+            [
+                "--id=@group",
+                "create",
+                "Load_Balancer_Group",
+                f"name={_quoted(name)}",
+            ]
+        )
+
+    wanted_switches = set(switches) if present else set()
+    wanted_routers = set(routers) if present else set()
+    commands.extend(
+        ["remove", "Logical_Switch", item, "load_balancer_group", target]
+        for item in sorted(current_switches - wanted_switches)
+    )
+    commands.extend(
+        ["add", "Logical_Switch", item, "load_balancer_group", target]
+        for item in sorted(wanted_switches - current_switches)
+    )
+    commands.extend(
+        ["remove", "Logical_Router", item, "load_balancer_group", target]
+        for item in sorted(current_routers - wanted_routers)
+    )
+    commands.extend(
+        ["add", "Logical_Router", item, "load_balancer_group", target]
+        for item in sorted(wanted_routers - current_routers)
+    )
+    if not present:
+        commands.append(["destroy", "Load_Balancer_Group", target])
+    db.batch([commands])
+
+
+def apply(runner: Runner, topology: dict[str, Any]) -> None:
+    db = _Database(runner)
     owner = topology["owner"]
     topology["southbound"]["started_ns"] = time.monotonic_ns()
-    _configure_roots(topology, owner)
+    _configure_roots(db, topology, owner)
 
-    switches = _rows("Logical_Switch", "_uuid", "name", "external_ids", "ports")
-    routers = _rows(
+    switches = db.rows("Logical_Switch", "_uuid", "name", "external_ids", "ports")
+    routers = db.rows(
         "Logical_Router",
         "_uuid",
         "name",
@@ -604,19 +649,20 @@ def apply(topology: dict[str, Any]) -> None:
         "static_routes",
         "nat",
     )
-    router_ports = _rows(
+    router_ports = db.rows(
         "Logical_Router_Port",
         "_uuid",
         "name",
         "external_ids",
         "gateway_chassis",
     )
-    switch_ports = _rows("Logical_Switch_Port", "_uuid", "name", "external_ids")
-    routes = _rows("Logical_Router_Static_Route", "_uuid", "external_ids")
-    nat = _rows("NAT", "_uuid", "external_ids")
-    gateway_chassis = _rows("Gateway_Chassis", "_uuid", "name")
+    switch_ports = db.rows("Logical_Switch_Port", "_uuid", "name", "external_ids")
+    routes = db.rows("Logical_Router_Static_Route", "_uuid", "external_ids")
+    nat = db.rows("NAT", "_uuid", "external_ids")
+    gateway_chassis = db.rows("Gateway_Chassis", "_uuid", "name")
 
     _configure_ports(
+        db,
         topology,
         owner,
         routers,
@@ -624,9 +670,9 @@ def apply(topology: dict[str, Any]) -> None:
         router_ports,
         switch_ports,
     )
-    _configure_gateway_chassis(topology, router_ports, gateway_chassis)
-    _configure_routes(topology, routers, routes, owner)
-    _configure_nat(topology, routers, nat, owner)
+    _configure_gateway_chassis(db, topology, router_ports, gateway_chassis)
+    _configure_routes(db, topology, routers, routes, owner)
+    _configure_nat(db, topology, routers, nat, owner)
     state = {
         "switches": switches,
         "routers": routers,
@@ -638,6 +684,7 @@ def apply(topology: dict[str, Any]) -> None:
     }
     _record_removed(topology, state)
     _cleanup(
+        db,
         topology,
         owner,
         state,
@@ -652,14 +699,3 @@ def apply(topology: dict[str, Any]) -> None:
             }
         )
     )
-
-
-def main() -> None:
-    path = Path(os.environ["OVN_SCALE_TOPOLOGY_PATH"])
-    topology = json.loads(path.read_text())
-    apply(topology)
-    path.write_text(json.dumps(topology))
-
-
-if __name__ == "__main__":
-    main()

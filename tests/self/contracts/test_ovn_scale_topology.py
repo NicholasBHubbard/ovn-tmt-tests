@@ -1,10 +1,11 @@
 import time
-from pathlib import Path
 from typing import Any
 
 import pytest
+from ovn_test import _scale_topology as apply_module
+from ovn_test.scale_topology import generate
 
-from ._support import load_module
+from ._support import FakeRunner
 
 
 def configuration(**overrides: Any) -> dict[str, Any]:
@@ -34,12 +35,8 @@ def configuration(**overrides: Any) -> dict[str, Any]:
     }
 
 
-def test_generates_arbitrary_worker_count(tree: Path) -> None:
-    topology = load_module(
-        tree,
-        "scale_topology",
-        "roles/ovn_scale_topology/files/generate.py",
-    ).generate(configuration())
+def test_generates_arbitrary_worker_count() -> None:
+    topology = generate(configuration())
 
     assert len(topology["workers"]) == 500
     assert len(topology["switches"]) == 1001
@@ -54,12 +51,10 @@ def test_generates_arbitrary_worker_count(tree: Path) -> None:
     assert topology["physical_bridge"] == "br-provider"
 
 
-def test_assigns_logical_workers_to_provisioned_chassis(tree: Path) -> None:
-    topology = load_module(
-        tree,
-        "scale_topology_chassis",
-        "roles/ovn_scale_topology/files/generate.py",
-    ).generate(configuration(worker_count=3, chassis=["compute-1", "compute-2"]))
+def test_assigns_logical_workers_to_provisioned_chassis() -> None:
+    topology = generate(
+        configuration(worker_count=3, chassis=["compute-1", "compute-2"])
+    )
 
     assert [worker["chassis"] for worker in topology["workers"]] == [
         "compute-1",
@@ -89,23 +84,13 @@ def test_assigns_logical_workers_to_provisioned_chassis(tree: Path) -> None:
     )
 
 
-def test_rejects_exhausted_chassis_vlan_space(tree: Path) -> None:
-    generate = load_module(
-        tree,
-        "scale_topology_vlan_limit",
-        "roles/ovn_scale_topology/files/generate.py",
-    ).generate
-
+def test_rejects_exhausted_chassis_vlan_space() -> None:
     with pytest.raises(ValueError, match="external VLAN space"):
         generate(configuration(worker_count=4095, chassis=["compute-1"]))
 
 
-def test_configures_requested_snat_conntrack_zone(tree: Path) -> None:
-    topology = load_module(
-        tree,
-        "scale_topology_snat_zone",
-        "roles/ovn_scale_topology/files/generate.py",
-    ).generate(configuration(worker_count=2, snat_ct_zone=42))
+def test_configures_requested_snat_conntrack_zone() -> None:
+    topology = generate(configuration(worker_count=2, snat_ct_zone=42))
 
     assert [
         router["options"]["snat-ct-zone"]
@@ -114,17 +99,13 @@ def test_configures_requested_snat_conntrack_zone(tree: Path) -> None:
     ] == [42, 42]
 
 
-def test_explicit_worker_names_override_generation(tree: Path) -> None:
-    topology = load_module(
-        tree,
-        "scale_topology",
-        "roles/ovn_scale_topology/files/generate.py",
-    ).generate(configuration(worker_count=500, workers=["alpha", "beta"]))
+def test_explicit_worker_names_override_generation() -> None:
+    topology = generate(configuration(worker_count=500, workers=["alpha", "beta"]))
 
     assert [worker["name"] for worker in topology["workers"]] == ["alpha", "beta"]
 
 
-def test_records_removed_southbound_objects(tree: Path) -> None:
+def test_records_removed_southbound_objects() -> None:
     topology = {
         "owner": "contract",
         "southbound": {
@@ -155,13 +136,7 @@ def test_records_removed_southbound_objects(tree: Path) -> None:
             for name in ("kept-port", "old-port")
         ],
     }
-    apply = load_module(
-        tree,
-        "scale_topology_apply",
-        "roles/ovn_scale_topology/files/apply.py",
-    )
-
-    apply._record_removed(topology, state)
+    apply_module._record_removed(topology, state)
 
     assert topology["southbound"]["absent_datapaths"] == [
         "old-router",
@@ -171,7 +146,7 @@ def test_records_removed_southbound_objects(tree: Path) -> None:
 
 
 def test_apply_records_convergence_start_before_changes(
-    tree: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     topology = {
         "owner": "contract",
@@ -180,13 +155,8 @@ def test_apply_records_convergence_start_before_changes(
         "switches": [],
         "routers": [],
     }
-    apply = load_module(
-        tree,
-        "scale_topology_apply_start",
-        "roles/ovn_scale_topology/files/apply.py",
-    )
-    monkeypatch.setattr(apply, "_configure_roots", lambda *_: None)
-    monkeypatch.setattr(apply, "_rows", lambda *_: [])
+    monkeypatch.setattr(apply_module, "_configure_roots", lambda *_: None)
+    monkeypatch.setattr(apply_module._Database, "rows", lambda *_: [])
     for name in (
         "_configure_ports",
         "_configure_gateway_chassis",
@@ -195,10 +165,10 @@ def test_apply_records_convergence_start_before_changes(
         "_record_removed",
         "_cleanup",
     ):
-        monkeypatch.setattr(apply, name, lambda *_: None)
+        monkeypatch.setattr(apply_module, name, lambda *_: None)
 
     before = time.monotonic_ns()
-    apply.apply(topology)
+    apply_module.apply(FakeRunner(), topology)
     after = time.monotonic_ns()
     capsys.readouterr()
 
