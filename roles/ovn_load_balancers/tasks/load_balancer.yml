@@ -6,7 +6,8 @@
       - --columns=_uuid
       - find
       - Load_Balancer
-      - "external_ids:ovn-tmt-tests-id={{ ovn_load_balancer.id }}"
+      - >-
+        external_ids:ovn-tmt-tests-id={{ ovn_load_balancer.id | to_json }}
   register: ovn_load_balancer_rows
   changed_when: false
 
@@ -25,8 +26,11 @@
       - ovn-nbctl
       - create
       - Load_Balancer
-      - "name={{ ovn_load_balancer.name | default(ovn_load_balancer.id) }}"
-      - "external_ids:ovn-tmt-tests-id={{ ovn_load_balancer.id }}"
+      - >-
+        name={{ ovn_load_balancer.name
+                | default(ovn_load_balancer.id) | to_json }}
+      - >-
+        external_ids:ovn-tmt-tests-id={{ ovn_load_balancer.id | to_json }}
   register: ovn_load_balancer_created
   changed_when: true
 
@@ -38,36 +42,48 @@
          if ovn_load_balancer_rows.stdout_lines | length == 1
          else ovn_load_balancer_created.stdout }}
 
-- name: Reset load balancer {{ ovn_load_balancer.id }}
+- name: Read current load balancer configuration {{ ovn_load_balancer.id }}
   when: ovn_load_balancer.state | default('present') == 'present'
   ansible.builtin.command:
     argv:
       - ovn-nbctl
-      - set
+      - --format=json
+      - --columns=name,protocol,vips,options,selection_fields
+      - list
       - Load_Balancer
       - "{{ ovn_load_balancer_uuid }}"
-      - "name={{ ovn_load_balancer.name | default(ovn_load_balancer.id) }}"
-      - "protocol={{ ovn_load_balancer.protocol | default('tcp') }}"
-      - --
+  register: ovn_load_balancer_before
+  changed_when: false
+
+- name: Build load balancer update {{ ovn_load_balancer.id }}
+  when: ovn_load_balancer.state | default('present') == 'present'
+  ansible.builtin.set_fact:
+    ovn_load_balancer_update_argv:
+      - ovn-nbctl
       - clear
       - Load_Balancer
       - "{{ ovn_load_balancer_uuid }}"
       - vips
       - options
       - selection_fields
-  changed_when: true
-
-- name: Configure VIPs for load balancer {{ ovn_load_balancer.id }}
-  when: ovn_load_balancer.state | default('present') == 'present'
-  ansible.builtin.command:
-    argv:
-      - ovn-nbctl
+      - --
       - set
       - Load_Balancer
       - "{{ ovn_load_balancer_uuid }}"
       - >-
-        vips:{{ ovn_load_balancer_vip.key | to_json
-        }}={{ ovn_load_balancer_backends | to_json }}
+        name={{ ovn_load_balancer.name
+                | default(ovn_load_balancer.id) | to_json }}
+      - >-
+        protocol={{ ovn_load_balancer.protocol | default('tcp') | to_json }}
+
+- name: Add VIPs to load balancer update {{ ovn_load_balancer.id }}
+  when: ovn_load_balancer.state | default('present') == 'present'
+  ansible.builtin.set_fact:
+    ovn_load_balancer_update_argv: >-
+      {{ ovn_load_balancer_update_argv
+         + ['--', 'set', 'Load_Balancer', ovn_load_balancer_uuid,
+            'vips:' ~ (ovn_load_balancer_vip.key | to_json)
+            ~ '=' ~ (ovn_load_balancer_backends | to_json)] }}
   loop: "{{ ovn_load_balancer.vips | default({}) | dict2items }}"
   loop_control:
     loop_var: ovn_load_balancer_vip
@@ -77,19 +93,15 @@
       {{ ovn_load_balancer_vip.value | join(',')
          if ovn_load_balancer_vip.value is not string
          else ovn_load_balancer_vip.value }}
-  changed_when: true
 
-- name: Configure options for load balancer {{ ovn_load_balancer.id }}
+- name: Add options to load balancer update {{ ovn_load_balancer.id }}
   when: ovn_load_balancer.state | default('present') == 'present'
-  ansible.builtin.command:
-    argv:
-      - ovn-nbctl
-      - set
-      - Load_Balancer
-      - "{{ ovn_load_balancer_uuid }}"
-      - >-
-        options:{{ ovn_load_balancer_option.key
-        }}={{ ovn_load_balancer_option_value }}
+  ansible.builtin.set_fact:
+    ovn_load_balancer_update_argv: >-
+      {{ ovn_load_balancer_update_argv
+         + ['--', 'set', 'Load_Balancer', ovn_load_balancer_uuid,
+            'options:' ~ (ovn_load_balancer_option.key | to_json)
+            ~ '=' ~ (ovn_load_balancer_option_value | to_json)] }}
   loop: "{{ ovn_load_balancer.options | default({}) | dict2items }}"
   loop_control:
     loop_var: ovn_load_balancer_option
@@ -99,21 +111,45 @@
       {{ (ovn_load_balancer_option.value | string | lower)
          if ovn_load_balancer_option.value is boolean
          else (ovn_load_balancer_option.value | string) }}
-  changed_when: true
 
-- name: Configure selection fields for load balancer {{ ovn_load_balancer.id }}
+- name: Add selection fields to load balancer update {{ ovn_load_balancer.id }}
   when:
     - ovn_load_balancer.state | default('present') == 'present'
     - ovn_load_balancer.selection_fields | default([]) | length > 0
+  ansible.builtin.set_fact:
+    ovn_load_balancer_update_argv: >-
+      {{ ovn_load_balancer_update_argv
+         + ['--', 'set', 'Load_Balancer', ovn_load_balancer_uuid,
+            'selection_fields='
+            ~ (ovn_load_balancer.selection_fields | to_json)] }}
+
+- name: Update load balancer atomically {{ ovn_load_balancer.id }}
+  when: ovn_load_balancer.state | default('present') == 'present'
+  ansible.builtin.command:
+    argv: "{{ ovn_load_balancer_update_argv }}"
+  changed_when: false
+
+- name: Read updated load balancer configuration {{ ovn_load_balancer.id }}
+  when: ovn_load_balancer.state | default('present') == 'present'
   ansible.builtin.command:
     argv:
       - ovn-nbctl
-      - set
+      - --format=json
+      - --columns=name,protocol,vips,options,selection_fields
+      - list
       - Load_Balancer
       - "{{ ovn_load_balancer_uuid }}"
-      - >-
-        selection_fields={{ ovn_load_balancer.selection_fields | to_json }}
-  changed_when: true
+  register: ovn_load_balancer_after
+  changed_when: false
+
+- name: Record load balancer update {{ ovn_load_balancer.id }}
+  when: ovn_load_balancer.state | default('present') == 'present'
+  ansible.builtin.set_fact:
+    ovn_load_balancers_updated: >-
+      {{ ovn_load_balancers_updated
+         or ovn_load_balancer_before.stdout != ovn_load_balancer_after.stdout }}
+  changed_when: >-
+    ovn_load_balancer_before.stdout != ovn_load_balancer_after.stdout
 
 - name: Find current switch attachments for load balancer {{ ovn_load_balancer.id }}
   when: ovn_load_balancer.state | default('present') == 'present'

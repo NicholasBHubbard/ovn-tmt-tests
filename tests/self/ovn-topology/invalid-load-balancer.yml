@@ -1,0 +1,41 @@
+- name: Reject invalid load balancer configuration
+  hosts: all
+  become: true
+  tasks:
+    - name: Verify invalid load balancer configurations are rejected
+      ansible.builtin.include_tasks: invalid-load-balancer-case.yml
+      loop:
+        - name: non-list configuration
+          load_balancers: invalid
+        - name: missing ID
+          load_balancers:
+            - state: absent
+        - name: invalid protocol
+          load_balancers:
+            - id: self-invalid
+              protocol: invalid
+        - name: non-mapping VIPs
+          load_balancers:
+            - id: self-invalid
+              vips: []
+        - name: invalid backend
+          load_balancers:
+            - id: self-invalid
+              vips:
+                192.0.2.1: 42
+        - name: non-mapping options
+          load_balancers:
+            - id: self-invalid
+              options: []
+        - name: invalid selection field
+          load_balancers:
+            - id: self-invalid
+              selection_fields:
+                - invalid
+        - name: non-list switches
+          load_balancers:
+            - id: self-invalid
+              switches: self-switch
+      loop_control:
+        loop_var: ovn_load_balancer_negative_case
+        label: "{{ ovn_load_balancer_negative_case.name }}"

@@ -1,12 +1,63 @@
-- name: Verify load balancer states
+- name: Verify load balancer configuration
   ansible.builtin.assert:
     that:
+      - ovn_load_balancers is sequence
+      - ovn_load_balancers is not string
+      - ovn_load_balancers is not mapping
+    fail_msg: "Load balancer configuration is invalid."
+
+- name: Verify load balancer definitions
+  ansible.builtin.assert:
+    that:
+      - ovn_load_balancer.id is defined
+      - ovn_load_balancer.id is string
+      - ovn_load_balancer.id | length > 0
       - >-
-        ovn_load_balancers
-        | map(attribute='state', default='present')
-        | difference(['present', 'absent'])
-        | length == 0
-    fail_msg: "Load balancer states must be present or absent."
+        ovn_load_balancer.state | default('present')
+        in ['present', 'absent']
+      - >-
+        ovn_load_balancer.state | default('present') == 'absent'
+        or (ovn_load_balancer.name | default(ovn_load_balancer.id)) is string
+      - >-
+        ovn_load_balancer.state | default('present') == 'absent'
+        or ovn_load_balancer.protocol | default('tcp') in ['tcp', 'udp', 'sctp']
+      - >-
+        ovn_load_balancer.state | default('present') == 'absent'
+        or ovn_load_balancer.vips | default({}) is mapping
+      - >-
+        ovn_load_balancer.state | default('present') == 'absent'
+        or ovn_load_balancer.options | default({}) is mapping
+      - >-
+        ovn_load_balancer.state | default('present') == 'absent'
+        or (ovn_load_balancer.selection_fields | default([]) is sequence
+            and ovn_load_balancer.selection_fields | default([]) is not string
+            and ovn_load_balancer.selection_fields | default([]) is not mapping
+            and ovn_load_balancer.selection_fields | default([])
+                | difference([
+                    'eth_dst', 'eth_src', 'ip_dst', 'ip_src',
+                    'ipv6_dst', 'ipv6_src', 'tp_dst', 'tp_src'
+                  ]) | length == 0)
+      - >-
+        ovn_load_balancer.state | default('present') == 'absent'
+        or (ovn_load_balancer.switches | default([]) is sequence
+            and ovn_load_balancer.switches | default([]) is not string
+            and ovn_load_balancer.switches | default([]) is not mapping
+            and ovn_load_balancer.switches | default([])
+                | select('string') | list | length
+                == ovn_load_balancer.switches | default([]) | length)
+      - >-
+        ovn_load_balancer.state | default('present') == 'absent'
+        or (ovn_load_balancer.routers | default([]) is sequence
+            and ovn_load_balancer.routers | default([]) is not string
+            and ovn_load_balancer.routers | default([]) is not mapping
+            and ovn_load_balancer.routers | default([])
+                | select('string') | list | length
+                == ovn_load_balancer.routers | default([]) | length)
+    fail_msg: "Load balancer configuration is invalid."
+  loop: "{{ ovn_load_balancers }}"
+  loop_control:
+    loop_var: ovn_load_balancer
+    label: "{{ ovn_load_balancer.id | default('unnamed') }}"
 
 - name: Verify load balancer IDs are unique
   ansible.builtin.assert:
@@ -15,6 +66,18 @@
         ovn_load_balancers | map(attribute='id') | unique | length
         == ovn_load_balancers | length
     fail_msg: "Load balancer IDs must be unique."
+
+- name: Verify load balancer VIPs
+  when: ovn_load_balancer.state | default('present') == 'present'
+  ansible.builtin.include_tasks: validate.yml
+  loop: "{{ ovn_load_balancers }}"
+  loop_control:
+    loop_var: ovn_load_balancer
+    label: "{{ ovn_load_balancer.id }}"
+
+- name: Initialize load balancer update state
+  ansible.builtin.set_fact:
+    ovn_load_balancers_updated: false
 
 - name: Configure load balancers
   ansible.builtin.include_tasks: load_balancer.yml

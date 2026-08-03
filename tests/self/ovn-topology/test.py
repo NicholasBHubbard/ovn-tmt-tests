@@ -6,6 +6,7 @@ from ovn_test.ovsdb import Ovsdb
 from ovn_test.state import Snapshots
 
 MANAGED = "external_ids:ovn-tmt-tests-id="
+SPECIAL_LB_ID = 'self-lb "delete"'
 
 
 @pytest.fixture
@@ -247,7 +248,7 @@ class TestInitial:
             "Logical_Router", "static_routes", route["_uuid"]
         ) == ["self-r1"]
         assert nb.exists("NAT", f"{MANAGED}self-nat-delete")
-        assert nb.exists("Load_Balancer", f"{MANAGED}self-lb-delete")
+        assert nb.exists("Load_Balancer", f"{MANAGED}{json.dumps(SPECIAL_LB_ID)}")
         assert nb.exists(
             "Logical_Router_Static_Route",
             f"{MANAGED}self-route-delete",
@@ -552,6 +553,7 @@ class TestResult:
             "Load_Balancer",
             "self-lb",
             "_uuid",
+            "name",
             "protocol",
             "vips",
             "options",
@@ -605,8 +607,12 @@ class TestResult:
             "self-r3"
         ]
         assert load_balancer["protocol"] == "tcp"
+        assert load_balancer["name"] == 'self lb "updated"'
         assert load_balancer["vips"] == {"198.51.100.100:443": "198.51.100.10:8443"}
-        assert load_balancer["options"] == {"reject": "false"}
+        assert load_balancer["options"] == {
+            "hairpin_snat_ip": "198.51.100.1 2001:db8::1",
+            "reject": "false",
+        }
         assert load_balancer["selection_fields"] == "ip_dst"
         assert load_balancer["_uuid"] == snapshots.load("load-balancer")
         assert nb.referring_names(
@@ -619,7 +625,7 @@ class TestResult:
             "load_balancer",
             load_balancer["_uuid"],
         ) == ["self-r3"]
-        assert not nb.exists("Load_Balancer", f"{MANAGED}self-lb-delete")
+        assert not nb.exists("Load_Balancer", f"{MANAGED}{json.dumps(SPECIAL_LB_ID)}")
         assert route["ip_prefix"] == "2001:db8:ffff::/64"
         assert route["nexthop"] == "2001:db8:2::1"
         assert route["policy"] == "dst-ip"

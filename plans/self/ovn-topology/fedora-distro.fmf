@@ -17,6 +17,10 @@ prepare:
     how: ansible
     order: 85
     playbook: tests/self/ovn-topology/invalid-gateway-chassis.yml
+  - name: Verify invalid load balancer configurations are rejected
+    how: ansible
+    order: 86
+    playbook: tests/self/ovn-topology/invalid-load-balancer.yml
   - name: Apply initial OVN topology
     how: ansible
     order: 90
@@ -36,4 +40,4 @@ prepare:
   - name: Reapply OVN topology
     how: ansible
     order: 130
-    playbook: tests/self/ovn-topology/reconfigure.yml
+    playbook: tests/self/ovn-topology/reapply.yml

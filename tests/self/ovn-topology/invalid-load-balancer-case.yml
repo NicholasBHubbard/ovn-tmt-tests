@@ -1,0 +1,31 @@
+- name: Require rejection of {{ ovn_load_balancer_negative_case.name }}
+  block:
+    - name: Apply invalid load balancer configuration
+      ansible.builtin.include_role:
+        name: ovn_load_balancers
+      vars:
+        ovn_load_balancers: "{{ ovn_load_balancer_negative_case.load_balancers }}"
+
+    - name: Fail if invalid configuration was accepted
+      ansible.builtin.fail:
+        msg: >-
+          Invalid configuration was accepted:
+          {{ ovn_load_balancer_negative_case.name }}
+  rescue:
+    - name: Verify expected validation failure
+      ansible.builtin.assert:
+        that:
+          - >-
+            ansible_failed_result.msg
+            == 'Load balancer configuration is invalid.'
+            or
+            ansible_failed_result.results | default([])
+            | selectattr(
+                'msg',
+                'equalto',
+                'Load balancer configuration is invalid.'
+              )
+            | list | length == 1
+        fail_msg: >-
+          {{ ovn_load_balancer_negative_case.name }} failed unexpectedly:
+          {{ ansible_failed_result.msg }}

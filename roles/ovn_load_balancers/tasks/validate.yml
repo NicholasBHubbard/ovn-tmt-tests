@@ -1,0 +1,16 @@
+- name: Verify VIP backends for load balancer {{ ovn_load_balancer.id }}
+  ansible.builtin.assert:
+    that:
+      - ovn_load_balancer_vip.key is string
+      - >-
+        ovn_load_balancer_vip.value is string
+        or (ovn_load_balancer_vip.value is sequence
+            and ovn_load_balancer_vip.value is not mapping
+            and ovn_load_balancer_vip.value
+                | select('string') | list | length
+                == ovn_load_balancer_vip.value | length)
+    fail_msg: "Load balancer configuration is invalid."
+  loop: "{{ ovn_load_balancer.vips | default({}) | dict2items }}"
+  loop_control:
+    loop_var: ovn_load_balancer_vip
+    label: "{{ ovn_load_balancer_vip.key }}"

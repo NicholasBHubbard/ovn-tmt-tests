@@ -69,7 +69,7 @@
         state: absent
     ovn_load_balancers:
       - id: self-lb
-        name: self-lb
+        name: 'self lb "updated"'
         protocol: tcp
         vips:
           198.51.100.100:443: 198.51.100.10:8443
@@ -79,9 +79,10 @@
           - self-r3
         options:
           reject: false
+          hairpin_snat_ip: "198.51.100.1 2001:db8::1"
         selection_fields:
           - ip_dst
-      - id: self-lb-delete
+      - id: 'self-lb "delete"'
         state: absent
     ovn_static_routes:
       - id: self-route

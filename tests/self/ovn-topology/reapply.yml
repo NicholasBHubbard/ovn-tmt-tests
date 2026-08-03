@@ -1,0 +1,13 @@
+- name: Reapply changed topology
+  ansible.builtin.import_playbook: reconfigure.yml
+
+- name: Verify unchanged load balancer reapplication
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Verify load balancer configuration was unchanged
+      ansible.builtin.assert:
+        that:
+          - not ovn_load_balancers_updated
+        fail_msg: "Identical load balancer configuration reported a change."
