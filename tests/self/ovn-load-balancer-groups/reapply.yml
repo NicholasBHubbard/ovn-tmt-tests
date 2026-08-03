@@ -1,0 +1,35 @@
+- name: Reapply load balancer groups
+  hosts: all
+  become: true
+  tasks:
+    - name: Write unchanged load balancer groups
+      ansible.builtin.copy:
+        dest: /tmp/ovn-load-balancer-groups.json
+        mode: "0600"
+        content: |
+          [
+            {
+              "id": "self-group-main",
+              "switches": ["self-group-b"],
+              "routers": ["self-group-b"]
+            },
+            {"id": "self-group-delete", "state": "absent"}
+          ]
+
+    - name: Reapply unchanged load balancer groups
+      ansible.builtin.include_role:
+        name: ovn_load_balancer_groups
+      vars:
+        ovn_load_balancer_groups: []
+        ovn_load_balancer_groups_path: /tmp/ovn-load-balancer-groups.json
+
+    - name: Verify unchanged reapplication
+      ansible.builtin.assert:
+        that:
+          - not ovn_load_balancer_groups_result.changed
+        fail_msg: "Identical load balancer group configuration reported a change."
+
+    - name: Remove unchanged load balancer groups
+      ansible.builtin.file:
+        path: /tmp/ovn-load-balancer-groups.json
+        state: absent

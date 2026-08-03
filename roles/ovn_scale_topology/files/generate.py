@@ -256,8 +256,7 @@ def generate(config: dict[str, Any]) -> dict[str, Any]:
 
     result["load_balancer_groups"] = [
         {
-            "id": owner,
-            "name": config["load_balancer_group"],
+            "id": config["load_balancer_group"],
             "switches": [worker["switch"] for worker in result["workers"]],
             "routers": [worker["gateway_router"] for worker in result["workers"]],
         }

@@ -1,0 +1,65 @@
+- name: Create load balancer group fixtures
+  hosts: all
+  become: true
+  tasks:
+    - name: Create logical switches
+      ansible.builtin.include_role:
+        name: ovn_switches
+      vars:
+        ovn_switches:
+          - name: self-group-a
+          - name: self-group-b
+
+    - name: Create logical routers
+      ansible.builtin.include_role:
+        name: ovn_routers
+      vars:
+        ovn_routers:
+          - name: self-group-a
+          - name: self-group-b
+
+    - name: Create load balancer
+      ansible.builtin.include_role:
+        name: ovn_load_balancers
+      vars:
+        ovn_load_balancers:
+          - id: self-group-lb
+            vips:
+              192.0.2.100:80: 192.0.2.10:8080
+
+    - name: Create load balancer groups
+      ansible.builtin.include_role:
+        name: ovn_load_balancer_groups
+      vars:
+        ovn_load_balancer_groups:
+          - id: self-group-main
+            switches:
+              - self-group-a
+            routers:
+              - self-group-a
+          - id: self-group-delete
+            switches:
+              - self-group-b
+
+    - name: Find test load balancer
+      ansible.builtin.command:
+        argv:
+          - ovn-nbctl
+          - --bare
+          - --columns=_uuid
+          - find
+          - Load_Balancer
+          - external_ids:ovn-tmt-tests-id="self-group-lb"
+      register: ovn_load_balancer_group_test_lb
+      changed_when: false
+
+    - name: Add test load balancer to group
+      ansible.builtin.command:
+        argv:
+          - ovn-nbctl
+          - add
+          - Load_Balancer_Group
+          - self-group-main
+          - load_balancer
+          - "{{ ovn_load_balancer_group_test_lb.stdout }}"
+      changed_when: true

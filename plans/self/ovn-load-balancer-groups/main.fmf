@@ -1,0 +1,9 @@
+summary: Base configuration for OVN load-balancer-group self-tests
+
+discover:
+  how: fmf
+  test:
+    - /tests/self/ovn-load-balancer-groups
+
+execute:
+  how: tmt

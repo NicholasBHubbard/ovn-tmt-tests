@@ -1,0 +1,16 @@
+- name: Reconfigure load balancer groups
+  hosts: all
+  become: true
+  tasks:
+    - name: Apply changed load balancer groups
+      ansible.builtin.include_role:
+        name: ovn_load_balancer_groups
+      vars:
+        ovn_load_balancer_groups:
+          - id: self-group-main
+            switches:
+              - self-group-b
+            routers:
+              - self-group-b
+          - id: self-group-delete
+            state: absent

@@ -1,0 +1,89 @@
+- name: Verify invalid load balancer group updates are safe
+  hosts: all
+  become: true
+  tasks:
+    - name: Reject invalid inline configuration
+      block:
+        - name: Apply invalid inline configuration
+          ansible.builtin.include_role:
+            name: ovn_load_balancer_groups
+          vars:
+            ovn_load_balancer_groups:
+              - id: self-group-main
+                switches: self-group-b
+
+        - name: Fail if invalid inline configuration was accepted
+          ansible.builtin.fail:
+            msg: "Invalid inline configuration was accepted."
+      rescue:
+        - name: Verify inline validation failure
+          ansible.builtin.assert:
+            that:
+              - >-
+                'load balancer group switches must be string lists'
+                in ((ansible_failed_result.stdout | default(''))
+                    ~ (ansible_failed_result.stderr | default('')))
+
+    - name: Write invalid file configuration
+      ansible.builtin.copy:
+        dest: /tmp/ovn-load-balancer-groups-invalid.json
+        mode: "0600"
+        content: |
+          {
+            "load_balancer_groups": [
+              {"id": "self-group-main", "state": "invalid"}
+            ]
+          }
+
+    - name: Reject invalid file configuration
+      block:
+        - name: Apply invalid file configuration
+          ansible.builtin.include_role:
+            name: ovn_load_balancer_groups
+          vars:
+            ovn_load_balancer_groups: []
+            ovn_load_balancer_groups_path: >-
+              /tmp/ovn-load-balancer-groups-invalid.json
+
+        - name: Fail if invalid file configuration was accepted
+          ansible.builtin.fail:
+            msg: "Invalid file configuration was accepted."
+      rescue:
+        - name: Verify file validation failure
+          ansible.builtin.assert:
+            that:
+              - >-
+                'load balancer group states must be present or absent'
+                in ((ansible_failed_result.stdout | default(''))
+                    ~ (ansible_failed_result.stderr | default('')))
+      always:
+        - name: Remove invalid file configuration
+          ansible.builtin.file:
+            path: /tmp/ovn-load-balancer-groups-invalid.json
+            state: absent
+
+    - name: Reject update with a missing switch
+      block:
+        - name: Apply update with a missing switch
+          ansible.builtin.include_role:
+            name: ovn_load_balancer_groups
+          vars:
+            ovn_load_balancer_groups:
+              - id: self-group-main
+                switches:
+                  - self-group-b
+                  - self-group-missing
+                routers:
+                  - self-group-b
+
+        - name: Fail if incomplete topology was accepted
+          ansible.builtin.fail:
+            msg: "A missing switch was accepted."
+      rescue:
+        - name: Verify missing switch failure
+          ansible.builtin.assert:
+            that:
+              - >-
+                'self-group-missing'
+                in ((ansible_failed_result.stdout | default(''))
+                    ~ (ansible_failed_result.stderr | default('')))

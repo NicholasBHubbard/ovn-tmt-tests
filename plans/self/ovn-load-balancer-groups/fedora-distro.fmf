@@ -1,0 +1,39 @@
+summary: Test ovn-load-balancer-groups role on Fedora
+
+provision:
+  - how: virtual
+    image: fedora
+
+prepare:
+  - name: Set up OVN central
+    how: ansible
+    playbook: playbooks/ovn-central.yml
+    extra-args: '-e ovn_install_method=distro -e ovs_setup_install_method=distro'
+  - name: Apply initial load balancer groups
+    how: ansible
+    order: 80
+    playbook: tests/self/ovn-load-balancer-groups/initial.yml
+  - name: Verify invalid and failed updates preserve state
+    how: ansible
+    order: 90
+    playbook: tests/self/ovn-load-balancer-groups/invalid.yml
+  - name: Verify initial load balancer groups
+    how: shell
+    order: 100
+    script: >-
+      python3 -m pytest
+      ./tests/self/ovn-load-balancer-groups/test.py::TestInitial
+  - name: Reconfigure load balancer groups
+    how: ansible
+    order: 110
+    playbook: tests/self/ovn-load-balancer-groups/reconfigure.yml
+  - name: Verify reconfigured load balancer groups
+    how: shell
+    order: 120
+    script: >-
+      python3 -m pytest
+      ./tests/self/ovn-load-balancer-groups/test.py::TestResult
+  - name: Reapply load balancer groups
+    how: ansible
+    order: 130
+    playbook: tests/self/ovn-load-balancer-groups/reapply.yml
