@@ -1,12 +1,37 @@
-- name: Verify gateway chassis states
+- name: Verify gateway chassis configuration
   ansible.builtin.assert:
     that:
+      - ovn_gateway_chassis is sequence
+      - ovn_gateway_chassis is not string
+      - ovn_gateway_chassis is not mapping
+    fail_msg: "Gateway chassis configuration is invalid."
+
+- name: Verify gateway chassis assignments
+  ansible.builtin.assert:
+    that:
+      - ovn_gateway_assignment.id is defined
+      - ovn_gateway_assignment.id is string
+      - ovn_gateway_assignment.id | length > 0
       - >-
-        ovn_gateway_chassis
-        | map(attribute='state', default='present')
-        | difference(['present', 'absent'])
-        | length == 0
-    fail_msg: "Gateway chassis states must be present or absent."
+        ovn_gateway_assignment.state | default('present')
+        in ['present', 'absent']
+      - >-
+        ovn_gateway_assignment.state | default('present') == 'absent'
+        or (ovn_gateway_assignment.router_port is defined
+            and ovn_gateway_assignment.router_port is string
+            and ovn_gateway_assignment.router_port | length > 0
+            and ovn_gateway_assignment.chassis is defined
+            and ovn_gateway_assignment.chassis is string
+            and ovn_gateway_assignment.chassis | length > 0)
+      - >-
+        (ovn_gateway_assignment.priority | default(0)) is integer
+        and (ovn_gateway_assignment.priority | default(0)) >= 0
+        and (ovn_gateway_assignment.priority | default(0)) <= 32767
+    fail_msg: "Gateway chassis configuration is invalid."
+  loop: "{{ ovn_gateway_chassis }}"
+  loop_control:
+    loop_var: ovn_gateway_assignment
+    label: "{{ ovn_gateway_assignment.id | default('unnamed') }}"
 
 - name: Verify gateway chassis IDs are unique
   ansible.builtin.assert:

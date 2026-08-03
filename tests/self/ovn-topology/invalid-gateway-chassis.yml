@@ -1,0 +1,36 @@
+- name: Reject invalid gateway chassis configuration
+  hosts: all
+  become: true
+  tasks:
+    - name: Verify invalid gateway chassis configurations are rejected
+      ansible.builtin.include_tasks: invalid-gateway-chassis-case.yml
+      loop:
+        - name: non-list configuration
+          assignments: invalid
+        - name: missing ID
+          assignments:
+            - state: absent
+        - name: missing required fields
+          assignments:
+            - id: self-invalid
+        - name: non-integer priority
+          assignments:
+            - id: self-invalid
+              router_port: self-port
+              chassis: self-chassis
+              priority: invalid
+        - name: negative priority
+          assignments:
+            - id: self-invalid
+              router_port: self-port
+              chassis: self-chassis
+              priority: -1
+        - name: excessive priority
+          assignments:
+            - id: self-invalid
+              router_port: self-port
+              chassis: self-chassis
+              priority: 32768
+      loop_control:
+        loop_var: ovn_gateway_chassis_negative_case
+        label: "{{ ovn_gateway_chassis_negative_case.name }}"

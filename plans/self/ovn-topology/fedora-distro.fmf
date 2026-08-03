@@ -13,6 +13,10 @@ prepare:
     how: shell
     order: 80
     script: python3 -m pytest ./tests/self/ovn-topology/test.py::TestPreconditions
+  - name: Verify invalid gateway chassis configurations are rejected
+    how: ansible
+    order: 85
+    playbook: tests/self/ovn-topology/invalid-gateway-chassis.yml
   - name: Apply initial OVN topology
     how: ansible
     order: 90
