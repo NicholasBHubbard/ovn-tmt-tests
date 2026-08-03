@@ -38,7 +38,10 @@ extend-select = [
 "tools/*.py" = ["ANN401", "TID251"]
 # These reusable modules are the narrow JSON, YAML and OVSDB boundaries.
 "tests/lib/ovn_test/{namespace,scale,topology,workload}.py" = ["TID251"]
-"tests/lib/ovn_test/{_scale_topology,scale_topology}.py" = ["ANN401", "TID251"]
+"tests/lib/ovn_test/{_scale_topology_apply,scale_topology}.py" = [
+    "ANN401",
+    "TID251",
+]
 "tests/lib/ovn_test/network.py" = ["ANN401", "TID251"]
 "tests/lib/ovn_test/ovsdb.py" = ["ANN401", "TID251"]
 

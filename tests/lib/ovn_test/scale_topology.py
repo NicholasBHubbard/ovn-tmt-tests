@@ -3,8 +3,8 @@ from collections import Counter
 from collections.abc import Mapping, Sequence
 from typing import Any, Optional, TypedDict, Union
 
-from ovn_test._scale_topology import apply as apply_database
-from ovn_test._scale_topology import apply_load_balancer_group
+from ovn_test._scale_topology_apply import apply as apply_database
+from ovn_test._scale_topology_apply import apply_load_balancer_group
 from ovn_test.command import Runner
 from ovn_test.config import read_bool, read_int
 from ovn_test.ovsdb import Ovsdb

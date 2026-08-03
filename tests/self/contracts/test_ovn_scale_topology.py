@@ -2,7 +2,7 @@ import time
 from typing import Any
 
 import pytest
-from ovn_test import _scale_topology as apply_module
+from ovn_test import _scale_topology_apply as apply_module
 from ovn_test.scale_topology import generate
 
 from ._support import FakeRunner
