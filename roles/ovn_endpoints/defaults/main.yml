@@ -6,7 +6,8 @@
 # ovn_endpoints_mtu defaults to 1500; mtu overrides it for one endpoint.
 # Omitted options are cleared from listed logical switch ports.
 ovn_endpoints: []
-ovn_endpoints_bridge: br-int
+ovn_endpoints_bridge: >-
+  {{ ovn_chassis_integration_bridge | default('br-int') }}
 ovn_endpoints_dhcp_timeout: 30
 ovn_endpoints_mode: local
 ovn_endpoints_mtu: 1500

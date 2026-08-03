@@ -49,3 +49,7 @@ prepare:
     how: ansible
     order: 84
     playbook: tests/self/ovn-endpoints/reconfigure.yml
+  - name: Verify invalid endpoint configurations are rejected
+    how: ansible
+    order: 85
+    playbook: tests/self/ovn-endpoints/invalid-configuration.yml

@@ -1,3 +1,11 @@
+- name: Verify endpoint configuration
+  ansible.builtin.assert:
+    that:
+      - ovn_endpoints is sequence
+      - ovn_endpoints is not string
+      - ovn_endpoints_mode in ["ports", "local"]
+    fail_msg: "OVN endpoint configuration is invalid."
+
 - name: Verify endpoint states
   ansible.builtin.assert:
     that:
@@ -17,6 +25,33 @@
         | difference(['static', 'dynamic'])
         | length == 0
     fail_msg: "Endpoint address modes must be static or dynamic."
+
+- name: Verify endpoint definitions
+  ansible.builtin.assert:
+    that:
+      - ovn_endpoint.name is defined
+      - ovn_endpoint.iface_id is defined
+      - >-
+        ovn_endpoint.state | default('present') == 'absent'
+        or (ovn_endpoint.host is defined
+            and ovn_endpoint.switch is defined
+            and ovn_endpoint.mac is defined)
+    fail_msg: "OVN endpoint configuration is invalid."
+  loop: "{{ ovn_endpoints }}"
+  loop_control:
+    loop_var: ovn_endpoint
+    label: "{{ ovn_endpoint.name | default('unnamed') }}"
+
+- name: Verify endpoint identities are unique
+  ansible.builtin.assert:
+    that:
+      - >-
+        ovn_endpoints | map(attribute='name') | unique | length
+        == ovn_endpoints | length
+      - >-
+        ovn_endpoints | map(attribute='iface_id') | unique | length
+        == ovn_endpoints | length
+    fail_msg: "OVN endpoint names and interface IDs must be unique."
 
 - name: Verify default endpoint MTU
   ansible.builtin.assert:

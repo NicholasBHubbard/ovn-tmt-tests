@@ -296,6 +296,7 @@ class TestResult:
         pid = snapshots.load("ovn-endpoint-dhcp-pid")
         assert "dhclient" not in process_arguments(runner, pid)
         assert not list(Path("/run/ovn-tmt-tests").glob("self-vm2-dhclient4.*"))
+        assert not list(Path("/run/ovn-tmt-tests").glob("self-stale-dhcp-*"))
         assert not Path("/etc/netns/self-vm2").exists()
 
     def test_host_and_static_namespace_files(self, snapshots: Snapshots) -> None:

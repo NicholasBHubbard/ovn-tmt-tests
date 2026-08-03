@@ -1,0 +1,37 @@
+- name: Reject invalid OVN endpoint configuration
+  hosts: all
+  become: true
+  tasks:
+    - name: Verify invalid endpoint configurations are rejected
+      ansible.builtin.include_tasks: invalid-case.yml
+      loop:
+        - name: invalid mode
+          mode: invalid
+          endpoints: []
+          message: "OVN endpoint configuration is invalid."
+        - name: missing fields
+          endpoints:
+            - name: self-invalid
+              iface_id: self-invalid
+          message: "OVN endpoint configuration is invalid."
+        - name: duplicate names
+          endpoints:
+            - name: self-duplicate
+              iface_id: self-first
+              state: absent
+            - name: self-duplicate
+              iface_id: self-second
+              state: absent
+          message: "OVN endpoint names and interface IDs must be unique."
+        - name: duplicate interface IDs
+          endpoints:
+            - name: self-first
+              iface_id: self-duplicate
+              state: absent
+            - name: self-second
+              iface_id: self-duplicate
+              state: absent
+          message: "OVN endpoint names and interface IDs must be unique."
+      loop_control:
+        loop_var: ovn_endpoint_negative_case
+        label: "{{ ovn_endpoint_negative_case.name }}"

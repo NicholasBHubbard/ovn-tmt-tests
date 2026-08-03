@@ -1,3 +1,17 @@
+- name: Create partial DHCP cleanup fixture
+  hosts: all
+  become: true
+  tasks:
+    - name: Create stale DHCP files
+      ansible.builtin.copy:
+        content: "999999\n"
+        dest: "/run/ovn-tmt-tests/self-stale-dhcp-dhclient4.{{ item }}"
+        mode: "0600"
+      loop:
+        - pid
+        - leases
+        - managed
+
 - name: Create the destination OVS bridge
   hosts: all
   become: true
@@ -11,7 +25,7 @@
   vars:
     ovn_endpoint_central_hosts: all
     ovn_endpoint_compute_hosts: all
-    ovn_endpoints_bridge: self-br
+    ovn_chassis_integration_bridge: self-br
     ovn_endpoints:
       - name: self-vm1
         host: default-0
@@ -45,4 +59,7 @@
         addresses: []
       - name: self-delete
         iface_id: self-port4
+        state: absent
+      - name: self-stale-dhcp
+        iface_id: self-stale-dhcp
         state: absent

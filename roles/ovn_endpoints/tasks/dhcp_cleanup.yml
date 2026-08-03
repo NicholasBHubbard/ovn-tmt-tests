@@ -4,7 +4,14 @@
       {{ ovn_endpoints_runtime_dir }}/{{ ovn_endpoint.name }}-dhclient4.managed
   register: ovn_endpoint_dhcp_state
 
+- name: Find managed namespace for {{ ovn_endpoint.name }}
+  ansible.builtin.stat:
+    path: "/var/run/netns/{{ ovn_endpoint.name }}"
+    get_checksum: false
+  register: ovn_endpoint_namespace
+
 - name: Stop managed DHCPv4 client for {{ ovn_endpoint.name }}
+  when: ovn_endpoint_namespace.stat.exists
   ansible.builtin.command:
     argv:
       - ip
