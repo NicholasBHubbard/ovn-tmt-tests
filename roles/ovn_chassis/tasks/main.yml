@@ -5,10 +5,13 @@
       - ovn_chassis_name is match('^[A-Za-z0-9][A-Za-z0-9_.-]*$')
       - ovn_chassis_remote | length > 0
       - ovn_chassis_encap_type | length > 0
+      - ovn_chassis_integration_bridge | length > 0
       - ovn_chassis_bridges is sequence
       - ovn_chassis_bridges is not string
       - ovn_chassis_cms_options is sequence
       - ovn_chassis_cms_options is not string
+      - (ovn_chassis_ready_timeout | int) > 0
+      - (ovn_chassis_ready_delay | int) > 0
     fail_msg: "OVN chassis configuration is invalid."
 
 - name: Verify OVN controller is installed
@@ -26,6 +29,10 @@
     ovn_chassis_effective_encap_ip: >-
       {{ ovn_chassis_encap_ip
          or ansible_facts['default_ipv4']['address'] }}
+    ovn_chassis_ready_retries: >-
+      {{ [(((ovn_chassis_ready_timeout | int)
+            + (ovn_chassis_ready_delay | int) - 1)
+           // (ovn_chassis_ready_delay | int)), 1] | max }}
   changed_when: false
 
 - name: Configure chassis OVS database
@@ -43,23 +50,12 @@
              in (ansible_facts.services | default({})) }}
   changed_when: false
 
-- name: Find OVN control script
-  when: not ovn_chassis_has_controller_service
-  ansible.builtin.find:
-    paths:
-      - /usr
-      - /usr/local
-    patterns: ovn-ctl
-    file_type: file
-    recurse: true
-  register: ovn_chassis_ovn_ctl_find
-
-- name: Verify OVN control script exists
+- name: Verify OVN control script is available
   when: not ovn_chassis_has_controller_service
   ansible.builtin.assert:
     that:
-      - ovn_chassis_ovn_ctl_find.files | length > 0
-    fail_msg: "Could not find ovn-ctl under /usr or /usr/local."
+      - ovn_install_ovn_ctl_path | default('') | length > 0
+    fail_msg: "Apply ovn_install before ovn_chassis in the same play."
 
 - name: Start OVN controller via systemd
   when: ovn_chassis_has_controller_service
@@ -72,7 +68,7 @@
   when: not ovn_chassis_has_controller_service
   ansible.builtin.command:
     argv:
-      - "{{ ovn_chassis_ovn_ctl_find.files[0].path }}"
+      - "{{ ovn_install_ovn_ctl_path }}"
       - start_controller
   changed_when: true
 
@@ -83,8 +79,8 @@
       - -t
       - ovn-controller
       - connection-status
-  retries: 10
-  delay: 2
+  retries: "{{ ovn_chassis_ready_retries }}"
+  delay: "{{ ovn_chassis_ready_delay }}"
   register: ovn_chassis_connected
   until: ovn_chassis_connected.stdout == "connected"
   changed_when: false

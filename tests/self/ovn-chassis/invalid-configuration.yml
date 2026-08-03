@@ -4,6 +4,15 @@
   roles:
     - ovn_chassis
   vars:
-    ovn_chassis_name: "{{ ovn_chassis_invalid_cases[ovn_chassis_invalid_case] }}"
-    ovn_chassis_invalid_cases:
-      invalid_name: invalid name
+    ovn_chassis_name: >-
+      {{ 'invalid name'
+         if ovn_chassis_invalid_case == 'invalid_name'
+         else 'valid-name' }}
+    ovn_chassis_integration_bridge: >-
+      {{ ''
+         if ovn_chassis_invalid_case == 'empty_integration_bridge'
+         else 'br-int' }}
+    ovn_chassis_ready_timeout: >-
+      {{ 0 if ovn_chassis_invalid_case == 'invalid_ready_timeout' else 20 }}
+    ovn_chassis_ready_delay: >-
+      {{ 0 if ovn_chassis_invalid_case == 'invalid_ready_delay' else 2 }}

@@ -138,13 +138,16 @@
   vars:
     ovn_chassis_sb_port: "{{ ovn_multihost_sb_port | default(6642) }}"
     ovn_chassis_name: "{{ inventory_hostname }}"
+    ovn_chassis_integration_bridge: >-
+      {{ ovn_multihost_integration_bridge | default('br-int') }}
+    ovn_chassis_ready_timeout: >-
+      {{ ovn_multihost_sb_wait_timeout | default(2700) }}
     ovn_chassis_monitor_all: >-
       {{ ovn_multihost_monitor_all | default(false) | bool }}
     ovn_chassis_bridges: >-
-      {{ ['br-int']
-         + ([ovn_compute_physical_bridge]
-            if ovn_compute_physical_bridge | default('') | length > 0
-            else []) }}
+      {{ [ovn_compute_physical_bridge]
+         if ovn_compute_physical_bridge | default('') | length > 0
+         else [] }}
     ovn_chassis_bridge_mappings: >-
       {{ (ovn_compute_physical_network ~ ':' ~ ovn_compute_physical_bridge)
          if ovn_compute_physical_network | default('') | length > 0
@@ -178,12 +181,16 @@
     ovn_chassis_remote: "{{ ovn_central_sb_remotes | join(',') }}"
     ovn_chassis_monitor_all: >-
       {{ ovn_multihost_monitor_all | default(false) | bool }}
+    ovn_chassis_integration_bridge: >-
+      {{ ovn_multihost_integration_bridge | default('br-int') }}
+    ovn_chassis_ready_timeout: >-
+      {{ ovn_multihost_sb_wait_timeout | default(2700) }}
     ovn_chassis_name: >-
       {{ ovn_gateway_chassis_name | default(inventory_hostname, true) }}
     ovn_chassis_bridges: >-
       {{ ((ovn_gateway_bridges | from_yaml) or [])
          if ovn_gateway_bridges is defined and ovn_gateway_bridges is string
-         else ovn_gateway_bridges | default(['br-int', 'br-ex']) }}
+         else ovn_gateway_bridges | default(['br-ex']) }}
     ovn_chassis_bridge_mappings: >-
       {{ ovn_gateway_bridge_mappings | default('public:br-ex') }}
     ovn_chassis_cms_options: >-

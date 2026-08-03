@@ -404,6 +404,17 @@ def test_multihost_runtime_configuration_is_complete(tree: Path) -> None:
     assert "ovn_gateway_cms_options | from_yaml" in playbook
 
 
+def test_ovn_chassis_uses_shared_install_paths(tree: Path) -> None:
+    tasks = content(tree, "roles/ovn_chassis/tasks/main.yml")
+    defaults = content(tree, "roles/ovn_chassis/defaults/main.yml")
+    configure = content(tree, "roles/ovn_chassis/tasks/configure.yml")
+    assert "ovn_install_ovn_ctl_path" in tasks
+    assert "ansible.builtin.find" not in tasks
+    assert "ovn_chassis_ready_timeout" in defaults
+    assert "ovn_chassis_ready_delay" in defaults
+    assert "external-ids:ovn-bridge={{ ovn_chassis_integration_bridge }}" in configure
+
+
 def test_package_file_configuration_accepts_cli_list(tree: Path) -> None:
     assert_contains(
         tree,

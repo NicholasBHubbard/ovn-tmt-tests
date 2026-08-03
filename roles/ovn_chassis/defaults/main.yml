@@ -3,8 +3,10 @@ ovn_chassis_remote: "tcp:127.0.0.1:{{ ovn_chassis_sb_port }}"
 ovn_chassis_encap_type: geneve
 ovn_chassis_encap_ip: "{{ ansible_facts['default_ipv4']['address'] }}"
 ovn_chassis_name: "{{ ansible_facts['hostname'] }}"
+ovn_chassis_integration_bridge: br-int
 ovn_chassis_bridge_mappings: ""
 ovn_chassis_cms_options: []
 ovn_chassis_monitor_all: false
-ovn_chassis_bridges:
-  - br-int
+ovn_chassis_bridges: []
+ovn_chassis_ready_timeout: 20
+ovn_chassis_ready_delay: 2

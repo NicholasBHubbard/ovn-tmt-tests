@@ -3,9 +3,11 @@
   vars:
     ovn_install_method: distro
     ovs_setup_install_method: distro
+    ovn_chassis_integration_bridge: self-br-int
     ovn_chassis_bridges:
-      - br-int
       - br-ex
+    ovn_chassis_ready_timeout: 30
+    ovn_chassis_ready_delay: 3
     ovn_chassis_bridge_mappings: public:br-ex
     ovn_chassis_cms_options:
       - enable-chassis-as-gw

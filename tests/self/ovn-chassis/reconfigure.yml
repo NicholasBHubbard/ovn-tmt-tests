@@ -4,10 +4,12 @@
   roles:
     - ovn_chassis
   vars:
+    ovn_chassis_integration_bridge: self-br-new
     ovn_chassis_bridges:
-      - br-int
       - br-ex
     ovn_chassis_bridge_mappings: provider:br-ex
     ovn_chassis_cms_options:
       - enable-chassis-as-gw
     ovn_chassis_monitor_all: false
+    ovn_chassis_ready_timeout: 30
+    ovn_chassis_ready_delay: 3

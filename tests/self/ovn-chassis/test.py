@@ -11,6 +11,7 @@ EXTERNAL_IDS = (
     "ovn-remote",
     "ovn-encap-type",
     "ovn-encap-ip",
+    "ovn-bridge",
     "ovn-cms-options",
     "ovn-monitor-all",
     "ovn-bridge-mappings",
@@ -40,7 +41,9 @@ class TestPreconditions:
     def test_controller_is_absent(self, runner: Runner) -> None:
         assert processes(runner, "ovn-controller") == []
 
-    @pytest.mark.parametrize("bridge", ("br-int", "br-ex"))
+    @pytest.mark.parametrize(
+        "bridge", ("br-int", "br-ex", "self-br-int", "self-br-new")
+    )
     def test_bridge_is_absent(self, runner: Runner, bridge: str) -> None:
         assert not runner.succeeds("ovs-vsctl", "br-exists", bridge)
 
@@ -57,8 +60,10 @@ class TestPreconditions:
 
 class TestInitial:
     def test_gateway_configuration(self, runner: Runner, ovs: Ovsdb) -> None:
+        assert runner.succeeds("ovs-vsctl", "br-exists", "self-br-int")
         assert runner.succeeds("ovs-vsctl", "br-exists", "br-ex")
         ids = external_ids(ovs)
+        assert ids["ovn-bridge"] == "self-br-int"
         assert ids["ovn-cms-options"] == "enable-chassis-as-gw,prefer-chassis-as-gw"
         assert ids["ovn-monitor-all"] == "true"
         assert ids["ovn-bridge-mappings"] == "public:br-ex"
@@ -67,6 +72,7 @@ class TestInitial:
 class TestReconfigured:
     def test_gateway_configuration(self, ovs: Ovsdb) -> None:
         ids = external_ids(ovs)
+        assert ids["ovn-bridge"] == "self-br-new"
         assert ids["ovn-cms-options"] == "enable-chassis-as-gw"
         assert "ovn-monitor-all" not in ids
         assert ids["ovn-bridge-mappings"] == "provider:br-ex"
@@ -78,6 +84,18 @@ class TestInvalid:
         (
             (
                 "invalid_name",
+                "OVN chassis configuration is invalid.",
+            ),
+            (
+                "empty_integration_bridge",
+                "OVN chassis configuration is invalid.",
+            ),
+            (
+                "invalid_ready_timeout",
+                "OVN chassis configuration is invalid.",
+            ),
+            (
+                "invalid_ready_delay",
                 "OVN chassis configuration is invalid.",
             ),
         ),
@@ -129,9 +147,11 @@ class TestResult:
             "ovn-remote",
             "ovn-encap-type",
             "ovn-encap-ip",
+            "ovn-bridge",
             "system-id",
         ):
             assert key in ids
         assert "ovn-cms-options" not in ids
         assert "ovn-bridge-mappings" not in ids
+        assert ids["ovn-bridge"] == "br-int"
         assert sb.exists("Chassis", f"name={ids['system-id']}")
