@@ -21,10 +21,18 @@ prepare:
     how: ansible
     order: 86
     playbook: tests/self/ovn-topology/invalid-load-balancer.yml
+  - name: Verify invalid localnet port configurations are rejected
+    how: ansible
+    order: 87
+    playbook: tests/self/ovn-topology/invalid-localnet-port.yml
   - name: Apply initial OVN topology
     how: ansible
     order: 90
     playbook: tests/self/ovn-topology/initial.yml
+  - name: Verify failed localnet port updates are atomic
+    how: ansible
+    order: 95
+    playbook: tests/self/ovn-topology/invalid-localnet-port-update.yml
   - name: Verify initial OVN topology
     how: shell
     order: 100

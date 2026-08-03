@@ -1,0 +1,16 @@
+- name: Verify options for localnet port {{ ovn_localnet_port.name }}
+  ansible.builtin.assert:
+    that:
+      - ovn_localnet_port_option.key is string
+      - ovn_localnet_port_option.key | length > 0
+      - "'=' not in ovn_localnet_port_option.key"
+      - ovn_localnet_port_option.key != 'network_name'
+      - >-
+        ovn_localnet_port_option.value is string
+        or ovn_localnet_port_option.value is boolean
+        or ovn_localnet_port_option.value is integer
+    fail_msg: "Localnet port configuration is invalid."
+  loop: "{{ ovn_localnet_port.options | default({}) | dict2items }}"
+  loop_control:
+    loop_var: ovn_localnet_port_option
+    label: "{{ ovn_localnet_port_option.key }}"

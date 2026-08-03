@@ -1,12 +1,61 @@
-- name: Verify localnet port states
+- name: Verify localnet port configuration
+  ansible.builtin.assert:
+    that:
+      - ovn_localnet_ports is sequence
+      - ovn_localnet_ports is not string
+      - ovn_localnet_ports is not mapping
+    fail_msg: "Localnet port configuration is invalid."
+
+- name: Verify localnet port definitions
+  ansible.builtin.assert:
+    that:
+      - ovn_localnet_port is mapping
+      - ovn_localnet_port.name is defined
+      - ovn_localnet_port.name is string
+      - ovn_localnet_port.name | length > 0
+      - >-
+        ovn_localnet_port.state | default('present') in ['present', 'absent']
+      - >-
+        ovn_localnet_port.state | default('present') == 'absent'
+        or (ovn_localnet_port.switch is defined
+            and ovn_localnet_port.switch is string
+            and ovn_localnet_port.switch | length > 0
+            and ovn_localnet_port.network is defined
+            and ovn_localnet_port.network is string
+            and ovn_localnet_port.network | length > 0
+            and ovn_localnet_port.options | default({}) is mapping)
+      - >-
+        ovn_localnet_port.state | default('present') == 'absent'
+        or ovn_localnet_port.tag is undefined
+        or (ovn_localnet_port.tag is integer
+            and ovn_localnet_port.tag is not boolean
+            and ovn_localnet_port.tag >= 0
+            and ovn_localnet_port.tag <= 4095)
+    fail_msg: "Localnet port configuration is invalid."
+  loop: "{{ ovn_localnet_ports }}"
+  loop_control:
+    loop_var: ovn_localnet_port
+    label: "{{ ovn_localnet_port.name | default('unnamed') }}"
+
+- name: Verify localnet port names are unique
   ansible.builtin.assert:
     that:
       - >-
-        ovn_localnet_ports
-        | map(attribute='state', default='present')
-        | difference(['present', 'absent'])
-        | length == 0
-    fail_msg: "Localnet port states must be present or absent."
+        ovn_localnet_ports | map(attribute='name') | unique | length
+        == ovn_localnet_ports | length
+    fail_msg: "Localnet port configuration is invalid."
+
+- name: Verify localnet port options
+  when: ovn_localnet_port.state | default('present') == 'present'
+  ansible.builtin.include_tasks: validate.yml
+  loop: "{{ ovn_localnet_ports }}"
+  loop_control:
+    loop_var: ovn_localnet_port
+    label: "{{ ovn_localnet_port.name }}"
+
+- name: Initialize localnet port update state
+  ansible.builtin.set_fact:
+    ovn_localnet_ports_updated: false
 
 - name: Configure OVN localnet ports
   ansible.builtin.include_tasks: port.yml

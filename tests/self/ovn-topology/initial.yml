@@ -47,7 +47,10 @@
         switch: self-sw
         network: self-provider
         tag: 100
-      - name: self-localnet-delete
+        options:
+          ethtype: 802.1ad
+          localnet_learn_fdb: true
+      - name: 'self-localnet "delete"'
         switch: self-sw
         network: self-provider-delete
     ovn_routers:

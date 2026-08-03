@@ -7,6 +7,7 @@ from ovn_test.state import Snapshots
 
 MANAGED = "external_ids:ovn-tmt-tests-id="
 SPECIAL_LB_ID = 'self-lb "delete"'
+SPECIAL_LOCALNET_PORT = 'self-localnet "delete"'
 
 
 @pytest.fixture
@@ -114,7 +115,11 @@ class TestInitial:
         )
 
         assert localnet["type"] == "localnet"
-        assert localnet["options"]["network_name"] == "self-provider"
+        assert localnet["options"] == {
+            "ethtype": "802.1ad",
+            "localnet_learn_fdb": "true",
+            "network_name": "self-provider",
+        }
         assert localnet["tag"] == 100
         assert localnet["addresses"] == "unknown"
         assert nb.referring_names("Logical_Switch", "ports", localnet["_uuid"]) == [
@@ -137,7 +142,9 @@ class TestInitial:
         assert nb.referring_names(
             "Logical_Router_Port", "gateway_chassis", secondary["_uuid"]
         ) == ["self-rp"]
-        assert nb.exists("Logical_Switch_Port", "name=self-localnet-delete")
+        assert nb.exists(
+            "Logical_Switch_Port", f"name={json.dumps(SPECIAL_LOCALNET_PORT)}"
+        )
         assert nb.exists("Gateway_Chassis", "name=self-gateway-delete")
         snapshots.save("localnet", localnet["_uuid"])
         snapshots.save("gateway", gateway["_uuid"])
@@ -426,7 +433,10 @@ class TestResult:
         )
 
         assert localnet["type"] == "localnet"
-        assert localnet["options"]["network_name"] == "self-provider-moved"
+        assert localnet["options"] == {
+            "localnet_learn_fdb": "false",
+            "network_name": "self-provider-moved",
+        }
         assert localnet["tag"] == []
         assert localnet["addresses"] == "unknown"
         assert nb.referring_names("Logical_Switch", "ports", localnet["_uuid"]) == [
@@ -464,7 +474,9 @@ class TestResult:
             "gateway_chassis",
             unmanaged_gateway["_uuid"],
         ) == ["self-rp-gateway"]
-        assert not nb.exists("Logical_Switch_Port", "name=self-localnet-delete")
+        assert not nb.exists(
+            "Logical_Switch_Port", f"name={json.dumps(SPECIAL_LOCALNET_PORT)}"
+        )
         assert nb.exists("Logical_Switch_Port", "name=self-localnet-unmanaged")
 
     def test_dhcp_reconfiguration(self, nb: Ovsdb, snapshots: Snapshots) -> None:

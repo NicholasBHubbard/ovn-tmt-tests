@@ -1,0 +1,51 @@
+- name: Reject invalid localnet port configuration
+  hosts: all
+  become: true
+  tasks:
+    - name: Verify invalid localnet port configurations are rejected
+      ansible.builtin.include_tasks: invalid-localnet-port-case.yml
+      loop:
+        - name: non-list configuration
+          localnet_ports: invalid
+        - name: missing name
+          localnet_ports:
+            - state: absent
+        - name: missing present fields
+          localnet_ports:
+            - name: self-invalid
+        - name: invalid VLAN tag
+          localnet_ports:
+            - name: self-invalid
+              switch: self-switch
+              network: self-network
+              tag: 4096
+        - name: non-mapping options
+          localnet_ports:
+            - name: self-invalid
+              switch: self-switch
+              network: self-network
+              options: []
+        - name: reserved network option
+          localnet_ports:
+            - name: self-invalid
+              switch: self-switch
+              network: self-network
+              options:
+                network_name: duplicate
+        - name: invalid option value
+          localnet_ports:
+            - name: self-invalid
+              switch: self-switch
+              network: self-network
+              options:
+                invalid:
+                  - value
+        - name: duplicate names
+          localnet_ports:
+            - name: self-duplicate
+              state: absent
+            - name: self-duplicate
+              state: absent
+      loop_control:
+        loop_var: ovn_localnet_port_negative_case
+        label: "{{ ovn_localnet_port_negative_case.name }}"

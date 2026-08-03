@@ -24,7 +24,9 @@
       - name: self-localnet
         switch: self-moved
         network: self-provider-moved
-      - name: self-localnet-delete
+        options:
+          localnet_learn_fdb: false
+      - name: 'self-localnet "delete"'
         state: absent
     ovn_routers:
       - name: self-r1

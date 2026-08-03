@@ -1,0 +1,27 @@
+- name: Verify failed localnet port updates are atomic
+  hosts: all
+  become: true
+  tasks:
+    - name: Require rejection of missing destination switch
+      block:
+        - name: Move localnet port to missing switch
+          ansible.builtin.include_role:
+            name: ovn_localnet_ports
+          vars:
+            ovn_localnet_ports:
+              - name: self-localnet
+                switch: self-missing
+                network: self-provider-failed
+                tag: 200
+
+        - name: Fail if missing switch was accepted
+          ansible.builtin.fail:
+            msg: "Missing localnet destination switch was accepted."
+      rescue:
+        - name: Verify missing switch failure
+          ansible.builtin.assert:
+            that:
+              - >-
+                'self-missing'
+                in ((ansible_failed_result.stdout | default(''))
+                    ~ (ansible_failed_result.stderr | default('')))
