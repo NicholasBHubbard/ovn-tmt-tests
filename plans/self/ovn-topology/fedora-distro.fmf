@@ -25,6 +25,10 @@ prepare:
     how: ansible
     order: 87
     playbook: tests/self/ovn-topology/invalid-localnet-port.yml
+  - name: Verify invalid NAT rule configurations are rejected
+    how: ansible
+    order: 88
+    playbook: tests/self/ovn-topology/invalid-nat-rule.yml
   - name: Apply initial OVN topology
     how: ansible
     order: 90
@@ -33,6 +37,10 @@ prepare:
     how: ansible
     order: 95
     playbook: tests/self/ovn-topology/invalid-localnet-port-update.yml
+  - name: Verify failed NAT rule updates are atomic
+    how: ansible
+    order: 96
+    playbook: tests/self/ovn-topology/invalid-nat-rule-update.yml
   - name: Verify initial OVN topology
     how: shell
     order: 100

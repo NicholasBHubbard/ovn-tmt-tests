@@ -1,0 +1,30 @@
+- name: Verify failed NAT rule updates are atomic
+  hosts: all
+  become: true
+  tasks:
+    - name: Require rejection of missing destination router
+      block:
+        - name: Move NAT rule to missing router
+          ansible.builtin.include_role:
+            name: ovn_nat
+          vars:
+            ovn_nat_rules:
+              - id: self-nat
+                router: self-missing
+                type: snat
+                external_ip: 203.0.113.10
+                logical_ip: 10.0.0.0/24
+                options:
+                  stateless: false
+
+        - name: Fail if missing router was accepted
+          ansible.builtin.fail:
+            msg: "Missing NAT destination router was accepted."
+      rescue:
+        - name: Verify missing router failure
+          ansible.builtin.assert:
+            that:
+              - >-
+                'self-missing'
+                in ((ansible_failed_result.stdout | default(''))
+                    ~ (ansible_failed_result.stderr | default('')))

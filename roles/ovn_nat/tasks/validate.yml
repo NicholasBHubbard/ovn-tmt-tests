@@ -1,0 +1,28 @@
+- name: Verify external port range for NAT rule {{ ovn_nat_rule.id }}
+  when: ovn_nat_rule.external_port_range is defined
+  vars:
+    ovn_nat_port_range: "{{ ovn_nat_rule.external_port_range.split('-') }}"
+  ansible.builtin.assert:
+    that:
+      - ovn_nat_rule.external_port_range is regex('^[0-9]+-[0-9]+$')
+      - ovn_nat_port_range[0] | int >= 1
+      - ovn_nat_port_range[1] | int <= 65535
+      - ovn_nat_port_range[0] | int <= ovn_nat_port_range[1] | int
+    fail_msg: "NAT rule configuration is invalid."
+
+- name: Verify options for NAT rule {{ ovn_nat_rule.id }}
+  ansible.builtin.assert:
+    that:
+      - ovn_nat_option.key is string
+      - ovn_nat_option.key | length > 0
+      - "'=' not in ovn_nat_option.key"
+      - >-
+        ovn_nat_option.value is string
+        or ovn_nat_option.value is boolean
+        or (ovn_nat_option.value is integer
+            and ovn_nat_option.value is not boolean)
+    fail_msg: "NAT rule configuration is invalid."
+  loop: "{{ ovn_nat_rule.options | default({}) | dict2items }}"
+  loop_control:
+    loop_var: ovn_nat_option
+    label: "{{ ovn_nat_option.key }}"

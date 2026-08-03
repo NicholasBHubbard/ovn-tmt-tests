@@ -1,12 +1,81 @@
-- name: Verify NAT rule states
+- name: Verify NAT rule configuration
   ansible.builtin.assert:
     that:
+      - ovn_nat_rules is sequence
+      - ovn_nat_rules is not string
+      - ovn_nat_rules is not mapping
+    fail_msg: "NAT rule configuration is invalid."
+
+- name: Verify NAT rule definitions
+  ansible.builtin.assert:
+    that:
+      - ovn_nat_rule is mapping
+      - ovn_nat_rule.id is defined
+      - ovn_nat_rule.id is string
+      - ovn_nat_rule.id | length > 0
+      - ovn_nat_rule.state | default('present') in ['present', 'absent']
       - >-
-        ovn_nat_rules
-        | map(attribute='state', default='present')
-        | difference(['present', 'absent'])
-        | length == 0
-    fail_msg: "NAT rule states must be present or absent."
+        ovn_nat_rule.state | default('present') == 'absent'
+        or (ovn_nat_rule.router is defined
+            and ovn_nat_rule.router is string
+            and ovn_nat_rule.router | length > 0
+            and ovn_nat_rule.type is defined
+            and ovn_nat_rule.type in ['snat', 'dnat', 'dnat_and_snat']
+            and ovn_nat_rule.external_ip is defined
+            and ovn_nat_rule.external_ip is string
+            and ovn_nat_rule.external_ip | length > 0
+            and ovn_nat_rule.logical_ip is defined
+            and ovn_nat_rule.logical_ip is string
+            and ovn_nat_rule.logical_ip | length > 0
+            and ovn_nat_rule.options | default({}) is mapping)
+      - >-
+        ovn_nat_rule.state | default('present') == 'absent'
+        or ovn_nat_rule.logical_port is undefined
+        or (ovn_nat_rule.logical_port is string
+            and ovn_nat_rule.logical_port | length > 0)
+      - >-
+        ovn_nat_rule.state | default('present') == 'absent'
+        or ovn_nat_rule.external_mac is undefined
+        or (ovn_nat_rule.external_mac is string
+            and ovn_nat_rule.external_mac | length > 0)
+      - >-
+        ovn_nat_rule.state | default('present') == 'absent'
+        or ovn_nat_rule.external_port_range is undefined
+        or ovn_nat_rule.external_port_range is string
+      - >-
+        ovn_nat_rule.state | default('present') == 'absent'
+        or ovn_nat_rule.gateway_port is undefined
+        or (ovn_nat_rule.gateway_port is string
+            and ovn_nat_rule.gateway_port | length > 0)
+      - >-
+        ovn_nat_rule.state | default('present') == 'absent'
+        or ovn_nat_rule.allowed_ext_ips is undefined
+        or (ovn_nat_rule.allowed_ext_ips is string
+            and ovn_nat_rule.allowed_ext_ips | length > 0)
+      - >-
+        ovn_nat_rule.state | default('present') == 'absent'
+        or ovn_nat_rule.exempted_ext_ips is undefined
+        or (ovn_nat_rule.exempted_ext_ips is string
+            and ovn_nat_rule.exempted_ext_ips | length > 0)
+      - >-
+        ovn_nat_rule.state | default('present') == 'absent'
+        or ovn_nat_rule.allowed_ext_ips is undefined
+        or ovn_nat_rule.exempted_ext_ips is undefined
+      - >-
+        ovn_nat_rule.state | default('present') == 'absent'
+        or ovn_nat_rule.match is undefined
+        or ovn_nat_rule.match is string
+      - >-
+        ovn_nat_rule.state | default('present') == 'absent'
+        or ((ovn_nat_rule.priority | default(0)) is integer
+            and (ovn_nat_rule.priority | default(0)) is not boolean
+            and (ovn_nat_rule.priority | default(0)) >= 0
+            and (ovn_nat_rule.priority | default(0)) <= 32767)
+    fail_msg: "NAT rule configuration is invalid."
+  loop: "{{ ovn_nat_rules }}"
+  loop_control:
+    loop_var: ovn_nat_rule
+    label: "{{ ovn_nat_rule.id | default('unnamed') }}"
 
 - name: Verify NAT rule IDs are unique
   ansible.builtin.assert:
@@ -14,7 +83,19 @@
       - >-
         ovn_nat_rules | map(attribute='id') | unique | length
         == ovn_nat_rules | length
-    fail_msg: "NAT rule IDs must be unique."
+    fail_msg: "NAT rule configuration is invalid."
+
+- name: Verify NAT rule options and port ranges
+  when: ovn_nat_rule.state | default('present') == 'present'
+  ansible.builtin.include_tasks: validate.yml
+  loop: "{{ ovn_nat_rules }}"
+  loop_control:
+    loop_var: ovn_nat_rule
+    label: "{{ ovn_nat_rule.id }}"
+
+- name: Initialize NAT rule update state
+  ansible.builtin.set_fact:
+    ovn_nat_rules_updated: false
 
 - name: Configure OVN NAT rules
   ansible.builtin.include_tasks: rule.yml

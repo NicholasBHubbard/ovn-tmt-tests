@@ -8,6 +8,9 @@ from ovn_test.state import Snapshots
 MANAGED = "external_ids:ovn-tmt-tests-id="
 SPECIAL_LB_ID = 'self-lb "delete"'
 SPECIAL_LOCALNET_PORT = 'self-localnet "delete"'
+SPECIAL_NAT_ID = 'self-nat "delete"'
+SPECIAL_NAT_GATEWAY_PORT = 'self-rp "nat"'
+SPECIAL_NAT_EXEMPTED_SET = 'self-nat "exempted"'
 
 
 @pytest.fixture
@@ -174,6 +177,8 @@ class TestInitial:
             "external_mac",
             "external_port_range",
             "gateway_port",
+            "allowed_ext_ips",
+            "exempted_ext_ips",
             "match",
             "priority",
             "options",
@@ -206,8 +211,15 @@ class TestInitial:
         assert nat["external_port_range"] == "10000-20000"
         assert (
             nat["gateway_port"]
-            == nb.by_name("Logical_Router_Port", "self-rp", "_uuid")["_uuid"]
+            == nb.by_name("Logical_Router_Port", SPECIAL_NAT_GATEWAY_PORT, "_uuid")[
+                "_uuid"
+            ]
         )
+        assert (
+            nat["allowed_ext_ips"]
+            == nb.by_name("Address_Set", "self-nat-allowed", "_uuid")["_uuid"]
+        )
+        assert nat["exempted_ext_ips"] == []
         assert nat["match"] == "ip4.src == 192.0.2.0/24"
         assert nat["priority"] == 100
         assert nat["options"] == {"add_route": "true", "stateless": "true"}
@@ -254,7 +266,7 @@ class TestInitial:
         assert nb.referring_names(
             "Logical_Router", "static_routes", route["_uuid"]
         ) == ["self-r1"]
-        assert nb.exists("NAT", f"{MANAGED}self-nat-delete")
+        assert nb.exists("NAT", f"{MANAGED}{json.dumps(SPECIAL_NAT_ID)}")
         assert nb.exists("Load_Balancer", f"{MANAGED}{json.dumps(SPECIAL_LB_ID)}")
         assert nb.exists(
             "Logical_Router_Static_Route",
@@ -557,6 +569,8 @@ class TestResult:
             "external_mac",
             "external_port_range",
             "gateway_port",
+            "allowed_ext_ips",
+            "exempted_ext_ips",
             "match",
             "priority",
             "options",
@@ -589,13 +603,18 @@ class TestResult:
         assert nat["external_mac"] == []
         assert nat["external_port_range"] == ""
         assert nat["gateway_port"] == []
+        assert nat["allowed_ext_ips"] == []
+        assert (
+            nat["exempted_ext_ips"]
+            == nb.by_name("Address_Set", SPECIAL_NAT_EXEMPTED_SET, "_uuid")["_uuid"]
+        )
         assert nat["match"] == ""
         assert nat["priority"] == 0
         assert nat["options"] == {}
         assert nat["_uuid"] == snapshots.load("nat")
         assert nat["_uuid"] == snapshots.load("nat-moved")
         assert nb.referring_names("Logical_Router", "nat", nat["_uuid"]) == ["self-r3"]
-        assert not nb.exists("NAT", f"{MANAGED}self-nat-delete")
+        assert not nb.exists("NAT", f"{MANAGED}{json.dumps(SPECIAL_NAT_ID)}")
         snat = nb.managed(
             "NAT",
             "self-nat-snat",

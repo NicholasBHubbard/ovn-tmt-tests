@@ -10,5 +10,6 @@
       ansible.builtin.assert:
         that:
           - not ovn_localnet_ports_updated
+          - not ovn_nat_rules_updated
           - not ovn_load_balancers_updated
         fail_msg: "Identical topology configuration reported a change."

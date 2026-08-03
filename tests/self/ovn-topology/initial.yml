@@ -1,4 +1,4 @@
-- name: Create an ACL target outside the managed topology
+- name: Create self-test objects outside the managed topology
   hosts: all
   become: true
   tasks:
@@ -8,6 +8,37 @@
           - ovn-nbctl
           - pg-add
           - self-pg
+      changed_when: true
+
+    - name: Create self-test address sets
+      ansible.builtin.command:
+        argv:
+          - ovn-nbctl
+          - create
+          - Address_Set
+          - "name={{ item | to_json }}"
+      loop:
+        - self-nat-allowed
+        - 'self-nat "exempted"'
+      changed_when: true
+
+    - name: Create router for special NAT gateway port
+      ansible.builtin.command:
+        argv:
+          - ovn-nbctl
+          - lr-add
+          - self-r1
+      changed_when: true
+
+    - name: Create special NAT gateway port
+      ansible.builtin.command:
+        argv:
+          - ovn-nbctl
+          - lrp-add
+          - self-r1
+          - 'self-rp "nat"'
+          - "02:00:00:00:10:05"
+          - 198.18.0.1/24
       changed_when: true
 
 - name: Apply the top-down topology configuration
@@ -108,7 +139,8 @@
         logical_port: self-port1
         external_mac: "02:00:00:00:01:01"
         external_port_range: 10000-20000
-        gateway_port: self-rp
+        gateway_port: 'self-rp "nat"'
+        allowed_ext_ips: self-nat-allowed
         match: ip4.src == 192.0.2.0/24
         priority: 100
         options:
@@ -119,7 +151,7 @@
         type: snat
         external_ip: 198.51.100.20
         logical_ip: 192.0.2.0/24
-      - id: self-nat-delete
+      - id: 'self-nat "delete"'
         router: self-r3
         type: dnat
         external_ip: 203.0.113.10

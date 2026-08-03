@@ -67,7 +67,8 @@
         type: dnat
         external_ip: 2001:db8:ffff::10
         logical_ip: 2001:db8:2::1
-      - id: self-nat-delete
+        exempted_ext_ips: 'self-nat "exempted"'
+      - id: 'self-nat "delete"'
         state: absent
     ovn_load_balancers:
       - id: self-lb

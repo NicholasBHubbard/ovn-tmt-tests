@@ -1,0 +1,74 @@
+- name: Reject invalid NAT rule configuration
+  hosts: all
+  become: true
+  tasks:
+    - name: Verify invalid NAT rule configurations are rejected
+      ansible.builtin.include_tasks: invalid-nat-rule-case.yml
+      loop:
+        - name: non-list configuration
+          nat_rules: invalid
+        - name: missing ID
+          nat_rules:
+            - state: absent
+        - name: missing present fields
+          nat_rules:
+            - id: self-invalid
+        - name: invalid type
+          nat_rules:
+            - id: self-invalid
+              router: self-router
+              type: invalid
+              external_ip: 192.0.2.1
+              logical_ip: 10.0.0.1
+        - name: invalid priority
+          nat_rules:
+            - id: self-invalid
+              router: self-router
+              type: snat
+              external_ip: 192.0.2.1
+              logical_ip: 10.0.0.0/24
+              priority: 32768
+        - name: invalid external port range
+          nat_rules:
+            - id: self-invalid
+              router: self-router
+              type: snat
+              external_ip: 192.0.2.1
+              logical_ip: 10.0.0.0/24
+              external_port_range: 65535-1
+        - name: non-mapping options
+          nat_rules:
+            - id: self-invalid
+              router: self-router
+              type: snat
+              external_ip: 192.0.2.1
+              logical_ip: 10.0.0.0/24
+              options: []
+        - name: invalid option value
+          nat_rules:
+            - id: self-invalid
+              router: self-router
+              type: snat
+              external_ip: 192.0.2.1
+              logical_ip: 10.0.0.0/24
+              options:
+                invalid:
+                  - value
+        - name: conflicting external address selectors
+          nat_rules:
+            - id: self-invalid
+              router: self-router
+              type: snat
+              external_ip: 192.0.2.1
+              logical_ip: 10.0.0.0/24
+              allowed_ext_ips: self-allowed
+              exempted_ext_ips: self-exempted
+        - name: duplicate IDs
+          nat_rules:
+            - id: self-duplicate
+              state: absent
+            - id: self-duplicate
+              state: absent
+      loop_control:
+        loop_var: ovn_nat_negative_case
+        label: "{{ ovn_nat_negative_case.name }}"

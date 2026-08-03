@@ -1,0 +1,29 @@
+- name: Find NAT rule reference {{ ovn_nat_rule.id ~ ' ' ~ ovn_nat_reference.field }}
+  when: ovn_nat_rule[ovn_nat_reference.field] is defined
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - --bare
+      - --columns=_uuid
+      - find
+      - "{{ ovn_nat_reference.table }}"
+      - >-
+        name={{ ovn_nat_rule[ovn_nat_reference.field] | to_json }}
+  register: ovn_nat_reference_row
+  changed_when: false
+
+- name: Verify NAT rule reference {{ ovn_nat_rule.id ~ ' ' ~ ovn_nat_reference.field }}
+  when: ovn_nat_rule[ovn_nat_reference.field] is defined
+  ansible.builtin.assert:
+    that:
+      - ovn_nat_reference_row.stdout_lines | length == 1
+    fail_msg: >-
+      NAT rule {{ ovn_nat_rule.id }} {{ ovn_nat_reference.field }}
+      {{ ovn_nat_rule[ovn_nat_reference.field] }} was not found unambiguously.
+
+- name: Record NAT rule reference {{ ovn_nat_rule.id ~ ' ' ~ ovn_nat_reference.field }}
+  when: ovn_nat_rule[ovn_nat_reference.field] is defined
+  ansible.builtin.set_fact:
+    ovn_nat_reference_ids: >-
+      {{ ovn_nat_reference_ids
+         | combine({ovn_nat_reference.field: ovn_nat_reference_row.stdout}) }}
