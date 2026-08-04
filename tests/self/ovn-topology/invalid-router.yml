@@ -54,7 +54,7 @@
           - create
           - Logical_Router
           - 'name="self-ambiguous-router"'
-      loop: "{{ range(2) }}"
+      loop: "{{ range(2) | list }}"
       register: ovn_router_duplicate_rows
       changed_when: true
 
