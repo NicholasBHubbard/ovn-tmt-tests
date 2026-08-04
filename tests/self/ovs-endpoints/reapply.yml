@@ -1,0 +1,11 @@
+- name: Reapply changed OVS endpoints
+  ansible.builtin.import_playbook: reconfigure.yml
+
+- name: Verify identical OVS endpoints are unchanged
+  hosts: all
+  become: true
+  tasks:
+    - name: Verify no OVS endpoints were updated
+      ansible.builtin.assert:
+        that:
+          - not ovs_endpoints_updated

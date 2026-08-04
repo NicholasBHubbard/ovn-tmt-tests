@@ -16,11 +16,18 @@
       ansible.builtin.assert:
         that:
           - >-
-            ansible_failed_result.msg == ovs_endpoint_negative_case.message
+            ansible_failed_result.msg
+            == ovs_endpoint_negative_case.message
+               | default('OVS endpoint configuration is invalid.')
             or
             ansible_failed_result.results | default([])
-            | selectattr('msg', 'equalto', ovs_endpoint_negative_case.message)
-            | list | length == 1
+            | selectattr(
+                'msg',
+                'equalto',
+                ovs_endpoint_negative_case.message
+                | default('OVS endpoint configuration is invalid.')
+              )
+            | list | length > 0
         fail_msg: >-
           {{ ovs_endpoint_negative_case.name }} failed for an unexpected reason:
           {{ ansible_failed_result.msg }}

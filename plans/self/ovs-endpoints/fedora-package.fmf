@@ -42,4 +42,4 @@ prepare:
   - name: Reapply OVS endpoints
     how: ansible
     order: 84
-    playbook: tests/self/ovs-endpoints/reconfigure.yml
+    playbook: tests/self/ovs-endpoints/reapply.yml

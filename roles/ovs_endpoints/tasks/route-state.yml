@@ -1,0 +1,21 @@
+- name: Add current routes for {{ ovs_endpoint.name }}
+  vars:
+    ovs_current_route_table: >-
+      {{ 'main'
+         if ovs_current_route.table | default('main') | string
+            in ['254', 'main']
+         else ovs_current_route.table | default('main') | string }}
+    ovs_current_route_state: >-
+      {{ (ovs_route_table_result.ovs_route_family | string) ~ '|'
+         ~ ovs_current_route.dst | default('default') ~ '|'
+         ~ (ovs_current_route.gateway | default('') | string) ~ '|'
+         ~ (ovs_current_route.metric | default('') | string) ~ '|'
+         ~ ovs_current_route_table }}
+  ansible.builtin.set_fact:
+    ovs_endpoint_current_routes: >-
+      {{ ovs_endpoint_current_routes + [ovs_current_route_state] }}
+  loop: "{{ ovs_route_table_result.stdout | from_json }}"
+  loop_control:
+    loop_var: ovs_current_route
+    label: "{{ ovs_current_route.dst | default('default') }}"
+  changed_when: false

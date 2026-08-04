@@ -1,19 +1,128 @@
-- name: Configure routes for {{ ovs_endpoint.name }}
-  ansible.builtin.command:
-    cmd: >-
-      ip netns exec {{ ovs_endpoint.name }}
-      ip -{{ ovs_route.family
-              | default(6 if ':' in
-                ((ovs_route.to | string)
-                 ~ (ovs_route.via | default('') | string))
-                else 4) }}
-      route replace {{ ovs_route.to }}
-      {% if ovs_route.via is defined %}via {{ ovs_route.via }}{% endif %}
-      dev {{ ovs_endpoints_interface }}
-      {% if ovs_route.metric is defined %}metric {{ ovs_route.metric }}{% endif %}
-      {% if ovs_route.table is defined %}table {{ ovs_route.table }}{% endif %}
+- name: Initialize route state for {{ ovs_endpoint.name }}
+  ansible.builtin.set_fact:
+    ovs_endpoint_current_routes: []
+    ovs_endpoint_desired_routes: []
+  changed_when: false
+
+- name: Record desired routes for {{ ovs_endpoint.name }}
+  vars:
+    ovs_route_family: >-
+      {{ ovs_route.family
+         | default(6 if ':' in
+           ((ovs_route.to | string)
+            ~ (ovs_route.via | default('') | string))
+           else 4) }}
+    ovs_route_table: >-
+      {{ 'main'
+         if ovs_route.table | default('main') | string in ['254', 'main']
+         else ovs_route.table | default('main') | string }}
+    ovs_route_state: >-
+      {{ (ovs_route_family | string) ~ '|'
+         ~ ovs_route.to ~ '|'
+         ~ (ovs_route.via | default('') | string) ~ '|'
+         ~ (ovs_route.metric | default('') | string) ~ '|'
+         ~ ovs_route_table }}
+  ansible.builtin.set_fact:
+    ovs_endpoint_desired_routes: >-
+      {{ ovs_endpoint_desired_routes + [ovs_route_state] }}
   loop: "{{ ovs_endpoint.routes | default([]) }}"
   loop_control:
     loop_var: ovs_route
     label: "{{ ovs_route.to }}"
+  changed_when: false
+
+- name: Read current routes for {{ ovs_endpoint.name }}
+  ansible.builtin.command:
+    argv:
+      - ip
+      - -j
+      - -n
+      - "{{ ovs_endpoint.name }}"
+      - "-{{ ovs_route_family }}"
+      - route
+      - show
+      - table
+      - all
+      - dev
+      - "{{ ovs_endpoints_interface }}"
+      - proto
+      - boot
+  loop:
+    - 4
+    - 6
+  loop_control:
+    loop_var: ovs_route_family
+    label: "IPv{{ ovs_route_family }}"
+  register: ovs_endpoint_route_tables
+  changed_when: false
+
+- name: Record current routes for {{ ovs_endpoint.name }}
+  ansible.builtin.include_tasks: route-state.yml
+  loop: "{{ ovs_endpoint_route_tables.results }}"
+  loop_control:
+    loop_var: ovs_route_table_result
+    label: "IPv{{ ovs_route_table_result.ovs_route_family }}"
+
+- name: Remove outdated routes for {{ ovs_endpoint.name }}
+  when:
+    - >-
+      ovs_endpoint_current_routes | sort
+      != ovs_endpoint_desired_routes | sort
+  ansible.builtin.command:
+    argv:
+      - ip
+      - -n
+      - "{{ ovs_endpoint.name }}"
+      - "-{{ ovs_route_family }}"
+      - route
+      - flush
+      - table
+      - all
+      - dev
+      - "{{ ovs_endpoints_interface }}"
+      - proto
+      - boot
+  loop:
+    - 4
+    - 6
+  loop_control:
+    loop_var: ovs_route_family
+    label: "IPv{{ ovs_route_family }}"
+  register: ovs_endpoint_routes_flushed
   changed_when: true
+
+- name: Configure routes for {{ ovs_endpoint.name }}
+  vars:
+    ovs_route_family: >-
+      {{ ovs_route.family
+         | default(6 if ':' in
+           ((ovs_route.to | string)
+            ~ (ovs_route.via | default('') | string))
+           else 4) }}
+    ovs_route_argv: >-
+      {{ ['ip', '-n', ovs_endpoint.name, '-' ~ (ovs_route_family | string),
+          'route', 'replace', ovs_route.to]
+         + (['via', ovs_route.via] if ovs_route.via is defined else [])
+         + ['dev', ovs_endpoints_interface]
+         + (['metric', ovs_route.metric | string]
+            if ovs_route.metric is defined else [])
+         + (['table', ovs_route.table | string]
+            if ovs_route.table is defined else []) }}
+  when:
+    - >-
+      ovs_endpoint_current_routes | sort
+      != ovs_endpoint_desired_routes | sort
+  ansible.builtin.command:
+    argv: "{{ ovs_route_argv }}"
+  loop: "{{ ovs_endpoint.routes | default([]) }}"
+  loop_control:
+    loop_var: ovs_route
+    label: "{{ ovs_route.to }}"
+  changed_when: false
+
+- name: Record route update for {{ ovs_endpoint.name }}
+  ansible.builtin.set_fact:
+    ovs_endpoints_updated: >-
+      {{ ovs_endpoints_updated
+         or ovs_endpoint_routes_flushed.changed | default(false) }}
+  changed_when: false

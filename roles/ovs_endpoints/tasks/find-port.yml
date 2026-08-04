@@ -1,0 +1,44 @@
+- name: Find OVS port for {{ ovs_endpoint.name }}
+  ansible.builtin.command:
+    argv:
+      - ovs-vsctl
+      - --bare
+      - --columns=_uuid
+      - find
+      - Port
+      - "name={{ ovs_endpoints_host_interface | to_json }}"
+  register: ovs_endpoint_port_row
+  changed_when: false
+
+- name: Verify OVS port is unambiguous for {{ ovs_endpoint.name }}
+  ansible.builtin.assert:
+    that:
+      - ovs_endpoint_port_row.stdout_lines | length <= 1
+    fail_msg: "OVS endpoint port is not unique."
+
+- name: Find current OVS bridge for {{ ovs_endpoint.name }}
+  when: ovs_endpoint_port_row.stdout_lines | length == 1
+  ansible.builtin.command:
+    argv:
+      - ovs-vsctl
+      - --bare
+      - --columns=name
+      - find
+      - Bridge
+      - "ports{>=}{{ ovs_endpoint_port_row.stdout }}"
+  register: ovs_endpoint_bridge_row
+  changed_when: false
+
+- name: Verify OVS bridge is unambiguous for {{ ovs_endpoint.name }}
+  when: ovs_endpoint_port_row.stdout_lines | length == 1
+  ansible.builtin.assert:
+    that:
+      - ovs_endpoint_bridge_row.stdout_lines | length <= 1
+    fail_msg: "OVS endpoint bridge is not unique."
+
+- name: Record current OVS bridge for {{ ovs_endpoint.name }}
+  ansible.builtin.set_fact:
+    ovs_endpoint_current_bridge: >-
+      {{ ovs_endpoint_bridge_row.stdout | default('')
+         if not (ovs_endpoint_bridge_row.skipped | default(false)) else '' }}
+  changed_when: false

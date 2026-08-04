@@ -16,6 +16,7 @@
       - name: self-direct
         host: default-0
         bridge: self-br-a
+        iface_id: self direct initial
         mac: "02:00:00:00:20:01"
         addresses:
           - 192.0.2.10/24

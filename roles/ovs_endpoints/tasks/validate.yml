@@ -1,0 +1,119 @@
+- name: Verify OVS endpoint definition
+  ansible.builtin.assert:
+    that:
+      - ovs_endpoint is mapping
+      - ovs_endpoint.name is defined
+      - ovs_endpoint.name is string
+      - ovs_endpoint.name | length > 0
+      - "'/' not in ovs_endpoint.name"
+      - ovs_endpoint.name not in ['.', '..']
+      - ovs_endpoint.state | default('present') in ['present', 'absent']
+      - >-
+        ovs_endpoint.interface is undefined
+        or (ovs_endpoint.interface is string
+            and ovs_endpoint.interface | length > 0
+            and ovs_endpoint.interface | length <= 15
+            and ovs_endpoint.interface not in ['.', '..']
+            and not ovs_endpoint.interface | regex_search('[/\\s:]'))
+      - (ovs_endpoint.mtu | default(ovs_endpoints_mtu)) is integer
+      - (ovs_endpoint.mtu | default(ovs_endpoints_mtu)) > 0
+      - >-
+        ovs_endpoint.state | default('present') == 'absent'
+        or (ovs_endpoint.host is defined
+            and ovs_endpoint.host is string
+            and ovs_endpoint.host | length > 0
+            and ovs_endpoint.bridge is defined
+            and ovs_endpoint.bridge is string
+            and ovs_endpoint.bridge | length > 0
+            and ovs_endpoint.mac is defined
+            and ovs_endpoint.mac is string
+            and ovs_endpoint.mac
+                is match('^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$')
+            and (ovs_endpoint.iface_id is undefined
+                 or (ovs_endpoint.iface_id is string
+                     and ovs_endpoint.iface_id | length > 0))
+            and ovs_endpoint.addresses | default([]) is sequence
+            and ovs_endpoint.addresses | default([]) is not string
+            and ovs_endpoint.addresses | default([]) is not mapping
+            and ovs_endpoint.routes | default([]) is sequence
+            and ovs_endpoint.routes | default([]) is not string
+            and ovs_endpoint.routes | default([]) is not mapping)
+    fail_msg: "OVS endpoint configuration is invalid."
+
+- name: Verify OVS endpoint addresses
+  when: ovs_endpoint.state | default('present') == 'present'
+  ansible.builtin.assert:
+    that:
+      - ovs_endpoint_address is string
+      - ovs_endpoint_address | length > 0
+      - "'/' in ovs_endpoint_address"
+      - not ovs_endpoint_address | regex_search('\\s')
+    fail_msg: "OVS endpoint configuration is invalid."
+  loop: "{{ ovs_endpoint.addresses | default([]) }}"
+  loop_control:
+    loop_var: ovs_endpoint_address
+    label: "{{ ovs_endpoint_address }}"
+
+- name: Verify OVS endpoint routes
+  when: ovs_endpoint.state | default('present') == 'present'
+  ansible.builtin.assert:
+    that:
+      - ovs_route is mapping
+      - ovs_route.to is defined
+      - ovs_route.to is string
+      - ovs_route.to | length > 0
+      - >-
+        ovs_route.via is undefined
+        or (ovs_route.via is string and ovs_route.via | length > 0)
+      - ovs_route.family is undefined or ovs_route.family in [4, 6]
+      - >-
+        ovs_route.metric is undefined
+        or (ovs_route.metric is integer and ovs_route.metric >= 0)
+      - >-
+        ovs_route.table is undefined
+        or (ovs_route.table is integer and ovs_route.table >= 0)
+        or (ovs_route.table is string and ovs_route.table | length > 0)
+    fail_msg: "OVS endpoint configuration is invalid."
+  loop: "{{ ovs_endpoint.routes | default([]) }}"
+  loop_control:
+    loop_var: ovs_route
+    label: >-
+      {{ ovs_route.to | default('invalid')
+         if ovs_route is mapping else 'invalid' }}
+
+- name: Check OVS endpoint IP configuration
+  when: ovs_endpoint.state | default('present') == 'present'
+  ansible.builtin.command:
+    argv:
+      - "{{ ansible_facts.python.executable | default('/usr/bin/python3') }}"
+      - -c
+      - |
+        import ipaddress
+        import json
+        import sys
+
+        addresses, routes = map(json.loads, sys.argv[1:])
+        for address in addresses:
+            ipaddress.ip_interface(address)
+        for route in routes:
+            family = route.get(
+                "family",
+                6 if ":" in route["to"] + route.get("via", "") else 4,
+            )
+            if route["to"] != "default":
+                if ipaddress.ip_network(route["to"], strict=False).version != family:
+                    raise ValueError("route destination family does not match")
+            if "via" in route and ipaddress.ip_address(route["via"]).version != family:
+                raise ValueError("route gateway family does not match")
+      - "{{ ovs_endpoint.addresses | default([]) | to_json }}"
+      - "{{ ovs_endpoint.routes | default([]) | to_json }}"
+  register: ovs_endpoint_ip_check
+  failed_when: false
+  changed_when: false
+
+- name: Verify OVS endpoint IP configuration
+  when: ovs_endpoint.state | default('present') == 'present'
+  ansible.builtin.assert:
+    that:
+      - ovs_endpoint_ip_check.rc == 0
+    fail_msg: "OVS endpoint configuration is invalid."

@@ -1,0 +1,46 @@
+- name: Check destination bridge for {{ ovs_endpoint.name }}
+  ansible.builtin.command:
+    argv:
+      - ovs-vsctl
+      - br-exists
+      - "{{ ovs_endpoint.bridge }}"
+  register: ovs_endpoint_bridge_check
+  failed_when: ovs_endpoint_bridge_check.rc not in [0, 2]
+  changed_when: false
+
+- name: Require destination bridge for {{ ovs_endpoint.name }}
+  ansible.builtin.assert:
+    that:
+      - ovs_endpoint_bridge_check.rc == 0
+    fail_msg: "OVS endpoint destination bridge does not exist."
+
+- name: Check route tables for {{ ovs_endpoint.name }}
+  when: ovs_route.table is defined
+  ansible.builtin.command:
+    argv:
+      - ip
+      - route
+      - show
+      - table
+      - "{{ ovs_route.table }}"
+  loop: "{{ ovs_endpoint.routes | default([]) }}"
+  loop_control:
+    loop_var: ovs_route
+    label: "{{ ovs_route.table | default('main') }}"
+  register: ovs_endpoint_route_table_checks
+  failed_when: false
+  changed_when: false
+
+- name: Verify route tables for {{ ovs_endpoint.name }}
+  when: ovs_route_table_check.rc is defined
+  ansible.builtin.assert:
+    that:
+      - >-
+        ovs_route_table_check.rc == 0
+        or 'FIB table does not exist' in ovs_route_table_check.stderr
+    fail_msg: "OVS endpoint configuration is invalid."
+  loop: "{{ ovs_endpoint_route_table_checks.results | default([]) }}"
+  loop_control:
+    loop_var: ovs_route_table_check
+    label: >-
+      {{ ovs_route_table_check.ovs_route.table | default('main') }}

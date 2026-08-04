@@ -2,27 +2,189 @@
   hosts: all
   become: true
   tasks:
+    - name: Create OVS endpoint validation bridge
+      ansible.builtin.include_role:
+        name: ovs_bridges
+      vars:
+        ovs_bridges:
+          - self-validation
+
     - name: Verify invalid OVS endpoint configuration is rejected
       ansible.builtin.include_tasks: invalid-case.yml
       loop:
+        - name: non-list configuration
+          endpoints: invalid
+        - name: unsupported endpoint entry
+          endpoints:
+            - 1
+        - name: missing endpoint name
+          endpoints:
+            - state: absent
+        - name: duplicate endpoint names
+          endpoints:
+            - name: self-duplicate
+              state: absent
+            - name: self-duplicate
+              state: absent
+        - name: missing present fields
+          endpoints:
+            - name: self-invalid
         - name: invalid state
           endpoints:
             - name: self-invalid
               state: invalid
-          message: "OVS endpoint states must be present or absent."
-        - name: zero endpoint MTU
+        - name: invalid MAC address
           endpoints:
             - name: self-invalid
-              mtu: 0
-          message: "OVS endpoint MTUs must be positive integers."
-        - name: non-integer endpoint MTU
+              host: default-0
+              bridge: self-validation
+              mac: invalid
+        - name: invalid interface name
           endpoints:
             - name: self-invalid
-              mtu: invalid
-          message: "OVS endpoint MTUs must be positive integers."
+              host: default-0
+              bridge: self-validation
+              interface: "bad interface"
+              mac: "02:00:00:00:30:01"
+        - name: invalid address collection
+          endpoints:
+            - name: self-invalid
+              host: default-0
+              bridge: self-validation
+              mac: "02:00:00:00:30:01"
+              addresses: invalid
+        - name: invalid IP address
+          endpoints:
+            - name: self-invalid
+              host: default-0
+              bridge: self-validation
+              mac: "02:00:00:00:30:01"
+              addresses:
+                - 192.0.2.999/24
+        - name: route without destination
+          endpoints:
+            - name: self-invalid
+              host: default-0
+              bridge: self-validation
+              mac: "02:00:00:00:30:01"
+              routes:
+                - via: 192.0.2.1
+        - name: invalid route family
+          endpoints:
+            - name: self-invalid
+              host: default-0
+              bridge: self-validation
+              mac: "02:00:00:00:30:01"
+              routes:
+                - to: default
+                  family: 5
+        - name: invalid route metric
+          endpoints:
+            - name: self-invalid
+              host: default-0
+              bridge: self-validation
+              mac: "02:00:00:00:30:01"
+              routes:
+                - to: default
+                  metric: invalid
+        - name: invalid route address family
+          endpoints:
+            - name: self-invalid
+              host: default-0
+              bridge: self-validation
+              mac: "02:00:00:00:30:01"
+              routes:
+                - to: 2001:db8::/64
+                  family: 4
+        - name: invalid route table
+          endpoints:
+            - name: self-invalid
+              host: default-0
+              bridge: self-validation
+              mac: "02:00:00:00:30:01"
+              routes:
+                - to: default
+                  table: self-invalid-table
+        - name: later semantically invalid route
+          endpoints:
+            - name: self-validation-safety
+              host: default-0
+              bridge: self-validation
+              mac: "02:00:00:00:30:01"
+            - name: self-invalid
+              host: default-0
+              bridge: self-validation
+              mac: "02:00:00:00:30:02"
+              routes:
+                - to: invalid
       loop_control:
         loop_var: ovs_endpoint_negative_case
         label: "{{ ovs_endpoint_negative_case.name }}"
+
+    - name: Check endpoint state after rejected configuration
+      ansible.builtin.stat:
+        path: "{{ ovs_endpoint_validation_path }}"
+      loop:
+        - /var/run/netns/self-validation-safety
+        - /sys/class/net/ovse-4a0a7c05b3
+      loop_control:
+        loop_var: ovs_endpoint_validation_path
+      register: ovs_endpoint_validation_state
+
+    - name: Verify rejected configuration preserved endpoint state
+      ansible.builtin.assert:
+        that:
+          - >-
+            ovs_endpoint_validation_state.results
+            | map(attribute='stat.exists') | select | list | length == 0
+
+    - name: Require missing destination bridge rejection
+      block:
+        - name: Apply endpoint with missing destination bridge
+          ansible.builtin.include_role:
+            name: ovs_endpoints
+          vars:
+            ovs_endpoints:
+              - name: self-missing-bridge
+                host: default-0
+                bridge: self-missing
+                mac: "02:00:00:00:30:03"
+
+        - name: Fail if missing destination bridge was accepted
+          ansible.builtin.fail:
+            msg: "Missing OVS endpoint destination bridge was accepted."
+      rescue:
+        - name: Verify missing destination bridge failure
+          ansible.builtin.assert:
+            that:
+              - >-
+                ansible_failed_result.msg
+                == 'OVS endpoint destination bridge does not exist.'
+
+    - name: Check missing-bridge endpoint state
+      ansible.builtin.stat:
+        path: "{{ ovs_endpoint_missing_bridge_path }}"
+      loop:
+        - /var/run/netns/self-missing-bridge
+        - /sys/class/net/ovse-ea5bfbfea8
+      loop_control:
+        loop_var: ovs_endpoint_missing_bridge_path
+      register: ovs_endpoint_missing_bridge_state
+
+    - name: Verify missing bridge did not create endpoint state
+      ansible.builtin.assert:
+        that:
+          - >-
+            ovs_endpoint_missing_bridge_state.results
+            | map(attribute='stat.exists') | select | list | length == 0
+
+    - name: Remove OVS endpoint validation bridge
+      ansible.builtin.include_role:
+        name: ovs_bridges
+      vars:
+        ovs_bridges:
+          - name: self-validation
+            state: absent
 
     - name: Require rejection of zero default MTU
       block:
@@ -41,8 +203,5 @@
           ansible.builtin.assert:
             that:
               - >-
-                ansible_failed_result.msg ==
-                'ovs_endpoints_mtu must be a positive integer.'
-            fail_msg: >-
-              zero default MTU failed for an unexpected reason:
-              {{ ansible_failed_result.msg }}
+                ansible_failed_result.msg
+                == 'OVS endpoint configuration is invalid.'

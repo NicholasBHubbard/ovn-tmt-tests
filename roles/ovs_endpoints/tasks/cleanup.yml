@@ -1,24 +1,43 @@
-- name: Find OVS bridge for {{ ovs_endpoint.name }}
-  ansible.builtin.command:
-    cmd: "ovs-vsctl port-to-br {{ ovs_endpoints_host_interface }}"
-  register: ovs_endpoint_cleanup_bridge
-  failed_when: false
-  changed_when: false
+- name: Find current OVS attachment for {{ ovs_endpoint.name }}
+  ansible.builtin.include_tasks: find-port.yml
 
 - name: Detach OVS endpoint {{ ovs_endpoint.name }}
-  when: ovs_endpoint_cleanup_bridge.rc == 0
+  when: ovs_endpoint_current_bridge | length > 0
   ansible.builtin.command:
-    cmd: >-
-      ovs-vsctl del-port {{ ovs_endpoint_cleanup_bridge.stdout }}
-      {{ ovs_endpoints_host_interface }}
+    argv:
+      - ovs-vsctl
+      - --if-exists
+      - del-port
+      - "{{ ovs_endpoint_current_bridge }}"
+      - "{{ ovs_endpoints_host_interface }}"
+  register: ovs_endpoint_detached
   changed_when: true
 
 - name: Delete host interface for {{ ovs_endpoint.name }}
   ansible.builtin.command:
-    cmd: "ip link delete {{ ovs_endpoints_host_interface }}"
+    argv:
+      - ip
+      - link
+      - delete
+      - "{{ ovs_endpoints_host_interface }}"
     removes: "/sys/class/net/{{ ovs_endpoints_host_interface }}"
+  register: ovs_endpoint_host_interface_deleted
 
 - name: Delete network namespace for {{ ovs_endpoint.name }}
   ansible.builtin.command:
-    cmd: "ip netns delete {{ ovs_endpoint.name }}"
+    argv:
+      - ip
+      - netns
+      - delete
+      - "{{ ovs_endpoint.name }}"
     removes: "/var/run/netns/{{ ovs_endpoint.name }}"
+  register: ovs_endpoint_namespace_deleted
+
+- name: Record OVS endpoint removal {{ ovs_endpoint.name }}
+  ansible.builtin.set_fact:
+    ovs_endpoints_updated: >-
+      {{ ovs_endpoints_updated
+         or ovs_endpoint_detached.changed | default(false)
+         or ovs_endpoint_host_interface_deleted.changed | default(false)
+         or ovs_endpoint_namespace_deleted.changed | default(false) }}
+  changed_when: false

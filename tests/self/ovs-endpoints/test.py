@@ -1,4 +1,5 @@
 import hashlib
+import json
 from typing import Any
 
 import pytest
@@ -29,6 +30,22 @@ def network(runner: Runner) -> Network:
 
 def bridge(runner: Runner, interface: str) -> str:
     return runner.output("ovs-vsctl", "port-to-br", interface)
+
+
+def iface_id(runner: Runner, interface: str) -> str:
+    output = runner.output(
+        "ovs-vsctl",
+        "--if-exists",
+        "get",
+        "Interface",
+        interface,
+        "external_ids:iface-id",
+    )
+    if not output:
+        return ""
+
+    value = json.loads(output)
+    return value if isinstance(value, str) else ""
 
 
 def long_host_interface() -> str:
@@ -63,6 +80,7 @@ class TestInitial:
         assert bridge(runner, "self-direct-p") == "self-br-a"
         assert bridge(runner, "self-peer-p") == "self-br-a"
         assert bridge(runner, long_host_interface()) == "self-br-a"
+        assert iface_id(runner, "self-direct-p") == "self direct initial"
 
     def test_long_endpoint(self, network: Network) -> None:
         link = network.link("inside0", "self-long-endpoint-name")
@@ -167,6 +185,7 @@ class TestResult:
         assert network.addresses("self-direct", "self-direct", scope="global") == [
             "203.0.113.10/24"
         ]
+        assert iface_id(runner, "self-direct-p") == ""
         runner.namespace("self-direct", "ping", "-c", "1", "-W", "2", "203.0.113.20")
 
     def test_routes_replaced(self, network: Network) -> None:

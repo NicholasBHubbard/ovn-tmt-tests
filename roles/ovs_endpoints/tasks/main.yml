@@ -1,34 +1,44 @@
-- name: Verify OVS endpoint states
+- name: Verify OVS endpoint configuration
   ansible.builtin.assert:
     that:
-      - >-
-        ovs_endpoints
-        | map(attribute='state', default='present')
-        | difference(['present', 'absent'])
-        | length == 0
-    fail_msg: "OVS endpoint states must be present or absent."
-
-- name: Verify default OVS endpoint MTU
-  ansible.builtin.assert:
-    that:
+      - ovs_endpoints is sequence
+      - ovs_endpoints is not string
+      - ovs_endpoints is not mapping
       - ovs_endpoints_mtu is integer
       - ovs_endpoints_mtu > 0
-    fail_msg: "ovs_endpoints_mtu must be a positive integer."
+    fail_msg: "OVS endpoint configuration is invalid."
 
-- name: Verify OVS endpoint MTUs
+- name: Verify OVS endpoint definitions
+  ansible.builtin.include_tasks: validate.yml
+  loop: "{{ ovs_endpoints }}"
+  loop_control:
+    loop_var: ovs_endpoint
+    label: >-
+      {{ ovs_endpoint.name | default('unnamed')
+         if ovs_endpoint is mapping else 'invalid' }}
+
+- name: Verify OVS endpoint names are unique
   ansible.builtin.assert:
     that:
-      - (ovs_endpoint.mtu | default(ovs_endpoints_mtu)) is integer
-      - (ovs_endpoint.mtu | default(ovs_endpoints_mtu)) > 0
       - >-
-        ovs_endpoint.interface
-        | default(ovs_endpoint.name if ovs_endpoint.name | length <= 15 else 'eth0')
-        | length <= 15
-    fail_msg: "OVS endpoint MTUs must be positive integers."
+        ovs_endpoints | map(attribute='name') | unique | length
+        == ovs_endpoints | length
+    fail_msg: "OVS endpoint configuration is invalid."
+
+- name: Verify destination OVS bridges
+  when:
+    - ovs_endpoint.state | default('present') == 'present'
+    - ovs_endpoint.host == inventory_hostname
+  ansible.builtin.include_tasks: preflight.yml
   loop: "{{ ovs_endpoints }}"
   loop_control:
     loop_var: ovs_endpoint
     label: "{{ ovs_endpoint.name }}"
+
+- name: Initialize OVS endpoint update state
+  ansible.builtin.set_fact:
+    ovs_endpoints_updated: false
+  changed_when: false
 
 - name: Remove absent or moved OVS endpoints
   when:
