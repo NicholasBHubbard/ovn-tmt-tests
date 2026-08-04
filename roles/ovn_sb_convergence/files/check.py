@@ -54,7 +54,7 @@ def _rows(command: Sequence[str], table: str, *columns: str) -> list[dict[str, A
 
 
 def _expectations(config: dict[str, Any]) -> dict[str, set[str]]:
-    result = {}
+    result: dict[str, set[str]] = {}
     for kind in KINDS:
         values = config.get(kind, [])
         absent_values = config.get(f"absent_{kind}", [])
@@ -62,8 +62,8 @@ def _expectations(config: dict[str, Any]) -> dict[str, set[str]]:
             raise ValueError(f"{kind} expectations must be lists")
         if not all(isinstance(item, str) and item for item in values + absent_values):
             raise ValueError(f"{kind} expectations must contain non-empty names")
-        wanted = set(values)
-        absent = set(absent_values)
+        wanted = {item for item in values if isinstance(item, str)}
+        absent = {item for item in absent_values if isinstance(item, str)}
         if wanted & absent:
             raise ValueError(f"{kind} cannot be both expected and absent")
         result[kind] = wanted
