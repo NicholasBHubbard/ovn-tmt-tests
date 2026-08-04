@@ -1,0 +1,53 @@
+- name: Reject invalid OVS bridge configuration
+  hosts: all
+  become: true
+  tasks:
+    - name: Verify invalid OVS bridge configurations are rejected
+      ansible.builtin.include_tasks: invalid-case.yml
+      loop:
+        - name: non-list configuration
+          bridges: invalid
+        - name: unsupported entry
+          bridges:
+            - 1
+        - name: missing name
+          bridges:
+            - state: absent
+        - name: non-string name
+          bridges:
+            - name: 1
+        - name: empty name
+          bridges:
+            - name: ""
+        - name: invalid state
+          bridges:
+            - name: self-invalid
+              state: invalid
+        - name: duplicate names
+          bridges:
+            - self-duplicate
+            - name: self-duplicate
+              state: absent
+        - name: later invalid entry
+          bridges:
+            - self-bridge-validation-safety
+            - name: self-invalid
+              state: invalid
+      loop_control:
+        loop_var: ovs_bridge_negative_case
+        label: "{{ ovs_bridge_negative_case.name }}"
+
+    - name: Check bridge state after rejected configuration
+      ansible.builtin.command:
+        argv:
+          - ovs-vsctl
+          - br-exists
+          - self-bridge-validation-safety
+      register: ovs_bridge_validation_safety
+      failed_when: ovs_bridge_validation_safety.rc not in [0, 2]
+      changed_when: false
+
+    - name: Verify rejected configuration preserved OVS state
+      ansible.builtin.assert:
+        that:
+          - ovs_bridge_validation_safety.rc == 2

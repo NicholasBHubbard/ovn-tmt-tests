@@ -1,0 +1,30 @@
+- name: Require rejection of {{ ovs_bridge_negative_case.name }}
+  block:
+    - name: Apply invalid OVS bridge configuration
+      ansible.builtin.include_role:
+        name: ovs_bridges
+      vars:
+        ovs_bridges: "{{ ovs_bridge_negative_case.bridges }}"
+
+    - name: Fail if invalid configuration was accepted
+      ansible.builtin.fail:
+        msg: >-
+          Invalid configuration was accepted:
+          {{ ovs_bridge_negative_case.name }}
+  rescue:
+    - name: Verify expected OVS bridge validation failure
+      ansible.builtin.assert:
+        that:
+          - >-
+            ansible_failed_result.msg == 'OVS bridge configuration is invalid.'
+            or
+            ansible_failed_result.results | default([])
+            | selectattr(
+                'msg',
+                'equalto',
+                'OVS bridge configuration is invalid.'
+              )
+            | list | length > 0
+        fail_msg: >-
+          {{ ovs_bridge_negative_case.name }} failed unexpectedly:
+          {{ ansible_failed_result.msg }}

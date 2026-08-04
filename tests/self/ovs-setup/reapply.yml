@@ -1,0 +1,11 @@
+- name: Reapply reusable OVS state
+  ansible.builtin.import_playbook: reconfigure.yml
+
+- name: Verify identical OVS bridge configuration is unchanged
+  hosts: all
+  become: true
+  tasks:
+    - name: Verify no OVS bridges were updated
+      ansible.builtin.assert:
+        that:
+          - not ovs_bridges_updated

@@ -1,6 +1,10 @@
 summary: Base configuration for ovs-setup self-tests
 
 prepare:
+  - name: Verify invalid OVS bridge configurations
+    how: ansible
+    order: 95
+    playbook: tests/self/ovs-setup/invalid-configuration.yml
   - name: Apply initial reusable OVS state
     how: ansible
     order: 100
@@ -20,7 +24,7 @@ prepare:
   - name: Reapply reusable OVS state
     how: ansible
     order: 140
-    playbook: tests/self/ovs-setup/reconfigure.yml
+    playbook: tests/self/ovs-setup/reapply.yml
 
 discover:
   how: fmf
