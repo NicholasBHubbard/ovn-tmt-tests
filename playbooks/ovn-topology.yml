@@ -2,7 +2,9 @@
   hosts: "{{ ovn_topology_central_hosts | default('central') }}"
   become: true
   roles:
-    - ovn_switches
+    - role: ovn_switches
+      vars:
+        ovn_switches_defer_absent: true
     - ovn_dhcp_options
     - ovn_localnet_ports
     - ovn_routers
@@ -13,3 +15,8 @@
     - ovn_load_balancers
     - ovn_load_balancer_groups
     - ovn_acls
+  post_tasks:
+    - name: Remove logical switches after dependent topology
+      ansible.builtin.include_role:
+        name: ovn_switches
+        tasks_from: absent

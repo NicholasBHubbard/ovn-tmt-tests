@@ -9,6 +9,7 @@
     - name: Verify managed configuration was unchanged
       ansible.builtin.assert:
         that:
+          - not ovn_switches_updated
           - not ovn_routers_updated
           - not ovn_localnet_ports_updated
           - not ovn_router_ports_updated

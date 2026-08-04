@@ -1,0 +1,132 @@
+- name: Reject invalid logical switch configuration
+  hosts: all
+  become: true
+  tasks:
+    - name: Create logical switch for validation safety test
+      ansible.builtin.command:
+        argv:
+          - ovn-nbctl
+          - ls-add
+          - self-switch-validation-safety
+          - --
+          - set
+          - Logical_Switch
+          - self-switch-validation-safety
+          - other_config:preserved=original
+      changed_when: true
+
+    - name: Verify invalid logical switch configurations are rejected
+      ansible.builtin.include_tasks: invalid-switch-case.yml
+      loop:
+        - name: non-list configuration
+          switches: invalid
+        - name: missing name
+          switches:
+            - state: absent
+        - name: empty name
+          switches:
+            - name: ""
+              state: absent
+        - name: invalid state
+          switches:
+            - name: self-invalid
+              state: invalid
+        - name: non-mapping other config
+          switches:
+            - name: self-invalid
+              other_config: []
+        - name: invalid other config value
+          switches:
+            - name: self-invalid
+              other_config:
+                invalid:
+                  - value
+        - name: invalid other config key
+          switches:
+            - name: self-invalid
+              other_config:
+                bad=key: value
+        - name: duplicate names
+          switches:
+            - name: self-duplicate
+              state: absent
+            - name: self-duplicate
+              state: absent
+        - name: later invalid entry
+          switches:
+            - name: self-switch-validation-safety
+              other_config:
+                preserved: changed
+            - name: self-invalid
+              other_config: []
+      loop_control:
+        loop_var: ovn_switch_negative_case
+        label: "{{ ovn_switch_negative_case.name }}"
+
+    - name: Read switch state after rejected configuration
+      ansible.builtin.command:
+        argv:
+          - ovn-nbctl
+          - get
+          - Logical_Switch
+          - self-switch-validation-safety
+          - other_config:preserved
+      register: ovn_switch_validation_safety
+      changed_when: false
+
+    - name: Verify rejected configuration preserved switch state
+      ansible.builtin.assert:
+        that:
+          - ovn_switch_validation_safety.stdout | trim('"') == 'original'
+
+    - name: Remove logical switch for validation safety test
+      ansible.builtin.command:
+        argv:
+          - ovn-nbctl
+          - ls-del
+          - self-switch-validation-safety
+      changed_when: true
+
+    - name: Create duplicate logical switch rows
+      ansible.builtin.command:
+        argv:
+          - ovn-nbctl
+          - create
+          - Logical_Switch
+          - 'name="self-ambiguous-switch"'
+      loop: "{{ range(2) | list }}"
+      register: ovn_switch_duplicate_rows
+      changed_when: true
+
+    - name: Require rejection of ambiguous logical switch state
+      block:
+        - name: Remove ambiguous logical switch
+          ansible.builtin.include_role:
+            name: ovn_switches
+          vars:
+            ovn_switches:
+              - name: self-ambiguous-switch
+                state: absent
+
+        - name: Fail if ambiguous logical switch was accepted
+          ansible.builtin.fail:
+            msg: "Ambiguous logical switch state was accepted."
+      rescue:
+        - name: Verify ambiguous logical switch failure
+          ansible.builtin.assert:
+            that:
+              - >-
+                ansible_failed_result.msg
+                == 'Logical switch self-ambiguous-switch is not unique.'
+      always:
+        - name: Remove duplicate logical switch rows
+          ansible.builtin.command:
+            argv:
+              - ovn-nbctl
+              - destroy
+              - Logical_Switch
+              - "{{ ovn_switch_duplicate_row.stdout }}"
+          loop: "{{ ovn_switch_duplicate_rows.results }}"
+          loop_control:
+            loop_var: ovn_switch_duplicate_row
+          changed_when: true

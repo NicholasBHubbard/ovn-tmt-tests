@@ -1,0 +1,32 @@
+- name: Find logical switch for deletion {{ ovn_switch.name }}
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - --bare
+      - --columns=_uuid
+      - find
+      - Logical_Switch
+      - "name={{ ovn_switch.name | to_json }}"
+  register: ovn_switch_row
+  changed_when: false
+
+- name: Verify logical switch is unambiguous {{ ovn_switch.name }}
+  ansible.builtin.assert:
+    that:
+      - ovn_switch_row.stdout_lines | length <= 1
+    fail_msg: "Logical switch {{ ovn_switch.name }} is not unique."
+
+- name: Delete logical switch {{ ovn_switch.name }}
+  when: ovn_switch_row.stdout_lines | length == 1
+  ansible.builtin.command:
+    argv:
+      - ovn-nbctl
+      - ls-del
+      - "{{ ovn_switch_row.stdout }}"
+  changed_when: true
+
+- name: Record logical switch deletion {{ ovn_switch.name }}
+  when: ovn_switch_row.stdout_lines | length == 1
+  ansible.builtin.set_fact:
+    ovn_switches_updated: true
+  changed_when: false

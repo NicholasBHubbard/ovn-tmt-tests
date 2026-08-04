@@ -33,6 +33,10 @@
           exclude_ips: 192.0.2.1..192.0.2.2
       - name: self-unused
       - name: self-nat-gateway
+      - name: self-retired
+      - name: 'self-switch "special"'
+        other_config:
+          test-value: 'value with "quotes" and spaces'
       - name: self-moved
         other_config:
           subnet: 203.0.113.0/24
@@ -66,6 +70,9 @@
       - name: 'self-localnet "delete"'
         switch: self-sw
         network: self-provider-delete
+      - name: self-retiring-localnet
+        switch: self-retired
+        network: self-provider-retired
     ovn_routers:
       - name: self-r1
         enabled: false

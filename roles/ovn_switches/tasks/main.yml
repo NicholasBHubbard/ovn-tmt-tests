@@ -1,16 +1,56 @@
-- name: Verify logical switch states
+- name: Verify logical switch configuration
+  ansible.builtin.assert:
+    that:
+      - ovn_switches is sequence
+      - ovn_switches is not string
+      - ovn_switches is not mapping
+    fail_msg: "Logical switch configuration is invalid."
+
+- name: Verify logical switch definitions
+  ansible.builtin.assert:
+    that:
+      - ovn_switch is mapping
+      - ovn_switch.name is defined
+      - ovn_switch.name is string
+      - ovn_switch.name | length > 0
+      - ovn_switch.state | default('present') in ['present', 'absent']
+      - >-
+        ovn_switch.state | default('present') == 'absent'
+        or ovn_switch.other_config | default({}) is mapping
+    fail_msg: "Logical switch configuration is invalid."
+  loop: "{{ ovn_switches }}"
+  loop_control:
+    loop_var: ovn_switch
+    label: "{{ ovn_switch.name | default('unnamed') }}"
+
+- name: Verify logical switch names are unique
   ansible.builtin.assert:
     that:
       - >-
-        ovn_switches
-        | map(attribute='state', default='present')
-        | difference(['present', 'absent'])
-        | length == 0
-    fail_msg: "Logical switch states must be present or absent."
+        ovn_switches | map(attribute='name') | unique | length
+        == ovn_switches | length
+    fail_msg: "Logical switch configuration is invalid."
 
-- name: Configure OVN logical switches
+- name: Verify logical switch other config
+  when: ovn_switch.state | default('present') == 'present'
+  ansible.builtin.include_tasks: validate.yml
+  loop: "{{ ovn_switches }}"
+  loop_control:
+    loop_var: ovn_switch
+    label: "{{ ovn_switch.name }}"
+
+- name: Initialize logical switch update state
+  ansible.builtin.set_fact:
+    ovn_switches_updated: false
+
+- name: Configure present OVN logical switches
+  when: ovn_switch.state | default('present') == 'present'
   ansible.builtin.include_tasks: switch.yml
   loop: "{{ ovn_switches }}"
   loop_control:
     loop_var: ovn_switch
     label: "{{ ovn_switch.name }}"
+
+- name: Remove absent OVN logical switches
+  when: not ovn_switches_defer_absent | default(false)
+  ansible.builtin.include_tasks: absent.yml

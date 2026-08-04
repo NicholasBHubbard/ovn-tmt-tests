@@ -9,6 +9,10 @@
           mcast_snoop: false
       - name: self-unused
         state: absent
+      - name: self-retired
+        state: absent
+      - name: 'self-switch "special"'
+        state: absent
     ovn_dhcp_options:
       - id: self-dhcp
         cidr: 198.51.100.0/24
@@ -28,6 +32,9 @@
           localnet_learn_fdb: false
       - name: 'self-localnet "delete"'
         state: absent
+      - name: self-retiring-localnet
+        switch: self-moved
+        network: self-provider-moved
     ovn_routers:
       - name: self-r1
         enabled: true

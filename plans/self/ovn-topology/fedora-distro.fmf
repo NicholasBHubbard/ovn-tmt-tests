@@ -13,6 +13,10 @@ prepare:
     how: shell
     order: 80
     script: python3 -m pytest ./tests/self/ovn-topology/test.py::TestPreconditions
+  - name: Verify invalid switch configurations are rejected
+    how: ansible
+    order: 83
+    playbook: tests/self/ovn-topology/invalid-switch.yml
   - name: Verify invalid router configurations are rejected
     how: ansible
     order: 84

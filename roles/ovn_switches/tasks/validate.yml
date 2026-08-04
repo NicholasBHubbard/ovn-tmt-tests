@@ -1,0 +1,16 @@
+- name: Verify other config for logical switch {{ ovn_switch.name }}
+  ansible.builtin.assert:
+    that:
+      - ovn_switch_config.key is string
+      - ovn_switch_config.key | length > 0
+      - "'=' not in ovn_switch_config.key"
+      - >-
+        ovn_switch_config.value is string
+        or ovn_switch_config.value is boolean
+        or (ovn_switch_config.value is integer
+            and ovn_switch_config.value is not boolean)
+    fail_msg: "Logical switch configuration is invalid."
+  loop: "{{ ovn_switch.other_config | default({}) | dict2items }}"
+  loop_control:
+    loop_var: ovn_switch_config
+    label: "{{ ovn_switch_config.key }}"

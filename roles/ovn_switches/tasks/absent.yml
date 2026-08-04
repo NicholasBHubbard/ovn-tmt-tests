@@ -1,0 +1,7 @@
+- name: Remove absent OVN logical switches
+  when: ovn_switch.state | default('present') == 'absent'
+  ansible.builtin.include_tasks: delete.yml
+  loop: "{{ ovn_switches }}"
+  loop_control:
+    loop_var: ovn_switch
+    label: "{{ ovn_switch.name }}"

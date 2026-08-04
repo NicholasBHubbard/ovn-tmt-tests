@@ -1,27 +1,48 @@
-- name: Create logical switch and reset other config {{ ovn_switch.name }}
-  when: ovn_switch.state | default('present') == 'present'
+- name: Find logical switch {{ ovn_switch.name }}
   ansible.builtin.command:
     argv:
       - ovn-nbctl
-      - --may-exist
-      - ls-add
-      - "{{ ovn_switch.name }}"
-      - --
-      - clear
+      - --bare
+      - --columns=_uuid
+      - find
       - Logical_Switch
-      - "{{ ovn_switch.name }}"
-      - other_config
-  changed_when: true
+      - "name={{ ovn_switch.name | to_json }}"
+  register: ovn_switch_row
+  changed_when: false
 
-- name: Configure other config for logical switch {{ ovn_switch.name }}
-  when: ovn_switch.state | default('present') == 'present'
+- name: Verify logical switch is unambiguous {{ ovn_switch.name }}
+  ansible.builtin.assert:
+    that:
+      - ovn_switch_row.stdout_lines | length <= 1
+    fail_msg: "Logical switch {{ ovn_switch.name }} is not unique."
+
+- name: Read current logical switch {{ ovn_switch.name }}
   ansible.builtin.command:
     argv:
       - ovn-nbctl
-      - set
+      - --format=json
+      - --columns=other_config
+      - find
       - Logical_Switch
-      - "{{ ovn_switch.name }}"
-      - "other_config:{{ ovn_switch_config.key }}={{ ovn_switch_config_value }}"
+      - "name={{ ovn_switch.name | to_json }}"
+  register: ovn_switch_before
+  changed_when: false
+
+- name: Initialize logical switch update {{ ovn_switch.name }}
+  ansible.builtin.set_fact:
+    ovn_switch_update_argv: >-
+      {{ ['ovn-nbctl', 'set', 'Logical_Switch', ovn_switch_row.stdout,
+          'other_config={}']
+         if ovn_switch_row.stdout_lines | length == 1
+         else ['ovn-nbctl', 'create', 'Logical_Switch',
+               'name=' ~ (ovn_switch.name | to_json), 'other_config={}'] }}
+
+- name: Add other config to logical switch update {{ ovn_switch.name }}
+  ansible.builtin.set_fact:
+    ovn_switch_update_argv: >-
+      {{ ovn_switch_update_argv
+         + ['other_config:' ~ (ovn_switch_config.key | to_json)
+            ~ '=' ~ (ovn_switch_config_value | to_json)] }}
   loop: "{{ ovn_switch.other_config | default({}) | dict2items }}"
   loop_control:
     loop_var: ovn_switch_config
@@ -31,14 +52,33 @@
       {{ (ovn_switch_config.value | string | lower)
          if ovn_switch_config.value is boolean
          else (ovn_switch_config.value | string) }}
-  changed_when: true
 
-- name: Delete logical switch {{ ovn_switch.name }}
-  when: ovn_switch.state | default('present') == 'absent'
+- name: Update logical switch atomically {{ ovn_switch.name }}
+  ansible.builtin.command:
+    argv: "{{ ovn_switch_update_argv }}"
+  changed_when: false
+
+- name: Read updated logical switch {{ ovn_switch.name }}
   ansible.builtin.command:
     argv:
       - ovn-nbctl
-      - --if-exists
-      - ls-del
-      - "{{ ovn_switch.name }}"
-  changed_when: true
+      - --format=json
+      - --columns=other_config
+      - find
+      - Logical_Switch
+      - "name={{ ovn_switch.name | to_json }}"
+  register: ovn_switch_after
+  changed_when: false
+
+- name: Verify configured logical switch {{ ovn_switch.name }}
+  ansible.builtin.assert:
+    that:
+      - (ovn_switch_after.stdout | from_json).data | length == 1
+    fail_msg: "Logical switch {{ ovn_switch.name }} was not configured."
+
+- name: Record logical switch update {{ ovn_switch.name }}
+  vars:
+    ovn_switch_changed: "{{ ovn_switch_before.stdout != ovn_switch_after.stdout }}"
+  ansible.builtin.set_fact:
+    ovn_switches_updated: "{{ ovn_switches_updated or ovn_switch_changed }}"
+  changed_when: ovn_switch_changed

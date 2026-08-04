@@ -13,6 +13,7 @@ SPECIAL_NAT_GATEWAY_PORT = 'self-rp "nat"'
 SPECIAL_NAT_EXEMPTED_SET = 'self-nat "exempted"'
 SPECIAL_ROUTER_SWITCH_PORT = 'self-rp-sw "nat"'
 SPECIAL_ROUTER = 'self-r2 "delete"'
+SPECIAL_SWITCH = 'self-switch "special"'
 
 
 @pytest.fixture
@@ -53,6 +54,12 @@ class TestInitial:
             "exclude_ips": "192.0.2.1..192.0.2.2",
         }
         assert nb.exists("Logical_Switch", "name=self-unused")
+        assert nb.exists("Logical_Switch", "name=self-retired")
+        assert nb.by_name("Logical_Switch", SPECIAL_SWITCH, "other_config")[
+            "other_config"
+        ] == {
+            "test-value": 'value with "quotes" and spaces',
+        }
         assert nb.exists("Logical_Router", f"name={json.dumps(SPECIAL_ROUTER)}")
         third_router = nb.by_name("Logical_Router", "self-r3", "enabled", "options")
         assert third_router["enabled"] is True
@@ -138,6 +145,13 @@ class TestInitial:
             "tag",
             "addresses",
         )
+        retiring_localnet = nb.by_name(
+            "Logical_Switch_Port",
+            "self-retiring-localnet",
+            "_uuid",
+            "type",
+            "options",
+        )
         gateway = nb.by_name(
             "Gateway_Chassis",
             "self-gateway",
@@ -157,6 +171,11 @@ class TestInitial:
         assert nb.referring_names("Logical_Switch", "ports", localnet["_uuid"]) == [
             "self-sw"
         ]
+        assert retiring_localnet["type"] == "localnet"
+        assert retiring_localnet["options"] == {"network_name": "self-provider-retired"}
+        assert nb.referring_names(
+            "Logical_Switch", "ports", retiring_localnet["_uuid"]
+        ) == ["self-retired"]
         assert gateway["chassis_name"] == "self-gateway-1"
         assert gateway["priority"] == 20
         assert nb.referring_names(
@@ -179,6 +198,7 @@ class TestInitial:
         )
         assert nb.exists("Gateway_Chassis", "name=self-gateway-delete")
         snapshots.save("localnet", localnet["_uuid"])
+        snapshots.save("retiring-localnet", retiring_localnet["_uuid"])
         snapshots.save("gateway", gateway["_uuid"])
 
     def test_dhcp_options(self, nb: Ovsdb, snapshots: Snapshots) -> None:
@@ -421,6 +441,8 @@ class TestResult:
             "exclude_ips": "192.0.2.1..192.0.2.2",
         }
         assert not nb.exists("Logical_Switch", "name=self-unused")
+        assert not nb.exists("Logical_Switch", "name=self-retired")
+        assert not nb.exists("Logical_Switch", f"name={json.dumps(SPECIAL_SWITCH)}")
         assert router["options"] == {
             "chassis": "moved-chassis",
             "mac_binding_age_threshold": "10",
@@ -487,6 +509,13 @@ class TestResult:
             "tag",
             "addresses",
         )
+        retiring_localnet = nb.by_name(
+            "Logical_Switch_Port",
+            "self-retiring-localnet",
+            "_uuid",
+            "type",
+            "options",
+        )
         gateway = nb.by_name(
             "Gateway_Chassis",
             "self-gateway",
@@ -507,6 +536,12 @@ class TestResult:
         ]
         assert localnet["_uuid"] == snapshots.load("localnet")
         assert localnet["_uuid"] == snapshots.load("localnet-moved")
+        assert retiring_localnet["type"] == "localnet"
+        assert retiring_localnet["options"] == {"network_name": "self-provider-moved"}
+        assert nb.referring_names(
+            "Logical_Switch", "ports", retiring_localnet["_uuid"]
+        ) == ["self-moved"]
+        assert retiring_localnet["_uuid"] == snapshots.load("retiring-localnet")
         assert gateway["chassis_name"] == "self-gateway-2"
         assert gateway["priority"] == 30
         assert nb.referring_names(
