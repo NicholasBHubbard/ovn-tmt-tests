@@ -1,0 +1,16 @@
+- name: Verify options for logical static route {{ ovn_static_route.id }}
+  ansible.builtin.assert:
+    that:
+      - ovn_static_route_option.key is string
+      - ovn_static_route_option.key | length > 0
+      - "'=' not in ovn_static_route_option.key"
+      - >-
+        ovn_static_route_option.value is string
+        or ovn_static_route_option.value is boolean
+        or (ovn_static_route_option.value is integer
+            and ovn_static_route_option.value is not boolean)
+    fail_msg: "Logical static route configuration is invalid."
+  loop: "{{ ovn_static_route.options | default({}) | dict2items }}"
+  loop_control:
+    loop_var: ovn_static_route_option
+    label: "{{ ovn_static_route_option.key }}"

@@ -1,0 +1,71 @@
+- name: Reject invalid logical static route configuration
+  hosts: all
+  become: true
+  tasks:
+    - name: Verify invalid logical static route configurations are rejected
+      ansible.builtin.include_tasks: invalid-static-route-case.yml
+      loop:
+        - name: non-list configuration
+          static_routes: invalid
+        - name: missing ID
+          static_routes:
+            - state: absent
+        - name: missing present fields
+          static_routes:
+            - id: self-invalid
+        - name: invalid policy
+          static_routes:
+            - id: self-invalid
+              router: self-router
+              prefix: 192.0.2.0/24
+              nexthop: 198.51.100.1
+              policy: invalid
+        - name: invalid output port
+          static_routes:
+            - id: self-invalid
+              router: self-router
+              prefix: 192.0.2.0/24
+              nexthop: 198.51.100.1
+              output_port: []
+        - name: invalid selection field
+          static_routes:
+            - id: self-invalid
+              router: self-router
+              prefix: 192.0.2.0/24
+              nexthop: 198.51.100.1
+              selection_fields:
+                - invalid
+        - name: invalid BFD reference
+          static_routes:
+            - id: self-invalid
+              router: self-router
+              prefix: 192.0.2.0/24
+              nexthop: 198.51.100.1
+              bfd:
+                logical_port: self-port
+                dst_ip: 198.51.100.2
+        - name: non-mapping options
+          static_routes:
+            - id: self-invalid
+              router: self-router
+              prefix: 192.0.2.0/24
+              nexthop: 198.51.100.1
+              options: []
+        - name: invalid option value
+          static_routes:
+            - id: self-invalid
+              router: self-router
+              prefix: 192.0.2.0/24
+              nexthop: 198.51.100.1
+              options:
+                invalid:
+                  - value
+        - name: duplicate IDs
+          static_routes:
+            - id: self-duplicate
+              state: absent
+            - id: self-duplicate
+              state: absent
+      loop_control:
+        loop_var: ovn_static_route_negative_case
+        label: "{{ ovn_static_route_negative_case.name }}"

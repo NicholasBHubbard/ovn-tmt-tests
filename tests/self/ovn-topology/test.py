@@ -230,6 +230,9 @@ class TestInitial:
             "policy",
             "route_table",
             "output_port",
+            "bfd",
+            "selection_fields",
+            "options",
         )
 
         assert nat["type"] == "dnat_and_snat"
@@ -292,6 +295,18 @@ class TestInitial:
         assert route["policy"] == "src-ip"
         assert route["route_table"] == "blue"
         assert route["output_port"] == "self-rp"
+        bfd = nb.one(
+            "BFD",
+            'logical_port="self-rp"',
+            'dst_ip="192.0.2.1"',
+            columns=("_uuid",),
+        )
+        assert route["bfd"] == bfd["_uuid"]
+        assert sorted(route["selection_fields"]) == ["ip_proto", "ip_src"]
+        assert route["options"] == {
+            "dynamic-routing-advertise": "false",
+            "ecmp_symmetric_reply": "true",
+        }
         assert nb.referring_names(
             "Logical_Router", "static_routes", route["_uuid"]
         ) == ["self-r1"]
@@ -630,6 +645,9 @@ class TestResult:
             "policy",
             "route_table",
             "output_port",
+            "bfd",
+            "selection_fields",
+            "options",
         )
 
         assert nat["type"] == "dnat"
@@ -698,6 +716,9 @@ class TestResult:
         assert route["policy"] == "dst-ip"
         assert route["route_table"] == ""
         assert route["output_port"] == []
+        assert route["bfd"] == []
+        assert route["selection_fields"] == []
+        assert route["options"] == {}
         assert route["_uuid"] == snapshots.load("route")
         assert route["_uuid"] == snapshots.load("route-moved")
         assert nb.referring_names(

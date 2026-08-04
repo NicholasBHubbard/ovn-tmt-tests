@@ -37,9 +37,13 @@ prepare:
     how: ansible
     order: 89
     playbook: tests/self/ovn-topology/invalid-router-port.yml
-  - name: Apply initial OVN topology
+  - name: Verify invalid static route configurations are rejected
     how: ansible
     order: 90
+    playbook: tests/self/ovn-topology/invalid-static-route.yml
+  - name: Apply initial OVN topology
+    how: ansible
+    order: 91
     playbook: tests/self/ovn-topology/initial.yml
   - name: Verify failed router updates preserve state
     how: ansible
@@ -57,6 +61,10 @@ prepare:
     how: ansible
     order: 97
     playbook: tests/self/ovn-topology/invalid-router-port-update.yml
+  - name: Verify static route update failures are safe
+    how: ansible
+    order: 98
+    playbook: tests/self/ovn-topology/invalid-static-route-update.yml
   - name: Verify initial OVN topology
     how: shell
     order: 100

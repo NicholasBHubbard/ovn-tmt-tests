@@ -182,6 +182,12 @@
         policy: src-ip
         route_table: blue
         output_port: self-rp
+        selection_fields:
+          - ip_proto
+          - ip_src
+        options:
+          ecmp_symmetric_reply: true
+          dynamic-routing-advertise: false
       - id: self-route-delete
         router: self-r3
         prefix: 203.0.113.0/24
@@ -208,6 +214,42 @@
         priority: 900
         match: ip4
         action: drop
+
+- name: Add BFD to the managed static route
+  hosts: all
+  become: true
+  tasks:
+    - name: Create self-test BFD session
+      ansible.builtin.command:
+        argv:
+          - ovn-nbctl
+          - create
+          - BFD
+          - logical_port="self-rp"
+          - dst_ip="192.0.2.1"
+      changed_when: true
+
+    - name: Apply static route BFD reference
+      ansible.builtin.include_role:
+        name: ovn_static_routes
+      vars:
+        ovn_static_routes:
+          - id: self-route
+            router: self-r1
+            prefix: 198.51.100.0/24
+            nexthop: 192.0.2.1
+            policy: src-ip
+            route_table: blue
+            output_port: self-rp
+            bfd:
+              logical_port: self-rp
+              dst_ip: 192.0.2.1
+            selection_fields:
+              - ip_proto
+              - ip_src
+            options:
+              ecmp_symmetric_reply: true
+              dynamic-routing-advertise: false
 
 - name: Create unmanaged logical topology
   hosts: all

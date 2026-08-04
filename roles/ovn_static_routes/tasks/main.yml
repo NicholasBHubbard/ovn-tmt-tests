@@ -1,12 +1,69 @@
-- name: Verify logical static route states
+- name: Verify logical static route configuration
   ansible.builtin.assert:
     that:
+      - ovn_static_routes is sequence
+      - ovn_static_routes is not string
+      - ovn_static_routes is not mapping
+    fail_msg: "Logical static route configuration is invalid."
+
+- name: Verify logical static route definitions
+  ansible.builtin.assert:
+    that:
+      - ovn_static_route is mapping
+      - ovn_static_route.id is defined
+      - ovn_static_route.id is string
+      - ovn_static_route.id | length > 0
+      - ovn_static_route.state | default('present') in ['present', 'absent']
       - >-
-        ovn_static_routes
-        | map(attribute='state', default='present')
-        | difference(['present', 'absent'])
-        | length == 0
-    fail_msg: "Logical static route states must be present or absent."
+        ovn_static_route.state | default('present') == 'absent'
+        or (ovn_static_route.router is defined
+            and ovn_static_route.router is string
+            and ovn_static_route.router | length > 0
+            and ovn_static_route.prefix is defined
+            and ovn_static_route.prefix is string
+            and ovn_static_route.prefix | length > 0
+            and ovn_static_route.nexthop is defined
+            and ovn_static_route.nexthop is string
+            and ovn_static_route.nexthop | length > 0
+            and ovn_static_route.policy | default('dst-ip')
+                in ['dst-ip', 'src-ip']
+            and ovn_static_route.route_table | default('') is string
+            and ovn_static_route.options | default({}) is mapping)
+      - >-
+        ovn_static_route.state | default('present') == 'absent'
+        or ovn_static_route.output_port is undefined
+        or (ovn_static_route.output_port is string
+            and ovn_static_route.output_port | length > 0)
+      - >-
+        ovn_static_route.state | default('present') == 'absent'
+        or (ovn_static_route.selection_fields | default([]) is sequence
+            and ovn_static_route.selection_fields | default([]) is not string
+            and ovn_static_route.selection_fields | default([]) is not mapping
+            and ovn_static_route.selection_fields | default([])
+                | difference([
+                    'eth_dst', 'eth_src', 'ip_dst', 'ip_proto', 'ip_src',
+                    'ipv6_dst', 'ipv6_src', 'tp_dst', 'tp_src'
+                  ]) | length == 0)
+      - >-
+        ovn_static_route.state | default('present') == 'absent'
+        or ovn_static_route.bfd is undefined
+        or (ovn_static_route.bfd is mapping
+            and ovn_static_route.bfd.logical_port is defined
+            and ovn_static_route.bfd.logical_port is string
+            and ovn_static_route.bfd.logical_port | length > 0
+            and ovn_static_route.bfd.dst_ip is defined
+            and ovn_static_route.bfd.dst_ip is string
+            and ovn_static_route.bfd.dst_ip | length > 0
+            and ovn_static_route.bfd.dst_ip == ovn_static_route.nexthop
+            and ovn_static_route.nexthop != 'discard'
+            and (ovn_static_route.output_port is undefined
+                 or ovn_static_route.bfd.logical_port
+                    == ovn_static_route.output_port))
+    fail_msg: "Logical static route configuration is invalid."
+  loop: "{{ ovn_static_routes }}"
+  loop_control:
+    loop_var: ovn_static_route
+    label: "{{ ovn_static_route.id | default('unnamed') }}"
 
 - name: Verify logical static route IDs are unique
   ansible.builtin.assert:
@@ -14,7 +71,19 @@
       - >-
         ovn_static_routes | map(attribute='id') | unique | length
         == ovn_static_routes | length
-    fail_msg: "Logical static route IDs must be unique."
+    fail_msg: "Logical static route configuration is invalid."
+
+- name: Verify logical static route options
+  when: ovn_static_route.state | default('present') == 'present'
+  ansible.builtin.include_tasks: validate.yml
+  loop: "{{ ovn_static_routes }}"
+  loop_control:
+    loop_var: ovn_static_route
+    label: "{{ ovn_static_route.id }}"
+
+- name: Initialize logical static route update state
+  ansible.builtin.set_fact:
+    ovn_static_routes_updated: false
 
 - name: Configure OVN logical static routes
   ansible.builtin.include_tasks: route.yml
@@ -25,3 +94,7 @@
   vars:
     ovn_static_route_output_port: >-
       {{ ovn_static_route.output_port | default([]) | to_json }}
+    ovn_static_route_port_name: >-
+      {{ ovn_static_route.output_port
+         | default((ovn_static_route.bfd | default({})).logical_port
+                   | default('')) }}

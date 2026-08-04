@@ -1,0 +1,153 @@
+- name: Verify logical static route update failures are safe
+  hosts: all
+  become: true
+  tasks:
+    - name: Require rejection of missing destination router
+      block:
+        - name: Move static route to missing router
+          ansible.builtin.include_role:
+            name: ovn_static_routes
+          vars:
+            ovn_static_routes:
+              - id: self-route
+                router: self-missing
+                prefix: 10.0.0.0/8
+                nexthop: 192.0.2.2
+
+        - name: Fail if missing router was accepted
+          ansible.builtin.fail:
+            msg: "Missing static route router was accepted."
+      rescue:
+        - name: Verify missing router failure
+          ansible.builtin.assert:
+            that:
+              - >-
+                'self-missing'
+                in ((ansible_failed_result.stdout | default(''))
+                    ~ (ansible_failed_result.stderr | default('')))
+
+    - name: Require rejection of missing output port
+      block:
+        - name: Apply route with missing output port
+          ansible.builtin.include_role:
+            name: ovn_static_routes
+          vars:
+            ovn_static_routes:
+              - id: self-missing-port-route
+                router: self-r1
+                prefix: 10.0.0.0/8
+                nexthop: 192.0.2.2
+                output_port: self-missing-port
+
+        - name: Fail if missing output port was accepted
+          ansible.builtin.fail:
+            msg: "Missing static route output port was accepted."
+      rescue:
+        - name: Verify missing output port failure
+          ansible.builtin.assert:
+            that:
+              - "'output port' in ansible_failed_result.msg"
+
+    - name: Require rejection of output port on another router
+      block:
+        - name: Apply route with wrong-router output port
+          ansible.builtin.include_role:
+            name: ovn_static_routes
+          vars:
+            ovn_static_routes:
+              - id: self-wrong-port-route
+                router: self-r1
+                prefix: 10.0.0.0/8
+                nexthop: 203.0.113.1
+                output_port: self-rp-gateway
+
+        - name: Fail if wrong-router output port was accepted
+          ansible.builtin.fail:
+            msg: "Wrong-router static route output port was accepted."
+      rescue:
+        - name: Verify wrong-router output port failure
+          ansible.builtin.assert:
+            that:
+              - "'destination router' in ansible_failed_result.msg"
+
+    - name: Require rejection of missing BFD session
+      block:
+        - name: Apply route with missing BFD session
+          ansible.builtin.include_role:
+            name: ovn_static_routes
+          vars:
+            ovn_static_routes:
+              - id: self-missing-bfd-route
+                router: self-r1
+                prefix: 10.0.0.0/8
+                nexthop: 192.0.2.200
+                bfd:
+                  logical_port: self-rp
+                  dst_ip: 192.0.2.200
+
+        - name: Fail if missing BFD session was accepted
+          ansible.builtin.fail:
+            msg: "Missing static route BFD session was accepted."
+      rescue:
+        - name: Verify missing BFD session failure
+          ansible.builtin.assert:
+            that:
+              - "'BFD session' in ansible_failed_result.msg"
+
+    - name: Find managed static route row
+      ansible.builtin.command:
+        argv:
+          - ovn-nbctl
+          - --bare
+          - --columns=_uuid
+          - find
+          - Logical_Router_Static_Route
+          - external_ids:ovn-tmt-tests-id="self-route"
+      register: ovn_static_route_ambiguous_row
+      changed_when: false
+
+    - name: Require rejection of multiple owning routers
+      block:
+        - name: Add a second router reference to static route
+          ansible.builtin.command:
+            argv:
+              - ovn-nbctl
+              - add
+              - Logical_Router
+              - self-r3
+              - static_routes
+              - "{{ ovn_static_route_ambiguous_row.stdout }}"
+          changed_when: true
+
+        - name: Apply static route with ambiguous ownership
+          ansible.builtin.include_role:
+            name: ovn_static_routes
+          vars:
+            ovn_static_routes:
+              - id: self-route
+                router: self-r1
+                prefix: 198.51.100.0/24
+                nexthop: 192.0.2.1
+                policy: src-ip
+                route_table: blue
+                output_port: self-rp
+
+        - name: Fail if ambiguous route ownership was accepted
+          ansible.builtin.fail:
+            msg: "Ambiguous static route ownership was accepted."
+      rescue:
+        - name: Verify ambiguous ownership failure
+          ansible.builtin.assert:
+            that:
+              - "'exactly one' in ansible_failed_result.msg"
+      always:
+        - name: Remove extra router reference from static route
+          ansible.builtin.command:
+            argv:
+              - ovn-nbctl
+              - remove
+              - Logical_Router
+              - self-r3
+              - static_routes
+              - "{{ ovn_static_route_ambiguous_row.stdout }}"
+          changed_when: true
