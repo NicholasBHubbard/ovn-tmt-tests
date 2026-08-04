@@ -14,9 +14,23 @@
 - name: Wait for absent Southbound objects
   hosts: all
   become: true
+  pre_tasks:
+    - name: Write Southbound convergence expectations
+      ansible.builtin.copy:
+        dest: /tmp/ovn-sb-convergence-state.json
+        mode: "0600"
+        content: |
+          {
+            "southbound": {
+              "absent_datapaths": ["self-convergence"],
+              "absent_ports": ["self-convergence-port"]
+            }
+          }
   roles:
     - role: ovn_sb_convergence
-      ovn_sb_convergence_absent_datapaths:
-        - self-convergence
-      ovn_sb_convergence_absent_ports:
-        - self-convergence-port
+      ovn_sb_convergence_state_path: /tmp/ovn-sb-convergence-state.json
+  post_tasks:
+    - name: Remove Southbound convergence expectations
+      ansible.builtin.file:
+        path: /tmp/ovn-sb-convergence-state.json
+        state: absent

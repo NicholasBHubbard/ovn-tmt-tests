@@ -7,6 +7,15 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
+KINDS = ("datapaths", "ports")
+STATE_FIELDS = (
+    "datapaths",
+    "ports",
+    "absent_datapaths",
+    "absent_ports",
+    "started_ns",
+)
+
 
 def _decode(value: Any) -> Any:
     if not isinstance(value, list) or len(value) != 2:
@@ -34,20 +43,21 @@ def _rows(command: Sequence[str], table: str, *columns: str) -> list[dict[str, A
         stdout=subprocess.PIPE,
     ).stdout
     result = json.loads(output)
+    headings = result["headings"]
+    rows = result["data"]
+    if any(len(row) != len(headings) for row in rows):
+        raise ValueError("OVSDB row does not match its headings")
     return [
-        {
-            heading: _decode(value)
-            for heading, value in zip(result["headings"], row, strict=True)
-        }
-        for row in result["data"]
+        {heading: _decode(value) for heading, value in zip(headings, row)}
+        for row in rows
     ]
 
 
-def verify(expected: dict[str, Any], actual: dict[str, Any]) -> None:
-    problems = {}
-    for kind in ("datapaths", "ports"):
-        values = expected.get(kind, [])
-        absent_values = expected.get(f"absent_{kind}", [])
+def _expectations(config: dict[str, Any]) -> dict[str, set[str]]:
+    result = {}
+    for kind in KINDS:
+        values = config.get(kind, [])
+        absent_values = config.get(f"absent_{kind}", [])
         if not isinstance(values, list) or not isinstance(absent_values, list):
             raise ValueError(f"{kind} expectations must be lists")
         if not all(isinstance(item, str) and item for item in values + absent_values):
@@ -56,9 +66,20 @@ def verify(expected: dict[str, Any], actual: dict[str, Any]) -> None:
         absent = set(absent_values)
         if wanted & absent:
             raise ValueError(f"{kind} cannot be both expected and absent")
-        if missing := wanted - set(actual[kind]):
+        result[kind] = wanted
+        result[f"absent_{kind}"] = absent
+    if not any(result.values()):
+        raise ValueError("at least one Southbound expectation is required")
+    return result
+
+
+def verify(expected: dict[str, Any], actual: dict[str, Any]) -> None:
+    expectations = _expectations(expected)
+    problems = {}
+    for kind in KINDS:
+        if missing := expectations[kind] - set(actual[kind]):
             problems[f"missing_{kind}"] = sorted(missing)
-        if stale := absent & set(actual[kind]):
+        if stale := expectations[f"absent_{kind}"] & set(actual[kind]):
             problems[f"stale_{kind}"] = sorted(stale)
     if problems:
         summary = ", ".join(
@@ -73,10 +94,15 @@ def check(config: dict[str, Any]) -> dict[str, Any]:
     if isinstance(timeout, bool) or not isinstance(timeout, int) or timeout < 1:
         raise ValueError("timeout must be a positive integer")
     for command in ("nbctl", "sbctl"):
-        if not config.get(command) or not all(
-            isinstance(item, str) and item for item in config[command]
+        value = config.get(command)
+        if (
+            isinstance(value, (str, bytes))
+            or not isinstance(value, Sequence)
+            or not value
+            or not all(isinstance(item, str) and item for item in value)
         ):
             raise ValueError(f"{command} must be a non-empty command list")
+    _expectations(config)
 
     start = config.get("started_ns", time.monotonic_ns())
     if isinstance(start, bool) or not isinstance(start, int):
@@ -114,13 +140,27 @@ def check(config: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def merge_state(config: dict[str, Any], state: Any) -> dict[str, Any]:
+    if not isinstance(state, dict):
+        raise ValueError("Southbound state must be an object")
+    values = state.get("southbound", state)
+    if not isinstance(values, dict):
+        raise ValueError("Southbound state fields must be an object")
+    return {
+        **config,
+        **{field: values[field] for field in STATE_FIELDS if field in values},
+    }
+
+
 def main() -> None:
     config = json.loads(
         base64.b64decode(os.environ["OVN_SB_CONVERGENCE_CONFIG"]).decode()
     )
+    if not isinstance(config, dict):
+        raise ValueError("Southbound convergence configuration must be an object")
     if path := os.environ.get("OVN_SB_CONVERGENCE_STATE_PATH"):
         state = json.loads(Path(path).read_text())
-        config.update(state.get("southbound", state))
+        config = merge_state(config, state)
     print(json.dumps(check(config)))
 
 
