@@ -1,0 +1,11 @@
+- name: Reapply OVS external IDs
+  ansible.builtin.import_playbook: reconfigure.yml
+
+- name: Verify identical OVS external IDs are unchanged
+  hosts: all
+  become: true
+  tasks:
+    - name: Verify no OVS external IDs were updated
+      ansible.builtin.assert:
+        that:
+          - not ovs_external_ids_updated

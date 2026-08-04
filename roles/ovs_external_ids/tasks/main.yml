@@ -1,37 +1,79 @@
-- name: Verify OVS external IDs
+- name: Verify OVS external ID configuration
   ansible.builtin.assert:
     that:
       - ovs_external_ids is mapping
-      - ovs_external_ids.keys() | reject('equalto', '') | length == ovs_external_ids | length
-    fail_msg: "OVS external IDs must be a mapping with nonempty keys."
+    fail_msg: "OVS external ID configuration is invalid."
 
-- name: Set OVS external IDs
-  when: ovs_external_id.value is not none
-  ansible.builtin.command:
-    argv:
-      - ovs-vsctl
-      - set
-      - Open_vSwitch
-      - .
-      - "external_ids:{{ ovs_external_id.key }}={{ ovs_external_id.value }}"
+- name: Verify OVS external ID entries
+  ansible.builtin.assert:
+    that:
+      - ovs_external_id.key is string
+      - ovs_external_id.key | length > 0
+      - ovs_external_id.value is string or ovs_external_id.value is none
+    fail_msg: "OVS external ID configuration is invalid."
   loop: "{{ ovs_external_ids | dict2items }}"
   loop_control:
     loop_var: ovs_external_id
     label: "{{ ovs_external_id.key }}"
-  changed_when: true
 
-- name: Remove OVS external IDs
-  when: ovs_external_id.value is none
+- name: Initialize OVS external ID reconciliation
+  ansible.builtin.set_fact:
+    ovs_external_ids_argv:
+      - ovs-vsctl
+    ovs_external_ids_updated: false
+  changed_when: false
+
+- name: Read current OVS external IDs
+  when: ovs_external_ids | length > 0
   ansible.builtin.command:
     argv:
       - ovs-vsctl
-      - remove
+      - --format=json
+      - --columns=external_ids
+      - list
       - Open_vSwitch
       - .
-      - external_ids
-      - "{{ ovs_external_id.key }}"
+  register: ovs_external_ids_query
+  changed_when: false
+
+- name: Record current OVS external IDs
+  when: ovs_external_ids | length > 0
+  ansible.builtin.set_fact:
+    ovs_external_ids_current: >-
+      {{ (ovs_external_ids_query.stdout | from_json).data[0][0][1] }}
+  changed_when: false
+
+- name: Build OVS external ID transaction
+  vars:
+    ovs_external_id_current: >-
+      {{ ovs_external_ids_current
+         | selectattr('0', 'equalto', ovs_external_id.key)
+         | map(attribute='1') | list }}
+    ovs_external_id_command: >-
+      {{ ['--', 'set', 'Open_vSwitch', '.',
+          'external_ids:' ~ (ovs_external_id.key | to_json)
+          ~ '=' ~ (ovs_external_id.value | to_json)]
+         if ovs_external_id.value is not none
+            and (ovs_external_id_current | length == 0
+                 or ovs_external_id_current[0] != ovs_external_id.value)
+         else ['--', 'remove', 'Open_vSwitch', '.', 'external_ids',
+               ovs_external_id.key | to_json]
+         if ovs_external_id.value is none
+            and ovs_external_id_current | length > 0
+         else [] }}
+  ansible.builtin.set_fact:
+    ovs_external_ids_argv: >-
+      {{ ovs_external_ids_argv + ovs_external_id_command }}
+    ovs_external_ids_updated: >-
+      {{ ovs_external_ids_updated or ovs_external_id_command | length > 0 }}
   loop: "{{ ovs_external_ids | dict2items }}"
   loop_control:
     loop_var: ovs_external_id
     label: "{{ ovs_external_id.key }}"
+  changed_when: false
+
+- name: Reconcile OVS external IDs
+  when: ovs_external_ids_updated
+  ansible.builtin.command:
+    argv: "{{ ovs_external_ids_argv }}"
   changed_when: true

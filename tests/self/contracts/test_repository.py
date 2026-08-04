@@ -26,6 +26,7 @@ INHERITED_SELF_PLANS = (
     "ovn-topology",
     "ovn-unit-test-deps",
     "ovs-endpoints",
+    "ovs-external-ids",
     "ovs-setup",
 )
 

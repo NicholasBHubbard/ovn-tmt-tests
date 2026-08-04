@@ -1,0 +1,39 @@
+summary: Test OVS external IDs on Fedora
+
+provision:
+  - how: virtual
+    image: fedora
+
+prepare:
+  - name: Set up OVS
+    how: ansible
+    playbook: playbooks/ovs-setup.yml
+    extra-args: '-e ovs_setup_install_method=package'
+  - name: Check OVS external ID preconditions
+    how: shell
+    order: 78
+    script: >-
+      python3 -m pytest
+      ./tests/self/ovs-external-ids/test.py::TestPreconditions
+  - name: Verify invalid OVS external ID configuration
+    how: ansible
+    order: 79
+    playbook: tests/self/ovs-external-ids/invalid-configuration.yml
+  - name: Apply initial OVS external IDs
+    how: ansible
+    order: 80
+    playbook: tests/self/ovs-external-ids/initial.yml
+  - name: Verify initial OVS external IDs
+    how: shell
+    order: 81
+    script: >-
+      python3 -m pytest
+      ./tests/self/ovs-external-ids/test.py::TestInitial
+  - name: Reconfigure OVS external IDs
+    how: ansible
+    order: 82
+    playbook: tests/self/ovs-external-ids/reconfigure.yml
+  - name: Reapply OVS external IDs
+    how: ansible
+    order: 83
+    playbook: tests/self/ovs-external-ids/reapply.yml

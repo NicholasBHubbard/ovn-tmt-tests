@@ -16,27 +16,13 @@ class TestPreconditions:
         assert not processes(runner, "ovsdb-server")
 
 
-def external_id(runner: Runner, name: str) -> str:
-    return runner.output(
-        "ovs-vsctl",
-        "--if-exists",
-        "get",
-        "Open_vSwitch",
-        ".",
-        f"external_ids:{name}",
-    ).strip('"')
-
-
 class TestInitial:
-    def test_bridges_and_external_ids(self, snapshots: Snapshots) -> None:
+    def test_bridges(self, snapshots: Snapshots) -> None:
         runner = Runner()
         ovs = Ovsdb(runner, "ovs-vsctl")
 
         assert runner.succeeds("ovs-vsctl", "br-exists", "self-br-keep")
         assert runner.succeeds("ovs-vsctl", "br-exists", "self-br-delete")
-        assert external_id(runner, "self-managed") == "initial"
-        assert external_id(runner, "self-delete") == "remove-me"
-        assert external_id(runner, "self-unmanaged") == "preserve"
         snapshots.save(
             "ovs-bridge",
             ovs.by_name(
@@ -93,6 +79,3 @@ class TestResult:
         assert runner.succeeds("ovs-vsctl", "br-exists", "self-br-keep")
         assert not runner.succeeds("ovs-vsctl", "br-exists", "self-br-delete")
         assert runner.succeeds("ovs-vsctl", "br-exists", "self-bridge-new")
-        assert external_id(runner, "self-managed") == "updated"
-        assert external_id(runner, "self-delete") == ""
-        assert external_id(runner, "self-unmanaged") == "preserve"

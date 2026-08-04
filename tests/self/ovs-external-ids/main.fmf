@@ -1,0 +1,3 @@
+summary: Verify OVS external ID lifecycle
+test: python3 -m pytest ./test.py::TestResult
+duration: 5m

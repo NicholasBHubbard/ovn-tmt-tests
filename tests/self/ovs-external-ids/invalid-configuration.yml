@@ -1,0 +1,52 @@
+- name: Reject invalid OVS external ID configuration
+  hosts: all
+  become: true
+  tasks:
+    - name: Verify invalid configurations are rejected
+      ansible.builtin.include_tasks: invalid-case.yml
+      loop:
+        - name: non-mapping configuration
+          external_ids: invalid
+        - name: empty key
+          external_ids:
+            "": value
+        - name: non-string key
+          external_ids:
+            1: value
+        - name: null key
+          external_ids:
+            null: value
+        - name: integer value
+          external_ids:
+            self-invalid: 1
+        - name: boolean value
+          external_ids:
+            self-invalid: true
+        - name: mapping value
+          external_ids:
+            self-invalid:
+              nested: value
+        - name: later invalid value
+          external_ids:
+            self-validation-safety: changed
+            self-invalid: 1
+      loop_control:
+        loop_var: ovs_external_ids_negative_case
+        label: "{{ ovs_external_ids_negative_case.name }}"
+
+    - name: Read validation-safety external ID
+      ansible.builtin.command:
+        argv:
+          - ovs-vsctl
+          - --if-exists
+          - get
+          - Open_vSwitch
+          - .
+          - external_ids:self-validation-safety
+      register: ovs_external_ids_validation_safety
+      changed_when: false
+
+    - name: Verify rejected configuration preserved OVS state
+      ansible.builtin.assert:
+        that:
+          - ovs_external_ids_validation_safety.stdout | length == 0

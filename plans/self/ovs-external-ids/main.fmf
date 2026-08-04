@@ -1,0 +1,9 @@
+summary: Base configuration for OVS external ID self-tests
+
+discover:
+  how: fmf
+  test:
+    - /tests/self/ovs-external-ids
+
+execute:
+  how: tmt
