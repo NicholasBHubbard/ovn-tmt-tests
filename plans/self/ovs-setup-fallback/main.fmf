@@ -1,0 +1,27 @@
+summary: Test ovs-ctl fallback with packaged OVS
+
+provision:
+  - how: virtual
+    image: fedora
+
+prepare:
+  - name: Install OVS
+    how: install
+    order: 70
+    package:
+      - openvswitch
+  - how: shell
+    order: 80
+    script: python3 -m pytest ./tests/self/ovs-setup-fallback/test.py::TestPreconditions
+  - name: Start OVS through ovs-ctl
+    how: ansible
+    order: 90
+    playbook: tests/self/ovs-setup/fallback.yml
+
+discover:
+  how: fmf
+  test:
+    - /tests/self/ovs-setup-fallback$
+
+execute:
+  how: tmt

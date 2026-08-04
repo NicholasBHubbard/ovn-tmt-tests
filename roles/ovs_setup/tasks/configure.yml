@@ -1,68 +1,170 @@
 - name: Gather service facts
-  when: ansible_facts["service_mgr"] == 'systemd'
+  when: ansible_facts.service_mgr | default('') == 'systemd'
   ansible.builtin.service_facts:
 
-- name: Set openvswitch service availability
+- name: Select OVS systemd service
   ansible.builtin.set_fact:
-    ovs_has_systemd_service: >-
-      {{ ansible_facts["service_mgr"] == 'systemd'
-         and 'openvswitch.service' in (ansible_facts.services | default({})) }}
+    ovs_setup_selected_service: >-
+      {{ ovs_setup_service_name
+         if ovs_setup_service_name != 'auto'
+         else ('openvswitch'
+               if 'openvswitch.service'
+                  in (ansible_facts.services | default({}))
+               else ('openvswitch-switch'
+                     if 'openvswitch-switch.service'
+                        in (ansible_facts.services | default({}))
+                     else '')) }}
+  changed_when: false
 
-- name: Start openvswitch via systemd
-  when: ovs_has_systemd_service
-  ansible.builtin.service:
-    name: openvswitch
-    state: started
-    enabled: true
-
-- name: Find ovs-ctl script
-  when: not ovs_has_systemd_service
-  ansible.builtin.find:
-    paths:
-      - /usr
-      - /usr/local
-    patterns: ovs-ctl
-    file_type: file
-    recurse: true
-  register: ovs_ctl_find
-
-- name: Select ovs-ctl script
-  when: not ovs_has_systemd_service
-  ansible.builtin.set_fact:
-    ovs_ctl_path: "{{ (ovs_ctl_find.files | map(attribute='path') | list | first) | default('') }}"
-
-- name: Verify ovs-ctl script exists
-  when: not ovs_has_systemd_service
+- name: Verify requested OVS systemd service
+  when: ovs_setup_service_name not in ['auto', '']
   ansible.builtin.assert:
     that:
-      - ovs_ctl_path | length > 0
-    fail_msg: "Could not find ovs-ctl under /usr or /usr/local."
+      - ansible_facts.service_mgr | default('') == 'systemd'
+      - >-
+        ovs_setup_service_name in (ansible_facts.services | default({}))
+        or (ovs_setup_service_name ~ '.service')
+           in (ansible_facts.services | default({}))
+    fail_msg: "Requested OVS systemd service was not found."
 
-- name: Start openvswitch via ovs-ctl
-  when: not ovs_has_systemd_service
+- name: Check whether OVS is already running
+  when: ovs_setup_selected_service | length == 0
   ansible.builtin.command:
-    cmd: "{{ ovs_ctl_path }} start"
+    argv:
+      - ovs-vsctl
+      - show
+  register: ovs_setup_running
+  failed_when: false
+  changed_when: false
+
+- name: Inspect deterministic ovs-ctl candidates
+  when:
+    - ovs_setup_selected_service | length == 0
+    - ovs_setup_running.rc != 0
+  vars:
+    ovs_setup_ovs_ctl_candidates: >-
+      {{ ['/usr/share/openvswitch/scripts/ovs-ctl',
+          '/usr/local/share/openvswitch/scripts/ovs-ctl']
+         if ovs_setup_ovs_ctl_path == 'auto'
+         else [ovs_setup_ovs_ctl_path] }}
+  ansible.builtin.stat:
+    path: "{{ ovs_setup_ovs_ctl_candidate }}"
+    follow: true
+  loop: "{{ ovs_setup_ovs_ctl_candidates }}"
+  loop_control:
+    loop_var: ovs_setup_ovs_ctl_candidate
+    label: "{{ ovs_setup_ovs_ctl_candidate }}"
+  register: ovs_setup_ovs_ctl_files
+
+- name: Select ovs-ctl script
+  when:
+    - ovs_setup_selected_service | length == 0
+    - ovs_setup_running.rc != 0
+  ansible.builtin.set_fact:
+    ovs_setup_selected_ovs_ctl: >-
+      {{ (ovs_setup_ovs_ctl_files.results
+          | selectattr('stat.exists')
+          | selectattr('stat.isreg')
+          | map(attribute='stat.path')
+          | first) | default('') }}
+  changed_when: false
+
+- name: Verify ovs-ctl script exists
+  when:
+    - ovs_setup_selected_service | length == 0
+    - ovs_setup_running.rc != 0
+  ansible.builtin.assert:
+    that:
+      - ovs_setup_selected_ovs_ctl | length > 0
+    fail_msg: >-
+      No usable ovs-ctl script was found. Set ovs_setup_ovs_ctl_path to its
+      installed path.
+
+- name: Start OVS via systemd
+  when: ovs_setup_selected_service | length > 0
+  ansible.builtin.service:
+    name: "{{ ovs_setup_selected_service }}"
+    state: started
+    enabled: "{{ ovs_setup_service_enabled | bool }}"
+  register: ovs_setup_systemd_start
+
+- name: Start OVS via ovs-ctl
+  when:
+    - ovs_setup_selected_service | length == 0
+    - ovs_setup_running.rc != 0
+  ansible.builtin.command:
+    argv:
+      - "{{ ovs_setup_selected_ovs_ctl }}"
+      - start
+  register: ovs_setup_ovs_ctl_start
   changed_when: true
 
-- name: Create OVS bridges
+- name: Configure OVS bridges
   when: ovs_setup_bridges | length > 0
   ansible.builtin.include_role:
     name: ovs_bridges
   vars:
     ovs_bridges: "{{ ovs_setup_bridges }}"
 
-- name: Configure SSL private key
-  when: ovs_setup_ssl_enabled | bool
+- name: Read OVS SSL configuration
   ansible.builtin.command:
-    cmd: "ovs-vsctl set-ssl {{ ovs_setup_ssl_private_key }} {{ ovs_setup_ssl_certificate }} {{ ovs_setup_ssl_ca_cert }}"
-  changed_when: true
+    argv:
+      - ovs-vsctl
+      - --format=json
+      - --columns=private_key,certificate,ca_cert
+      - list
+      - SSL
+  register: ovs_setup_ssl_query
+  changed_when: false
 
-- name: Clear SSL configuration
-  when: not (ovs_setup_ssl_enabled | bool)
-  ansible.builtin.command:
-    cmd: ovs-vsctl del-ssl
-  changed_when: true
-
-- name: Mark OVS as configured
+- name: Record OVS SSL configuration
+  vars:
+    ovs_setup_ssl_table: "{{ ovs_setup_ssl_query.stdout | from_json }}"
   ansible.builtin.set_fact:
-    ovs_configured: true
+    ovs_setup_ssl_current: >-
+      {{ dict(ovs_setup_ssl_table.headings
+              | zip(ovs_setup_ssl_table.data[0]))
+         if ovs_setup_ssl_table.data | length == 1 else {} }}
+    ovs_setup_ssl_rows: "{{ ovs_setup_ssl_table.data | length }}"
+  changed_when: false
+
+- name: Configure OVS SSL
+  when:
+    - ovs_setup_ssl_enabled | bool
+    - >-
+      ovs_setup_ssl_current.private_key | default('')
+      != ovs_setup_ssl_private_key
+      or ovs_setup_ssl_current.certificate | default('')
+         != ovs_setup_ssl_certificate
+      or ovs_setup_ssl_current.ca_cert | default('') != ovs_setup_ssl_ca_cert
+  ansible.builtin.command:
+    argv:
+      - ovs-vsctl
+      - set-ssl
+      - "{{ ovs_setup_ssl_private_key }}"
+      - "{{ ovs_setup_ssl_certificate }}"
+      - "{{ ovs_setup_ssl_ca_cert }}"
+  register: ovs_setup_ssl_set
+  changed_when: true
+
+- name: Clear OVS SSL configuration
+  when:
+    - not (ovs_setup_ssl_enabled | bool)
+    - ovs_setup_ssl_rows | int > 0
+  ansible.builtin.command:
+    argv:
+      - ovs-vsctl
+      - del-ssl
+  register: ovs_setup_ssl_clear
+  changed_when: true
+
+- name: Record OVS setup update state
+  ansible.builtin.set_fact:
+    ovs_setup_updated: >-
+      {{ ovs_setup_systemd_start.changed | default(false)
+         or ovs_setup_ovs_ctl_start.changed | default(false)
+         or ((ovs_bridges_updated | default(false))
+             if ovs_setup_bridges | length > 0 else false)
+         or ovs_setup_ssl_set.changed | default(false)
+         or ovs_setup_ssl_clear.changed | default(false) }}
+  changed_when: false

@@ -1,42 +1,5 @@
-- name: Verify OVS bridge configuration
-  ansible.builtin.assert:
-    that:
-      - ovs_bridges is sequence
-      - ovs_bridges is not string
-      - ovs_bridges is not mapping
-    fail_msg: "OVS bridge configuration is invalid."
-
-- name: Verify OVS bridge definitions
-  ansible.builtin.assert:
-    that:
-      - ovs_bridge is string or ovs_bridge is mapping
-      - ovs_bridge is not string or ovs_bridge | length > 0
-      - >-
-        ovs_bridge is not mapping
-        or (ovs_bridge.name is defined
-            and ovs_bridge.name is string
-            and ovs_bridge.name | length > 0)
-      - >-
-        ovs_bridge is not mapping
-        or ovs_bridge.state | default('present') in ['present', 'absent']
-    fail_msg: "OVS bridge configuration is invalid."
-  loop: "{{ ovs_bridges }}"
-  loop_control:
-    loop_var: ovs_bridge
-    label: >-
-      {{ ovs_bridge.name | default('unnamed')
-         if ovs_bridge is mapping else ovs_bridge }}
-
-- name: Verify OVS bridge names are unique
-  vars:
-    ovs_bridge_names: >-
-      {{ (ovs_bridges | select('string') | list)
-         + (ovs_bridges | select('mapping')
-            | map(attribute='name') | list) }}
-  ansible.builtin.assert:
-    that:
-      - ovs_bridge_names | unique | length == ovs_bridges | length
-    fail_msg: "OVS bridge configuration is invalid."
+- name: Validate OVS bridge configuration
+  ansible.builtin.include_tasks: validate.yml
 
 - name: Initialize OVS bridge update state
   ansible.builtin.set_fact:

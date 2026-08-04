@@ -1,5 +1,4 @@
 import shutil
-from pathlib import Path
 
 from ovn_test.command import Runner
 from ovn_test.ovsdb import Ovsdb
@@ -31,6 +30,16 @@ class TestInitial:
                 "_uuid",
             )["_uuid"],
         )
+        assert ovs.find(
+            "SSL",
+            columns=("private_key", "certificate", "ca_cert"),
+        ) == [
+            {
+                "private_key": "/run/ovs-setup-self/a-key.pem",
+                "certificate": "/run/ovs-setup-self/a-cert.pem",
+                "ca_cert": "/run/ovs-setup-self/a-ca.pem",
+            }
+        ]
 
 
 class TestReconfigured:
@@ -45,17 +54,19 @@ class TestReconfigured:
                 "_uuid",
             )["_uuid"],
         )
+        assert ovs.find(
+            "SSL",
+            columns=("private_key", "certificate", "ca_cert"),
+        ) == [
+            {
+                "private_key": "/run/ovs-setup-self/c-key.pem",
+                "certificate": "/run/ovs-setup-self/c-cert.pem",
+                "ca_cert": "/run/ovs-setup-self/c-ca.pem",
+            }
+        ]
 
 
 class TestResult:
-    def test_git_refspec_is_configured(self, tree: Path) -> None:
-        tasks = (tree / "roles/ovs_setup/tasks/git.yml").read_text()
-
-        assert (
-            'refspec: "+{{ ovs_setup_git_version }}:refs/ovs-tmt/'
-            '{{ ovs_setup_git_version }}"'
-        ) in tasks
-
     def test_ovs_is_running(self) -> None:
         runner = Runner()
 
@@ -79,3 +90,7 @@ class TestResult:
         assert runner.succeeds("ovs-vsctl", "br-exists", "self-br-keep")
         assert not runner.succeeds("ovs-vsctl", "br-exists", "self-br-delete")
         assert runner.succeeds("ovs-vsctl", "br-exists", "self-bridge-new")
+        assert not ovs.find(
+            "SSL",
+            columns=("private_key", "certificate", "ca_cert"),
+        )

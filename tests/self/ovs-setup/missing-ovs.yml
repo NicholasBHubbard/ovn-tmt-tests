@@ -1,0 +1,24 @@
+- name: Reject a missing OVS installation
+  hosts: all
+  become: true
+  tasks:
+    - name: Require missing OVS rejection
+      block:
+        - name: Apply OVS setup without OVS in PATH
+          ansible.builtin.include_role:
+            name: ovs_setup
+            apply:
+              environment:
+                PATH: /run/ovs-setup-empty-path
+
+        - name: Fail if missing OVS was accepted
+          ansible.builtin.fail:
+            msg: "Missing OVS was accepted."
+      rescue:
+        - name: Verify expected missing OVS failure
+          ansible.builtin.assert:
+            that:
+              - "'Verify OVS is installed' in ansible_failed_task.name"
+            fail_msg: >-
+              Missing OVS failed unexpectedly in {{ ansible_failed_task.name }}:
+              {{ ansible_failed_result.msg }}

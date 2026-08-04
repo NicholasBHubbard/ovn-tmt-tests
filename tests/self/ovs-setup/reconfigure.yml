@@ -1,11 +1,36 @@
 - name: Reconfigure reusable OVS state
   hosts: all
   become: true
-  roles:
-    - role: ovs_bridges
-      ovs_bridges:
-        - self-br-keep
-        - name: self-br-delete
-          state: absent
-        - name: self-bridge-new
-          state: present
+  tasks:
+    - name: Apply first changed OVS setup state
+      ansible.builtin.include_role:
+        name: ovs_setup
+      vars:
+        ovs_setup_bridges:
+          - self-br-keep
+          - name: self-br-delete
+            state: absent
+          - self-bridge-new
+        ovs_setup_ssl_enabled: true
+        ovs_setup_ssl_private_key: /run/ovs-setup-self/b-key.pem
+        ovs_setup_ssl_certificate: /run/ovs-setup-self/b-cert.pem
+        ovs_setup_ssl_ca_cert: /run/ovs-setup-self/b-ca.pem
+
+    - name: Apply second changed OVS setup state in the same run
+      ansible.builtin.include_role:
+        name: ovs_setup
+      vars:
+        ovs_setup_bridges:
+          - self-br-keep
+          - name: self-br-delete
+            state: absent
+          - self-bridge-new
+        ovs_setup_ssl_enabled: true
+        ovs_setup_ssl_private_key: /run/ovs-setup-self/c-key.pem
+        ovs_setup_ssl_certificate: /run/ovs-setup-self/c-cert.pem
+        ovs_setup_ssl_ca_cert: /run/ovs-setup-self/c-ca.pem
+
+    - name: Verify second OVS setup application changed state
+      ansible.builtin.assert:
+        that:
+          - ovs_setup_updated

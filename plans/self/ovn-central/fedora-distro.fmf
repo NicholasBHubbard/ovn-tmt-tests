@@ -11,9 +11,9 @@ prepare:
   - how: ansible
     order: 90
     playbook: playbooks/ovn-central.yml
-    extra-args: '-e ovn_install_method=distro -e ovs_setup_install_method=distro'
+    extra-args: '-e ovn_install_method=distro'
   - name: Reapply OVN central configuration
     how: ansible
     order: 100
     playbook: playbooks/ovn-central.yml
-    extra-args: '-e ovn_install_method=distro -e ovs_setup_install_method=distro'
+    extra-args: '-e ovn_install_method=distro'

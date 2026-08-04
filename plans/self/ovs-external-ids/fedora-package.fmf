@@ -5,10 +5,14 @@ provision:
     image: fedora
 
 prepare:
+  - name: Install OVS
+    how: install
+    order: 20
+    package:
+      - openvswitch
   - name: Set up OVS
     how: ansible
     playbook: playbooks/ovs-setup.yml
-    extra-args: '-e ovs_setup_install_method=package'
   - name: Check OVS external ID preconditions
     how: shell
     order: 78

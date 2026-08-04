@@ -31,28 +31,28 @@ prepare+:
     how: ansible
     order: 90
     playbook: playbooks/ovn-clustered.yml
-    extra-args: '-e ovn_install_method=distro -e ovs_setup_install_method=distro'
+    extra-args: '-e ovn_install_method=distro'
     where: [leader]
 
   - name: Set up cluster followers
     how: ansible
     order: 100
     playbook: playbooks/ovn-clustered.yml
-    extra-args: '-e ovn_install_method=distro -e ovs_setup_install_method=distro'
+    extra-args: '-e ovn_install_method=distro'
     where: [follower]
 
   - name: Reapply cluster leader configuration
     how: ansible
     order: 105
     playbook: playbooks/ovn-clustered.yml
-    extra-args: '-e ovn_install_method=distro -e ovs_setup_install_method=distro'
+    extra-args: '-e ovn_install_method=distro'
     where: [leader]
 
   - name: Reapply cluster follower configuration
     how: ansible
     order: 106
     playbook: playbooks/ovn-clustered.yml
-    extra-args: '-e ovn_install_method=distro -e ovs_setup_install_method=distro'
+    extra-args: '-e ovn_install_method=distro'
     where: [follower]
 
   - name: Remove obsolete cluster member

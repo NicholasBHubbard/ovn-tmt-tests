@@ -1,8 +1,39 @@
 - name: Apply initial reusable OVS configuration
   hosts: all
   become: true
-  roles:
-    - role: ovs_bridges
-      ovs_bridges:
-        - self-br-keep
-        - name: self-br-delete
+  tasks:
+    - name: Create OVS setup SSL test directory
+      ansible.builtin.file:
+        path: /run/ovs-setup-self
+        state: directory
+        mode: "0700"
+
+    - name: Create OVS setup SSL test files
+      ansible.builtin.copy:
+        content: "OVS setup self-test\n"
+        dest: "/run/ovs-setup-self/{{ ovs_setup_ssl_test_file }}"
+        mode: "0600"
+      loop:
+        - a-key.pem
+        - a-cert.pem
+        - a-ca.pem
+        - b-key.pem
+        - b-cert.pem
+        - b-ca.pem
+        - c-key.pem
+        - c-cert.pem
+        - c-ca.pem
+      loop_control:
+        loop_var: ovs_setup_ssl_test_file
+
+    - name: Apply initial OVS setup state
+      ansible.builtin.include_role:
+        name: ovs_setup
+      vars:
+        ovs_setup_bridges:
+          - self-br-keep
+          - name: self-br-delete
+        ovs_setup_ssl_enabled: true
+        ovs_setup_ssl_private_key: /run/ovs-setup-self/a-key.pem
+        ovs_setup_ssl_certificate: /run/ovs-setup-self/a-cert.pem
+        ovs_setup_ssl_ca_cert: /run/ovs-setup-self/a-ca.pem

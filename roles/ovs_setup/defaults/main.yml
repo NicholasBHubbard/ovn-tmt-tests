@@ -1,50 +1,7 @@
-ovs_setup_install_method: package
-ovs_setup_package_names:
-  dnf:
-    - openvswitch
-  apt:
-    - openvswitch-switch
-ovs_setup_repository_package_names:
-  dnf: []
-  apt: []
-
-# source: build from local source directory
-ovs_setup_source_dir: /usr/src/ovs
-ovs_setup_configure_flags: ""
-ovs_setup_make_flags: ""
-ovs_setup_build_dependency_package_names:
-  dnf:
-    - autoconf
-    - automake
-    - gcc
-    - libtool
-    - make
-    - openssl-devel
-    - python3
-  apt:
-    - autoconf
-    - automake
-    - gcc
-    - libtool
-    - make
-    - libssl-dev
-    - python3
-ovs_setup_build_repository_package_names:
-  dnf: []
-  apt: []
-
-# git: clone from repo, then build
-ovs_setup_git_repo: https://github.com/openvswitch/ovs.git
-ovs_setup_git_branch: main
-ovs_setup_git_version: "{{ ovs_setup_git_branch }}"
-ovs_setup_git_package_names:
-  dnf:
-    - git
-  apt:
-    - git
-
-# configure: bridge and SSL settings
 ovs_setup_bridges: []
+ovs_setup_service_name: auto
+ovs_setup_service_enabled: true
+ovs_setup_ovs_ctl_path: auto
 ovs_setup_ssl_enabled: false
 ovs_setup_ssl_private_key: /etc/openvswitch/ovs-privkey.pem
 ovs_setup_ssl_certificate: /etc/openvswitch/ovs-cert.pem

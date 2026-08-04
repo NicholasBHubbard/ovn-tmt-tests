@@ -1,32 +1,80 @@
-- name: Verify install method is valid
+- name: Verify OVS setup configuration
   ansible.builtin.assert:
     that:
-      - ovs_setup_install_method in ["package", "distro", "source", "git"]
-    fail_msg: "Unknown ovs_setup_install_method '{{ ovs_setup_install_method }}'. Valid: package, distro, source, git."
+      - ovs_setup_service_name is string
+      - ovs_setup_ovs_ctl_path is string
+      - ovs_setup_ovs_ctl_path | length > 0
+      - >-
+        ovs_setup_service_enabled is boolean
+        or (ovs_setup_service_enabled is string
+            and ovs_setup_service_enabled | lower
+                in ['true', 'false', 'yes', 'no', '1', '0'])
+      - >-
+        ovs_setup_ssl_enabled is boolean
+        or (ovs_setup_ssl_enabled is string
+            and ovs_setup_ssl_enabled | lower
+                in ['true', 'false', 'yes', 'no', '1', '0'])
+      - >-
+        not (ovs_setup_ssl_enabled | bool)
+        or (ovs_setup_ssl_private_key is string
+            and ovs_setup_ssl_private_key | length > 0)
+      - >-
+        not (ovs_setup_ssl_enabled | bool)
+        or (ovs_setup_ssl_certificate is string
+            and ovs_setup_ssl_certificate | length > 0)
+      - >-
+        not (ovs_setup_ssl_enabled | bool)
+        or (ovs_setup_ssl_ca_cert is string
+            and ovs_setup_ssl_ca_cert | length > 0)
+    fail_msg: "OVS setup configuration is invalid."
 
-- name: Install OVS from distro packages
-  when:
-    - ovs_setup_install_method in ["package", "distro"]
-    - not (ovs_installed | default(false))
-  ansible.builtin.include_tasks: package.yml
+- name: Validate requested OVS bridges
+  ansible.builtin.include_role:
+    name: ovs_bridges
+    tasks_from: validate.yml
+  vars:
+    ovs_bridges: "{{ ovs_setup_bridges }}"
 
-- name: Install OVS from source
-  when:
-    - ovs_setup_install_method == "source"
-    - not (ovs_installed | default(false))
-  ansible.builtin.include_tasks: source.yml
+- name: Inspect requested OVS SSL files
+  when: ovs_setup_ssl_enabled | bool
+  ansible.builtin.stat:
+    path: "{{ ovs_setup_ssl_file }}"
+    follow: true
+  loop:
+    - "{{ ovs_setup_ssl_private_key }}"
+    - "{{ ovs_setup_ssl_certificate }}"
+    - "{{ ovs_setup_ssl_ca_cert }}"
+  loop_control:
+    loop_var: ovs_setup_ssl_file
+    label: "{{ ovs_setup_ssl_file }}"
+  register: ovs_setup_ssl_files
 
-- name: Install OVS from git
-  when:
-    - ovs_setup_install_method == "git"
-    - not (ovs_installed | default(false))
-  ansible.builtin.include_tasks: git.yml
+- name: Verify requested OVS SSL files
+  when: ovs_setup_ssl_enabled | bool
+  ansible.builtin.assert:
+    that:
+      - ovs_setup_ssl_files.results | map(attribute='stat.exists') | select('equalto', false) | length == 0
+      - ovs_setup_ssl_files.results | map(attribute='stat.isreg') | select('equalto', false) | length == 0
+    fail_msg: "OVS SSL files must exist and be regular files."
 
-- name: Mark OVS as installed
-  when: not (ovs_installed | default(false))
+- name: Verify OVS is installed
+  ansible.builtin.command:
+    argv:
+      - "{{ ovs_setup_binary }}"
+      - --version
+  loop:
+    - ovs-vsctl
+    - ovs-vswitchd
+    - ovsdb-server
+  loop_control:
+    loop_var: ovs_setup_binary
+    label: "{{ ovs_setup_binary }}"
+  changed_when: false
+
+- name: Initialize OVS setup update state
   ansible.builtin.set_fact:
-    ovs_installed: true
+    ovs_setup_updated: false
+  changed_when: false
 
 - name: Configure OVS
-  when: not (ovs_configured | default(false))
   ansible.builtin.include_tasks: configure.yml

@@ -1,4 +1,4 @@
-- name: Reject invalid OVS bridge configuration
+- name: Reject invalid OVS setup configuration
   hosts: all
   become: true
   tasks:
@@ -37,17 +37,27 @@
         loop_var: ovs_bridge_negative_case
         label: "{{ ovs_bridge_negative_case.name }}"
 
-    - name: Check bridge state after rejected configuration
-      ansible.builtin.command:
-        argv:
-          - ovs-vsctl
-          - br-exists
-          - self-bridge-validation-safety
-      register: ovs_bridge_validation_safety
-      failed_when: ovs_bridge_validation_safety.rc not in [0, 2]
-      changed_when: false
+    - name: Reject missing OVS SSL files
+      block:
+        - name: Apply missing OVS SSL files
+          ansible.builtin.include_role:
+            name: ovs_setup
+          vars:
+            ovs_setup_ssl_enabled: true
+            ovs_setup_ssl_private_key: /missing/private-key.pem
+            ovs_setup_ssl_certificate: /missing/certificate.pem
+            ovs_setup_ssl_ca_cert: /missing/ca-cert.pem
 
-    - name: Verify rejected configuration preserved OVS state
-      ansible.builtin.assert:
-        that:
-          - ovs_bridge_validation_safety.rc == 2
+        - name: Fail if missing OVS SSL files were accepted
+          ansible.builtin.fail:
+            msg: "Missing OVS SSL files were accepted."
+      rescue:
+        - name: Verify expected OVS SSL file validation failure
+          ansible.builtin.assert:
+            that:
+              - >-
+                ansible_failed_result.msg
+                == 'OVS SSL files must exist and be regular files.'
+            fail_msg: >-
+              Missing OVS SSL files failed unexpectedly:
+              {{ ansible_failed_result.msg }}

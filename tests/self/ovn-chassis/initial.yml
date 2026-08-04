@@ -2,7 +2,6 @@
   ansible.builtin.import_playbook: ../../../playbooks/ovn-chassis.yml
   vars:
     ovn_install_method: distro
-    ovs_setup_install_method: distro
     ovn_chassis_integration_bridge: self-br-int
     ovn_chassis_bridges:
       - br-ex

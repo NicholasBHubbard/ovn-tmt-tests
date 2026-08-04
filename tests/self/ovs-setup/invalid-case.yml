@@ -2,9 +2,9 @@
   block:
     - name: Apply invalid OVS bridge configuration
       ansible.builtin.include_role:
-        name: ovs_bridges
+        name: ovs_setup
       vars:
-        ovs_bridges: "{{ ovs_bridge_negative_case.bridges }}"
+        ovs_setup_bridges: "{{ ovs_bridge_negative_case.bridges }}"
 
     - name: Fail if invalid configuration was accepted
       ansible.builtin.fail:

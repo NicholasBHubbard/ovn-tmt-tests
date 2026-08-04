@@ -1,10 +1,18 @@
 summary: Base configuration for ovs-setup self-tests
 
 prepare:
-  - name: Verify invalid OVS bridge configurations
+  - name: Verify invalid OVS setup configurations
     how: ansible
-    order: 95
+    order: 82
     playbook: tests/self/ovs-setup/invalid-configuration.yml
+  - name: Verify missing OVS is rejected
+    how: ansible
+    order: 84
+    playbook: tests/self/ovs-setup/missing-ovs.yml
+  - name: Verify rejected configuration did not start OVS
+    how: shell
+    order: 86
+    script: python3 -m pytest ./tests/self/ovs-setup/test.py::TestPreconditions
   - name: Apply initial reusable OVS state
     how: ansible
     order: 100
@@ -21,6 +29,10 @@ prepare:
     how: shell
     order: 130
     script: python3 -m pytest ./tests/self/ovs-setup/test.py::TestReconfigured
+  - name: Disable reusable OVS SSL state
+    how: ansible
+    order: 135
+    playbook: tests/self/ovs-setup/disable.yml
   - name: Reapply reusable OVS state
     how: ansible
     order: 140
@@ -29,7 +41,7 @@ prepare:
 discover:
   how: fmf
   test:
-    - /tests/self/ovs-setup
+    - /tests/self/ovs-setup$
 
 execute:
   how: tmt

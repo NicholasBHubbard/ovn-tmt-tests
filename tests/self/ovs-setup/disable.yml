@@ -1,0 +1,14 @@
+- name: Disable reusable OVS SSL state
+  hosts: all
+  become: true
+  tasks:
+    - name: Apply OVS setup state without SSL
+      ansible.builtin.include_role:
+        name: ovs_setup
+      vars:
+        ovs_setup_bridges:
+          - self-br-keep
+          - name: self-br-delete
+            state: absent
+          - self-bridge-new
+        ovs_setup_ssl_enabled: false

@@ -1,0 +1,26 @@
+- name: Start OVS through a configured ovs-ctl path
+  hosts: all
+  become: true
+  tasks:
+    - name: Apply automatically located ovs-ctl OVS setup state
+      ansible.builtin.include_role:
+        name: ovs_setup
+      vars:
+        ovs_setup_service_name: ""
+
+    - name: Verify ovs-ctl started OVS
+      ansible.builtin.assert:
+        that:
+          - ovs_setup_updated
+
+    - name: Reapply OVS setup with an explicit ovs-ctl path
+      ansible.builtin.include_role:
+        name: ovs_setup
+      vars:
+        ovs_setup_service_name: ""
+        ovs_setup_ovs_ctl_path: /usr/share/openvswitch/scripts/ovs-ctl
+
+    - name: Verify ovs-ctl did not restart running OVS
+      ansible.builtin.assert:
+        that:
+          - not ovs_setup_updated
