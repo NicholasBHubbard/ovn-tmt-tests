@@ -1,0 +1,64 @@
+- name: Require rejection of {{ ovn_test_pki_negative_case.name }}
+  block:
+    - name: Apply invalid OVN test PKI configuration
+      ansible.builtin.include_role:
+        name: ovn_test_pki
+      vars:
+        ovn_test_pki_enabled: false
+        ovn_test_pki_action: >-
+          {{ ovn_test_pki_negative_case.action | default('create') }}
+        ovn_test_pki_controller_dir: >-
+          {{ ovn_test_pki_negative_case.controller_dir
+             | default('/tmp/ovn-test-pki-controller-invalid') }}
+        ovn_test_pki_remote_dir: >-
+          {{ ovn_test_pki_negative_case.remote_dir
+             | default('/tmp/ovn-test-pki-invalid') }}
+        ovn_test_pki_private_key: >-
+          {{ ovn_test_pki_negative_case.private_key
+             | default('/tmp/ovn-test-pki-invalid/private.pem') }}
+        ovn_test_pki_certificate: >-
+          {{ ovn_test_pki_negative_case.certificate
+             | default('/tmp/ovn-test-pki-invalid/certificate.pem') }}
+        ovn_test_pki_ca_cert: >-
+          {{ ovn_test_pki_negative_case.ca_cert
+             | default('/tmp/ovn-test-pki-invalid/ca.pem') }}
+        ovn_test_pki_key_bits: >-
+          {{ ovn_test_pki_negative_case.key_bits | default(2048) }}
+        ovn_test_pki_certificate_days: >-
+          {{ ovn_test_pki_negative_case.certificate_days | default(1) }}
+        ovn_test_pki_minimum_validity: >-
+          {{ ovn_test_pki_negative_case.minimum_validity | default(60) }}
+        ovn_test_pki_ca_subject: >-
+          {{ ovn_test_pki_negative_case.ca_subject
+             | default('/CN=OVN test CA') }}
+        ovn_test_pki_endpoint_subject: /CN=OVN test endpoint
+        ovn_test_pki_service_group: >-
+          {{ ovn_test_pki_negative_case.service_group
+             | default('openvswitch') }}
+        ovn_test_pki_package_names: >-
+          {{ ovn_test_pki_negative_case.package_names
+             | default({'dnf': ['openssl'], 'apt': ['openssl']}) }}
+
+    - name: Fail if invalid configuration was accepted
+      ansible.builtin.fail:
+        msg: >-
+          Invalid configuration was accepted:
+          {{ ovn_test_pki_negative_case.name }}
+  rescue:
+    - name: Verify expected PKI validation failure
+      ansible.builtin.assert:
+        that:
+          - >-
+            ansible_failed_result.msg
+            == 'OVN test PKI configuration is invalid.'
+            or
+            ansible_failed_result.results | default([])
+            | selectattr(
+                'msg',
+                'equalto',
+                'OVN test PKI configuration is invalid.'
+              )
+            | list | length > 0
+        fail_msg: >-
+          {{ ovn_test_pki_negative_case.name }} failed unexpectedly:
+          {{ ansible_failed_result.msg }}

@@ -1,0 +1,8 @@
+- name: Install OVN test PKI self-test credentials
+  hosts: all
+  become: true
+  vars_files:
+    - variables.yml
+  roles:
+    - role: ovn_test_pki
+      ovn_test_pki_action: install

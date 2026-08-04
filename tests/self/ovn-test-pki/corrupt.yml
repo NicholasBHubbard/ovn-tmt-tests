@@ -1,0 +1,15 @@
+- name: Corrupt OVN test PKI builder credentials
+  hosts: all
+  become: true
+  vars_files:
+    - variables.yml
+  tasks:
+    - name: Replace endpoint private key
+      ansible.builtin.command:
+        argv:
+          - openssl
+          - genrsa
+          - -out
+          - "{{ ovn_test_pki_private_key }}"
+          - "{{ ovn_test_pki_key_bits | int }}"
+      changed_when: true

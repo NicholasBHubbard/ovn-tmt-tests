@@ -1,0 +1,85 @@
+- name: Reject invalid OVN test PKI configuration
+  hosts: all
+  become: true
+  tasks:
+    - name: Verify invalid OVN test PKI configurations are rejected
+      ansible.builtin.include_tasks: invalid-case.yml
+      loop:
+        - name: invalid action
+          action: invalid
+        - name: relative controller directory
+          controller_dir: relative
+        - name: root controller directory
+          controller_dir: /
+        - name: relative remote directory
+          remote_dir: relative
+        - name: root remote directory
+          remote_dir: /
+        - name: credential outside remote directory
+          private_key: /tmp/outside-private.pem
+        - name: parent path traversal
+          private_key: /tmp/ovn-test-pki-invalid/../private.pem
+        - name: duplicate credential basenames
+          private_key: /tmp/ovn-test-pki-invalid/private.pem
+          certificate: /tmp/ovn-test-pki-invalid/nested/private.pem
+        - name: weak private key
+          key_bits: 1024
+        - name: invalid certificate lifetime
+          certificate_days: 0
+        - name: negative minimum validity
+          minimum_validity: -1
+        - name: excessive minimum validity
+          minimum_validity: 86400
+        - name: invalid CA subject
+          ca_subject: OVN test CA
+        - name: empty service group
+          service_group: ""
+        - name: invalid package mapping
+          package_names: []
+      loop_control:
+        loop_var: ovn_test_pki_negative_case
+        label: "{{ ovn_test_pki_negative_case.name }}"
+
+- name: Add multiple OVN test PKI builders
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Add synthetic builder hosts
+      ansible.builtin.add_host:
+        name: "self-pki-builder-{{ item }}"
+        groups: self_pki_builders
+        ansible_connection: local
+      loop:
+        - one
+        - two
+      run_once: true
+      changed_when: false
+
+- name: Reject multiple OVN test PKI builders
+  hosts: self_pki_builders
+  gather_facts: false
+  tasks:
+    - name: Require single builder rejection
+      block:
+        - name: Create PKI with multiple builders
+          ansible.builtin.include_role:
+            name: ovn_test_pki
+          vars:
+            ovn_test_pki_enabled: true
+            ovn_test_pki_action: create
+            ovn_test_pki_controller_dir: /tmp/ovn-test-pki-controller-invalid
+            ovn_test_pki_remote_dir: /tmp/ovn-test-pki-invalid
+            ovn_test_pki_private_key: /tmp/ovn-test-pki-invalid/private.pem
+            ovn_test_pki_certificate: /tmp/ovn-test-pki-invalid/certificate.pem
+            ovn_test_pki_ca_cert: /tmp/ovn-test-pki-invalid/ca.pem
+
+        - name: Fail if multiple builders were accepted
+          ansible.builtin.fail:
+            msg: "Multiple OVN test PKI builders were accepted."
+      rescue:
+        - name: Verify single builder requirement
+          ansible.builtin.assert:
+            that:
+              - >-
+                ansible_failed_result.msg
+                == 'OVN test PKI creation requires exactly one builder host.'

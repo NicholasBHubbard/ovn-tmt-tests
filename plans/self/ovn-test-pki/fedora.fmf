@@ -1,0 +1,5 @@
+summary: Test OVN test PKI on Fedora
+
+provision:
+  - how: virtual
+    image: fedora

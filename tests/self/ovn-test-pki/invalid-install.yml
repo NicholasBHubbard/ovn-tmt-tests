@@ -1,0 +1,50 @@
+- name: Reject invalid staged OVN test PKI
+  hosts: all
+  become: true
+  vars_files:
+    - variables.yml
+  tasks:
+    - name: Record installed certificate
+      ansible.builtin.stat:
+        path: "{{ ovn_test_pki_certificate }}"
+        checksum_algorithm: sha256
+      register: ovn_test_pki_certificate_before_invalid_install
+
+    - name: Corrupt staged certificate
+      become: false
+      delegate_to: localhost
+      ansible.builtin.copy:
+        content: invalid certificate
+        dest: >-
+          {{ ovn_test_pki_controller_dir }}/{{ ovn_test_pki_certificate | basename }}
+        mode: "0600"
+
+    - name: Require invalid bundle rejection
+      block:
+        - name: Install invalid staged PKI
+          ansible.builtin.include_role:
+            name: ovn_test_pki
+          vars:
+            ovn_test_pki_action: install
+
+        - name: Fail if invalid staged PKI was accepted
+          ansible.builtin.fail:
+            msg: "Invalid staged OVN test PKI was accepted."
+      rescue:
+        - name: Verify invalid bundle failure
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result.msg == 'OVN test PKI bundle is invalid.'
+
+    - name: Read certificate after rejected installation
+      ansible.builtin.stat:
+        path: "{{ ovn_test_pki_certificate }}"
+        checksum_algorithm: sha256
+      register: ovn_test_pki_certificate_after_invalid_install
+
+    - name: Verify rejected installation preserved credentials
+      ansible.builtin.assert:
+        that:
+          - >-
+            ovn_test_pki_certificate_after_invalid_install.stat.checksum
+            == ovn_test_pki_certificate_before_invalid_install.stat.checksum

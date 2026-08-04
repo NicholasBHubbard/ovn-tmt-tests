@@ -1,10 +1,3 @@
-- name: Install OpenSSL for OVN test PKI
-  when: ovn_test_pki_enabled | bool
-  ansible.builtin.include_role:
-    name: distro_packages
-  vars:
-    distro_packages_names: "{{ ovn_test_pki_package_names }}"
-
 - name: Remove disabled OVN test PKI from builder
   when: not (ovn_test_pki_enabled | bool)
   ansible.builtin.file:
@@ -19,85 +12,141 @@
     path: "{{ ovn_test_pki_controller_dir }}"
     state: absent
 
-- name: Create OVN test PKI directories
+- name: Inspect existing OVN test PKI
   when: ovn_test_pki_enabled | bool
-  block:
-    - name: Create OVN test PKI builder directory
-      ansible.builtin.file:
-        path: "{{ ovn_test_pki_remote_dir }}"
-        state: directory
-        mode: "0700"
+  ansible.builtin.include_tasks: check.yml
+  vars:
+    ovn_test_pki_check_private_key: "{{ ovn_test_pki_private_key }}"
+    ovn_test_pki_check_certificate: "{{ ovn_test_pki_certificate }}"
+    ovn_test_pki_check_ca_cert: "{{ ovn_test_pki_ca_cert }}"
+    ovn_test_pki_check_ca_private_key: >-
+      {{ ovn_test_pki_remote_dir }}/ca-private-key.pem
 
-    - name: Create OVN test PKI controller directory
-      become: false
-      delegate_to: localhost
-      ansible.builtin.file:
-        path: "{{ ovn_test_pki_controller_dir }}"
-        state: directory
-        mode: "0700"
+- name: Remove invalid OVN test PKI from builder
+  when:
+    - ovn_test_pki_enabled | bool
+    - not (ovn_test_pki_bundle_valid | default(false))
+  ansible.builtin.file:
+    path: "{{ ovn_test_pki_remote_dir }}"
+    state: absent
+
+- name: Remove invalid OVN test PKI from controller
+  when:
+    - ovn_test_pki_enabled | bool
+    - not (ovn_test_pki_bundle_valid | default(false))
+  become: false
+  delegate_to: localhost
+  ansible.builtin.file:
+    path: "{{ ovn_test_pki_controller_dir }}"
+    state: absent
+
+- name: Create OVN test PKI builder directories
+  when: ovn_test_pki_enabled | bool
+  ansible.builtin.file:
+    path: "{{ ovn_test_pki_builder_directory }}"
+    state: directory
+    mode: "0750"
+  loop:
+    - "{{ ovn_test_pki_remote_dir }}"
+    - "{{ ovn_test_pki_private_key | dirname }}"
+    - "{{ ovn_test_pki_certificate | dirname }}"
+    - "{{ ovn_test_pki_ca_cert | dirname }}"
+  loop_control:
+    loop_var: ovn_test_pki_builder_directory
+    label: "{{ ovn_test_pki_builder_directory }}"
+
+- name: Create OVN test PKI controller directory
+  when: ovn_test_pki_enabled | bool
+  become: false
+  delegate_to: localhost
+  ansible.builtin.file:
+    path: "{{ ovn_test_pki_controller_dir }}"
+    state: directory
+    mode: "0700"
 
 - name: Create OVN test CA private key
-  when: ovn_test_pki_enabled | bool
+  when:
+    - ovn_test_pki_enabled | bool
+    - not (ovn_test_pki_bundle_valid | default(false))
   ansible.builtin.command:
     argv:
       - openssl
       - genrsa
       - -out
       - "{{ ovn_test_pki_remote_dir }}/ca-private-key.pem"
-      - "2048"
+      - "{{ ovn_test_pki_key_bits | int }}"
     creates: "{{ ovn_test_pki_remote_dir }}/ca-private-key.pem"
 
 - name: Create OVN test CA certificate
-  when: ovn_test_pki_enabled | bool
+  when:
+    - ovn_test_pki_enabled | bool
+    - not (ovn_test_pki_bundle_valid | default(false))
   ansible.builtin.command:
     argv:
       - openssl
       - req
       - -x509
       - -new
+      - -sha256
       - -key
       - "{{ ovn_test_pki_remote_dir }}/ca-private-key.pem"
       - -out
       - "{{ ovn_test_pki_ca_cert }}"
       - -days
-      - "1"
+      - "{{ ovn_test_pki_certificate_days | int }}"
       - -subj
-      - /CN=OVN tmt test CA
+      - "{{ ovn_test_pki_ca_subject }}"
+      - -addext
+      - basicConstraints=critical,CA:TRUE
+      - -addext
+      - keyUsage=critical,keyCertSign,cRLSign
     creates: "{{ ovn_test_pki_ca_cert }}"
 
 - name: Create OVN test private key
-  when: ovn_test_pki_enabled | bool
+  when:
+    - ovn_test_pki_enabled | bool
+    - not (ovn_test_pki_bundle_valid | default(false))
   ansible.builtin.command:
     argv:
       - openssl
       - genrsa
       - -out
       - "{{ ovn_test_pki_private_key }}"
-      - "2048"
+      - "{{ ovn_test_pki_key_bits | int }}"
     creates: "{{ ovn_test_pki_private_key }}"
 
 - name: Create OVN test certificate request
-  when: ovn_test_pki_enabled | bool
+  when:
+    - ovn_test_pki_enabled | bool
+    - not (ovn_test_pki_bundle_valid | default(false))
   ansible.builtin.command:
     argv:
       - openssl
       - req
       - -new
+      - -sha256
       - -key
       - "{{ ovn_test_pki_private_key }}"
       - -out
       - "{{ ovn_test_pki_remote_dir }}/certificate-request.pem"
       - -subj
-      - /CN=OVN tmt test endpoint
+      - "{{ ovn_test_pki_endpoint_subject }}"
+      - -addext
+      - keyUsage=critical,digitalSignature,keyEncipherment
+      - -addext
+      - extendedKeyUsage=serverAuth,clientAuth
     creates: "{{ ovn_test_pki_remote_dir }}/certificate-request.pem"
 
 - name: Sign OVN test certificate
-  when: ovn_test_pki_enabled | bool
+  when:
+    - ovn_test_pki_enabled | bool
+    - not (ovn_test_pki_bundle_valid | default(false))
   ansible.builtin.command:
     argv:
       - openssl
       - x509
       - -req
+      - -sha256
       - -in
       - "{{ ovn_test_pki_remote_dir }}/certificate-request.pem"
       - -CA
@@ -105,19 +154,51 @@
       - -CAkey
       - "{{ ovn_test_pki_remote_dir }}/ca-private-key.pem"
       - -CAcreateserial
+      - -copy_extensions
+      - copy
       - -out
       - "{{ ovn_test_pki_certificate }}"
       - -days
-      - "1"
+      - "{{ ovn_test_pki_certificate_days | int }}"
     creates: "{{ ovn_test_pki_certificate }}"
+
+- name: Verify generated OVN test PKI
+  when:
+    - ovn_test_pki_enabled | bool
+    - not (ovn_test_pki_bundle_valid | default(false))
+  ansible.builtin.include_tasks: check.yml
+  vars:
+    ovn_test_pki_check_private_key: "{{ ovn_test_pki_private_key }}"
+    ovn_test_pki_check_certificate: "{{ ovn_test_pki_certificate }}"
+    ovn_test_pki_check_ca_cert: "{{ ovn_test_pki_ca_cert }}"
+    ovn_test_pki_check_ca_private_key: >-
+      {{ ovn_test_pki_remote_dir }}/ca-private-key.pem
+
+- name: Require valid OVN test PKI
+  when: ovn_test_pki_enabled | bool
+  ansible.builtin.assert:
+    that:
+      - ovn_test_pki_bundle_valid
+    fail_msg: "OVN test PKI generation failed."
+
+- name: Protect OVN test CA private key
+  when: ovn_test_pki_enabled | bool
+  ansible.builtin.file:
+    path: "{{ ovn_test_pki_remote_dir }}/ca-private-key.pem"
+    owner: root
+    mode: "0600"
 
 - name: Fetch OVN test PKI
   when: ovn_test_pki_enabled | bool
   ansible.builtin.fetch:
-    src: "{{ item }}"
-    dest: "{{ ovn_test_pki_controller_dir }}/{{ item | basename }}"
+    src: "{{ ovn_test_pki_credential_path }}"
+    dest: >-
+      {{ ovn_test_pki_controller_dir }}/{{ ovn_test_pki_credential_path | basename }}
     flat: true
   loop:
     - "{{ ovn_test_pki_private_key }}"
     - "{{ ovn_test_pki_certificate }}"
     - "{{ ovn_test_pki_ca_cert }}"
+  loop_control:
+    loop_var: ovn_test_pki_credential_path
+    label: "{{ ovn_test_pki_credential_path | basename }}"

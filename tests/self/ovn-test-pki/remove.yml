@@ -1,0 +1,9 @@
+- name: Remove OVN test PKI self-test credentials
+  hosts: all
+  become: true
+  vars_files:
+    - variables.yml
+  roles:
+    - role: ovn_test_pki
+      ovn_test_pki_action: create
+      ovn_test_pki_enabled: false

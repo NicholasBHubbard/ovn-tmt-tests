@@ -1,0 +1,11 @@
+ovn_test_pki_enabled: true
+ovn_test_pki_controller_dir: "{{ inventory_dir }}/ovn-test-pki-self"
+ovn_test_pki_remote_dir: /run/ovn-test-pki-self
+ovn_test_pki_private_key: /run/ovn-test-pki-self/identity/private.pem
+ovn_test_pki_certificate: /run/ovn-test-pki-self/identity/certificate.pem
+ovn_test_pki_ca_cert: /run/ovn-test-pki-self/trust/ca.pem
+ovn_test_pki_key_bits: 2048
+ovn_test_pki_certificate_days: 1
+ovn_test_pki_minimum_validity: 60
+ovn_test_pki_ca_subject: /CN=OVN PKI self-test CA
+ovn_test_pki_endpoint_subject: /CN=OVN PKI self-test endpoint

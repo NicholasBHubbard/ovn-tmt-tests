@@ -1,8 +1,72 @@
-- name: Verify OVN test PKI action
+- name: Verify OVN test PKI configuration types
   ansible.builtin.assert:
     that:
       - ovn_test_pki_action in ['create', 'install']
-    fail_msg: "OVN test PKI action must be create or install."
+      - ovn_test_pki_controller_dir is string
+      - ovn_test_pki_remote_dir is string
+      - ovn_test_pki_service_group is string
+      - ovn_test_pki_service_group | length > 0
+      - ovn_test_pki_private_key is string
+      - ovn_test_pki_certificate is string
+      - ovn_test_pki_ca_cert is string
+      - ovn_test_pki_ca_subject is string
+      - ovn_test_pki_endpoint_subject is string
+      - ovn_test_pki_package_names is mapping
+    fail_msg: "OVN test PKI configuration is invalid."
+
+- name: Verify OVN test PKI path configuration
+  ansible.builtin.assert:
+    that:
+      - ovn_test_pki_controller_dir.startswith('/')
+      - ovn_test_pki_controller_dir != '/'
+      - "'..' not in ovn_test_pki_controller_dir.split('/')"
+      - ovn_test_pki_remote_dir.startswith('/')
+      - ovn_test_pki_remote_dir != '/'
+      - "'..' not in ovn_test_pki_remote_dir.split('/')"
+      - ovn_test_pki_credential_path.startswith(
+          ovn_test_pki_remote_dir.rstrip('/') ~ '/')
+      - "'..' not in ovn_test_pki_credential_path.split('/')"
+      - ovn_test_pki_credential_path | basename | length > 0
+    fail_msg: "OVN test PKI configuration is invalid."
+  loop:
+    - "{{ ovn_test_pki_private_key }}"
+    - "{{ ovn_test_pki_certificate }}"
+    - "{{ ovn_test_pki_ca_cert }}"
+  loop_control:
+    loop_var: ovn_test_pki_credential_path
+    label: "{{ ovn_test_pki_credential_path }}"
+
+- name: Verify OVN test PKI generation configuration
+  ansible.builtin.assert:
+    that:
+      - >-
+        [ovn_test_pki_private_key, ovn_test_pki_certificate,
+         ovn_test_pki_ca_cert] | map('basename') | unique | length == 3
+      - (ovn_test_pki_key_bits | int) >= 2048
+      - (ovn_test_pki_certificate_days | int) > 0
+      - (ovn_test_pki_minimum_validity | int) >= 0
+      - >-
+        (ovn_test_pki_minimum_validity | int)
+        < (ovn_test_pki_certificate_days | int) * 86400
+      - ovn_test_pki_ca_subject.startswith('/')
+      - ovn_test_pki_endpoint_subject.startswith('/')
+    fail_msg: "OVN test PKI configuration is invalid."
+
+- name: Verify OVN test PKI has one builder
+  when:
+    - ovn_test_pki_enabled | bool
+    - ovn_test_pki_action == 'create'
+  ansible.builtin.assert:
+    that:
+      - ansible_play_hosts_all | length == 1
+    fail_msg: "OVN test PKI creation requires exactly one builder host."
+
+- name: Install OpenSSL for OVN test PKI
+  when: ovn_test_pki_enabled | bool
+  ansible.builtin.include_role:
+    name: distro_packages
+  vars:
+    distro_packages_names: "{{ ovn_test_pki_package_names }}"
 
 - name: Run OVN test PKI action
   ansible.builtin.include_tasks: "{{ ovn_test_pki_action }}.yml"

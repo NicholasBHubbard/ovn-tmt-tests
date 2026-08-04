@@ -3,18 +3,24 @@
   become: false
   delegate_to: localhost
   ansible.builtin.stat:
-    path: "{{ ovn_test_pki_controller_dir }}/{{ item | basename }}"
+    path: >-
+      {{ ovn_test_pki_controller_dir }}/{{ ovn_test_pki_credential_path | basename }}
   loop:
     - "{{ ovn_test_pki_private_key }}"
     - "{{ ovn_test_pki_certificate }}"
     - "{{ ovn_test_pki_ca_cert }}"
+  loop_control:
+    loop_var: ovn_test_pki_credential_path
+    label: "{{ ovn_test_pki_credential_path | basename }}"
   register: ovn_test_pki_controller_files
 
 - name: Verify OVN test PKI exists on controller
   when: ovn_test_pki_enabled | bool
   ansible.builtin.assert:
     that:
-      - ovn_test_pki_controller_files.results | map(attribute='stat.exists') | min
+      - >-
+        ovn_test_pki_controller_files.results
+        | map(attribute='stat.isreg', default=false) | min
     fail_msg: "Create the OVN test PKI before installing it."
 
 - name: Create OVN service group
@@ -32,21 +38,92 @@
     group: "{{ ovn_test_pki_service_group }}"
     mode: "0750"
 
-- name: Install OVN test PKI
+- name: Install verified OVN test PKI
   when: ovn_test_pki_enabled | bool
-  ansible.builtin.copy:
-    src: "{{ ovn_test_pki_controller_dir }}/{{ item.path | basename }}"
-    dest: "{{ item.path }}"
-    owner: root
-    group: "{{ ovn_test_pki_service_group }}"
-    mode: "{{ item.mode }}"
-  loop:
-    - path: "{{ ovn_test_pki_private_key }}"
-      mode: "0640"
-    - path: "{{ ovn_test_pki_certificate }}"
-      mode: "0644"
-    - path: "{{ ovn_test_pki_ca_cert }}"
-      mode: "0644"
+  block:
+    - name: Create OVN test PKI verification directory
+      ansible.builtin.tempfile:
+        path: "{{ ovn_test_pki_remote_dir }}"
+        prefix: .incoming-
+        state: directory
+      register: ovn_test_pki_verification_dir
+      changed_when: false
+
+    - name: Stage OVN test PKI for verification
+      ansible.builtin.copy:
+        src: >-
+          {{ ovn_test_pki_controller_dir }}/{{ ovn_test_pki_credential.path | basename }}
+        dest: >-
+          {{ ovn_test_pki_verification_dir.path }}/{{ ovn_test_pki_credential.path | basename }}
+        owner: root
+        group: root
+        mode: "0600"
+      loop:
+        - path: "{{ ovn_test_pki_private_key }}"
+        - path: "{{ ovn_test_pki_certificate }}"
+        - path: "{{ ovn_test_pki_ca_cert }}"
+      loop_control:
+        loop_var: ovn_test_pki_credential
+        label: "{{ ovn_test_pki_credential.path | basename }}"
+      changed_when: false
+
+    - name: Check staged OVN test PKI
+      ansible.builtin.include_tasks: check.yml
+      vars:
+        ovn_test_pki_check_private_key: >-
+          {{ ovn_test_pki_verification_dir.path }}/{{ ovn_test_pki_private_key | basename }}
+        ovn_test_pki_check_certificate: >-
+          {{ ovn_test_pki_verification_dir.path }}/{{ ovn_test_pki_certificate | basename }}
+        ovn_test_pki_check_ca_cert: >-
+          {{ ovn_test_pki_verification_dir.path }}/{{ ovn_test_pki_ca_cert | basename }}
+
+    - name: Require valid staged OVN test PKI
+      ansible.builtin.assert:
+        that:
+          - ovn_test_pki_bundle_valid
+        fail_msg: "OVN test PKI bundle is invalid."
+
+    - name: Create OVN test PKI destination directories
+      ansible.builtin.file:
+        path: "{{ ovn_test_pki_credential.path | dirname }}"
+        state: directory
+        owner: root
+        group: "{{ ovn_test_pki_service_group }}"
+        mode: "0750"
+      loop:
+        - path: "{{ ovn_test_pki_private_key }}"
+        - path: "{{ ovn_test_pki_certificate }}"
+        - path: "{{ ovn_test_pki_ca_cert }}"
+      loop_control:
+        loop_var: ovn_test_pki_credential
+        label: "{{ ovn_test_pki_credential.path | dirname }}"
+
+    - name: Install OVN test PKI
+      ansible.builtin.copy:
+        src: >-
+          {{ ovn_test_pki_verification_dir.path }}/{{ ovn_test_pki_credential.path | basename }}
+        dest: "{{ ovn_test_pki_credential.path }}"
+        remote_src: true
+        owner: root
+        group: "{{ ovn_test_pki_service_group }}"
+        mode: "{{ ovn_test_pki_credential.mode }}"
+      loop:
+        - path: "{{ ovn_test_pki_private_key }}"
+          mode: "0640"
+        - path: "{{ ovn_test_pki_certificate }}"
+          mode: "0644"
+        - path: "{{ ovn_test_pki_ca_cert }}"
+          mode: "0644"
+      loop_control:
+        loop_var: ovn_test_pki_credential
+        label: "{{ ovn_test_pki_credential.path | basename }}"
+  always:
+    - name: Remove OVN test PKI verification directory
+      when: ovn_test_pki_verification_dir is defined
+      ansible.builtin.file:
+        path: "{{ ovn_test_pki_verification_dir.path }}"
+        state: absent
+      changed_when: false
 
 - name: Remove disabled OVN test PKI
   when: not (ovn_test_pki_enabled | bool)

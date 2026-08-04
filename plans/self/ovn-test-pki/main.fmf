@@ -1,0 +1,63 @@
+summary: Base configuration for OVN test PKI self-tests
+
+prepare:
+  - name: Verify invalid PKI configurations are rejected
+    how: ansible
+    order: 80
+    playbook: tests/self/ovn-test-pki/invalid-configuration.yml
+  - name: Create initial PKI
+    how: ansible
+    order: 90
+    playbook: tests/self/ovn-test-pki/create.yml
+  - name: Install initial PKI
+    how: ansible
+    order: 95
+    playbook: tests/self/ovn-test-pki/install.yml
+  - name: Verify initial PKI
+    how: shell
+    order: 100
+    script: python3 -m pytest ./tests/self/ovn-test-pki/test.py::TestInitial
+  - name: Reject invalid staged PKI
+    how: ansible
+    order: 105
+    playbook: tests/self/ovn-test-pki/invalid-install.yml
+  - name: Reapply PKI creation
+    how: ansible
+    order: 110
+    playbook: tests/self/ovn-test-pki/create.yml
+  - name: Reapply PKI installation
+    how: ansible
+    order: 115
+    playbook: tests/self/ovn-test-pki/install.yml
+  - name: Verify unchanged PKI
+    how: shell
+    order: 120
+    script: python3 -m pytest ./tests/self/ovn-test-pki/test.py::TestReapplied
+  - name: Corrupt builder PKI
+    how: ansible
+    order: 130
+    playbook: tests/self/ovn-test-pki/corrupt.yml
+  - name: Regenerate PKI
+    how: ansible
+    order: 140
+    playbook: tests/self/ovn-test-pki/create.yml
+  - name: Install regenerated PKI
+    how: ansible
+    order: 145
+    playbook: tests/self/ovn-test-pki/install.yml
+  - name: Verify regenerated PKI
+    how: shell
+    order: 150
+    script: python3 -m pytest ./tests/self/ovn-test-pki/test.py::TestRegenerated
+  - name: Remove PKI
+    how: ansible
+    order: 160
+    playbook: tests/self/ovn-test-pki/remove.yml
+
+discover:
+  how: fmf
+  test:
+    - /tests/self/ovn-test-pki
+
+execute:
+  how: tmt

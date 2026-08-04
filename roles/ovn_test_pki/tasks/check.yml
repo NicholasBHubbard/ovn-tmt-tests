@@ -1,0 +1,107 @@
+- name: Check OVN test certificate freshness
+  ansible.builtin.command:
+    argv:
+      - openssl
+      - x509
+      - -checkend
+      - "{{ ovn_test_pki_minimum_validity | int }}"
+      - -noout
+      - -in
+      - "{{ ovn_test_pki_check_certificate }}"
+  register: ovn_test_pki_certificate_fresh
+  failed_when: false
+  changed_when: false
+
+- name: Check OVN test CA certificate freshness
+  ansible.builtin.command:
+    argv:
+      - openssl
+      - x509
+      - -checkend
+      - "{{ ovn_test_pki_minimum_validity | int }}"
+      - -noout
+      - -in
+      - "{{ ovn_test_pki_check_ca_cert }}"
+  register: ovn_test_pki_ca_fresh
+  failed_when: false
+  changed_when: false
+
+- name: Read OVN test certificate public key
+  ansible.builtin.command:
+    argv:
+      - openssl
+      - x509
+      - -in
+      - "{{ ovn_test_pki_check_certificate }}"
+      - -pubkey
+      - -noout
+  register: ovn_test_pki_certificate_public_key
+  failed_when: false
+  changed_when: false
+
+- name: Read OVN test private public key
+  ansible.builtin.command:
+    argv:
+      - openssl
+      - pkey
+      - -in
+      - "{{ ovn_test_pki_check_private_key }}"
+      - -pubout
+  register: ovn_test_pki_private_public_key
+  failed_when: false
+  changed_when: false
+
+- name: Verify OVN test certificate chain
+  ansible.builtin.command:
+    argv:
+      - openssl
+      - verify
+      - -CAfile
+      - "{{ ovn_test_pki_check_ca_cert }}"
+      - "{{ ovn_test_pki_check_certificate }}"
+  register: ovn_test_pki_chain_valid
+  failed_when: false
+  changed_when: false
+
+- name: Read OVN test CA certificate public key
+  when: ovn_test_pki_check_ca_private_key | default('') | length > 0
+  ansible.builtin.command:
+    argv:
+      - openssl
+      - x509
+      - -in
+      - "{{ ovn_test_pki_check_ca_cert }}"
+      - -pubkey
+      - -noout
+  register: ovn_test_pki_ca_certificate_public_key
+  failed_when: false
+  changed_when: false
+
+- name: Read OVN test CA private public key
+  when: ovn_test_pki_check_ca_private_key | default('') | length > 0
+  ansible.builtin.command:
+    argv:
+      - openssl
+      - pkey
+      - -in
+      - "{{ ovn_test_pki_check_ca_private_key }}"
+      - -pubout
+  register: ovn_test_pki_ca_private_public_key
+  failed_when: false
+  changed_when: false
+
+- name: Record OVN test PKI bundle validity
+  ansible.builtin.set_fact:
+    ovn_test_pki_bundle_valid: >-
+      {{ ovn_test_pki_certificate_fresh.rc == 0
+         and ovn_test_pki_ca_fresh.rc == 0
+         and ovn_test_pki_certificate_public_key.rc == 0
+         and ovn_test_pki_private_public_key.rc == 0
+         and ovn_test_pki_chain_valid.rc == 0
+         and ovn_test_pki_certificate_public_key.stdout
+             == ovn_test_pki_private_public_key.stdout
+         and (ovn_test_pki_check_ca_private_key | default('') | length == 0
+              or (ovn_test_pki_ca_certificate_public_key.rc | default(1)) == 0
+                 and (ovn_test_pki_ca_private_public_key.rc | default(1)) == 0
+                 and ovn_test_pki_ca_certificate_public_key.stdout
+                     == ovn_test_pki_ca_private_public_key.stdout) }}

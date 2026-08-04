@@ -1,0 +1,5 @@
+summary: Test OVN test PKI on Debian
+
+provision:
+  - how: virtual
+    image: debian
