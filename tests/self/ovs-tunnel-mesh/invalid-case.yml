@@ -1,0 +1,35 @@
+- name: Require rejection of {{ ovs_tunnel_mesh_negative_case.name }}
+  block:
+    - name: Apply invalid OVS tunnel mesh configuration
+      ansible.builtin.include_role:
+        name: ovs_tunnel_mesh
+      vars:
+        ovs_tunnel_mesh_definitions: >-
+          {{ ovs_tunnel_mesh_negative_case.meshes }}
+        ovs_tunnel_mesh_scope: "{{ groups['all'] }}"
+
+    - name: Fail if invalid OVS tunnel mesh was accepted
+      ansible.builtin.fail:
+        msg: >-
+          Invalid configuration was accepted:
+          {{ ovs_tunnel_mesh_negative_case.name }}
+  rescue:
+    - name: Verify expected OVS tunnel mesh validation failure
+      ansible.builtin.assert:
+        that:
+          - >-
+            ansible_failed_result.msg
+            == ovs_tunnel_mesh_negative_case.message
+               | default('OVS tunnel mesh configuration is invalid.')
+            or
+            ansible_failed_result.results | default([])
+            | selectattr(
+                'msg',
+                'equalto',
+                ovs_tunnel_mesh_negative_case.message
+                | default('OVS tunnel mesh configuration is invalid.')
+              )
+            | list | length > 0
+        fail_msg: >-
+          {{ ovs_tunnel_mesh_negative_case.name }} failed unexpectedly:
+          {{ ansible_failed_result.msg }}

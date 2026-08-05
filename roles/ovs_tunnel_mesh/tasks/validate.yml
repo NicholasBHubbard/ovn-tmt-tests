@@ -1,0 +1,105 @@
+- name: Verify OVS tunnel mesh definition
+  ansible.builtin.assert:
+    that:
+      - ovs_tunnel_mesh is mapping
+      - ovs_tunnel_mesh.name is defined
+      - ovs_tunnel_mesh.name is string
+      - ovs_tunnel_mesh.name | length > 0
+      - ovs_tunnel_mesh.state | default('present') in ['present', 'absent']
+    fail_msg: "OVS tunnel mesh configuration is invalid."
+
+- name: Verify present OVS tunnel mesh definition
+  when: ovs_tunnel_mesh.state | default('present') == 'present'
+  ansible.builtin.assert:
+    that:
+      - ovs_tunnel_mesh.hosts is defined
+      - ovs_tunnel_mesh.hosts is sequence
+      - ovs_tunnel_mesh.hosts is not string
+      - ovs_tunnel_mesh.hosts is not mapping
+      - ovs_tunnel_mesh.hosts | length > 1
+      - >-
+        ovs_tunnel_mesh.hosts | unique | length
+        == ovs_tunnel_mesh.hosts | length
+      - ovs_tunnel_mesh.bridge is defined
+      - ovs_tunnel_mesh.bridge is string
+      - ovs_tunnel_mesh.bridge | length > 0
+      - ovs_tunnel_mesh.key is defined
+      - >-
+        ovs_tunnel_mesh.key is integer
+        or (ovs_tunnel_mesh.key is string
+            and ovs_tunnel_mesh.key is match('^[0-9]+$'))
+      - ovs_tunnel_mesh.type | default('geneve') in ['geneve', 'gre', 'vxlan']
+      - >-
+        ovs_tunnel_mesh.hub is undefined
+        or (ovs_tunnel_mesh.hub is string
+            and ovs_tunnel_mesh.hub | length > 0
+            and ovs_tunnel_mesh.hub in ovs_tunnel_mesh.hosts)
+      - ovs_tunnel_mesh.addresses | default({}) is mapping
+    fail_msg: "OVS tunnel mesh configuration is invalid."
+
+- name: Verify OVS tunnel mesh key range
+  when: ovs_tunnel_mesh.state | default('present') == 'present'
+  ansible.builtin.assert:
+    that:
+      - ovs_tunnel_mesh.key | int >= 0
+      - >-
+        ovs_tunnel_mesh.key | int
+        <= (4294967295
+            if ovs_tunnel_mesh.type | default('geneve') == 'gre'
+            else 16777215)
+    fail_msg: "OVS tunnel mesh configuration is invalid."
+
+- name: Verify OVS tunnel mesh address keys
+  when: ovs_tunnel_mesh.state | default('present') == 'present'
+  ansible.builtin.assert:
+    that:
+      - >-
+        ovs_tunnel_mesh.addresses | default({}) | list
+        | difference(ovs_tunnel_mesh.hosts) | length == 0
+    fail_msg: "OVS tunnel mesh configuration is invalid."
+
+- name: Verify OVS tunnel mesh hosts
+  when: ovs_tunnel_mesh.state | default('present') == 'present'
+  ansible.builtin.assert:
+    that:
+      - ovs_tunnel_mesh_host is string
+      - ovs_tunnel_mesh_host | length > 0
+      - ovs_tunnel_mesh_host in hostvars
+      - ovs_tunnel_mesh_host in ovs_tunnel_mesh_scope
+    fail_msg: >-
+      OVS tunnel mesh hosts must be unique inventory hosts in the play scope.
+  loop: "{{ ovs_tunnel_mesh.hosts }}"
+  loop_control:
+    loop_var: ovs_tunnel_mesh_host
+    label: "{{ ovs_tunnel_mesh_host }}"
+
+- name: Check OVS tunnel mesh addresses
+  when: ovs_tunnel_mesh.state | default('present') == 'present'
+  vars:
+    ovs_tunnel_mesh_address: >-
+      {{ (ovs_tunnel_mesh.addresses | default({})).get(
+           ovs_tunnel_mesh_host,
+           hostvars[ovs_tunnel_mesh_host].ansible_host | default('')) }}
+  ansible.builtin.command:
+    argv:
+      - "{{ ansible_facts.python.executable | default('/usr/bin/python3') }}"
+      - -c
+      - "import ipaddress, sys; ipaddress.ip_address(sys.argv[1])"
+      - "{{ ovs_tunnel_mesh_address }}"
+  register: ovs_tunnel_mesh_address_check
+  failed_when: false
+  changed_when: false
+  loop: "{{ ovs_tunnel_mesh.hosts }}"
+  loop_control:
+    loop_var: ovs_tunnel_mesh_host
+    label: "{{ ovs_tunnel_mesh_host }}"
+
+- name: Verify OVS tunnel mesh addresses
+  when: ovs_tunnel_mesh.state | default('present') == 'present'
+  ansible.builtin.assert:
+    that:
+      - >-
+        ovs_tunnel_mesh_address_check.results
+        | rejectattr('rc', 'equalto', 0) | list | length == 0
+    fail_msg: >-
+      OVS tunnel mesh addresses must be literal IPv4 or IPv6 addresses.

@@ -1,0 +1,97 @@
+- name: Find bridge for OVS tunnel port {{ ovs_tunnel_mesh_port.name }}
+  ansible.builtin.command:
+    argv:
+      - ovs-vsctl
+      - port-to-br
+      - "{{ ovs_tunnel_mesh_port.name }}"
+  register: ovs_tunnel_mesh_port_bridge
+  failed_when: ovs_tunnel_mesh_port_bridge.rc not in [0, 1]
+  changed_when: false
+
+- name: Read OVS tunnel port {{ ovs_tunnel_mesh_port.name }}
+  ansible.builtin.command:
+    argv:
+      - ovs-vsctl
+      - --format=json
+      - --columns=type,options,external_ids
+      - find
+      - Interface
+      - "name={{ ovs_tunnel_mesh_port.name }}"
+  register: ovs_tunnel_mesh_port_query
+  changed_when: false
+
+- name: Verify OVS tunnel port is unambiguous {{ ovs_tunnel_mesh_port.name }}
+  vars:
+    ovs_tunnel_mesh_port_table: "{{ ovs_tunnel_mesh_port_query.stdout | from_json }}"
+  ansible.builtin.assert:
+    that:
+      - ovs_tunnel_mesh_port_table.data | length <= 1
+    fail_msg: "OVS tunnel port {{ ovs_tunnel_mesh_port.name }} is not unique."
+
+- name: Record OVS tunnel port state {{ ovs_tunnel_mesh_port.name }}
+  vars:
+    ovs_tunnel_mesh_port_table: "{{ ovs_tunnel_mesh_port_query.stdout | from_json }}"
+    ovs_tunnel_mesh_port_row: >-
+      {{ dict(ovs_tunnel_mesh_port_table.headings
+              | zip(ovs_tunnel_mesh_port_table.data[0]))
+         if ovs_tunnel_mesh_port_table.data | length == 1 else {} }}
+  ansible.builtin.set_fact:
+    ovs_tunnel_mesh_port_current_type: >-
+      {{ ovs_tunnel_mesh_port_row.type | default('') }}
+    ovs_tunnel_mesh_port_current_options: >-
+      {{ dict(ovs_tunnel_mesh_port_row.options[1])
+         if ovs_tunnel_mesh_port_row.options | default([]) | length == 2
+         else {} }}
+    ovs_tunnel_mesh_port_current_external_ids: >-
+      {{ dict(ovs_tunnel_mesh_port_row.external_ids[1])
+         if ovs_tunnel_mesh_port_row.external_ids | default([]) | length == 2
+         else {} }}
+  changed_when: false
+
+- name: Build OVS tunnel port update {{ ovs_tunnel_mesh_port.name }}
+  vars:
+    ovs_tunnel_mesh_port_configured: >-
+      {{ ovs_tunnel_mesh_port_current_type == ovs_tunnel_mesh_port.type
+         and ovs_tunnel_mesh_port_current_options
+             == {'remote_ip': ovs_tunnel_mesh_port.remote_ip,
+                 'key': ovs_tunnel_mesh_port.key}
+         and ovs_tunnel_mesh_port_current_external_ids.get(
+               'ovn-tmt-tests-mesh') == ovs_tunnel_mesh_port.mesh
+         and ovs_tunnel_mesh_port_current_external_ids.get(
+               'ovn-tmt-tests-peer') == ovs_tunnel_mesh_port.peer }}
+    ovs_tunnel_mesh_port_set_argv:
+      - --
+      - set
+      - Interface
+      - "{{ ovs_tunnel_mesh_port.name }}"
+      - "type={{ ovs_tunnel_mesh_port.type }}"
+      - "options:remote_ip={{ ovs_tunnel_mesh_port.remote_ip }}"
+      - "options:key={{ ovs_tunnel_mesh_port.key }}"
+      - "external_ids:ovn-tmt-tests-mesh={{ ovs_tunnel_mesh_port.mesh }}"
+      - "external_ids:ovn-tmt-tests-peer={{ ovs_tunnel_mesh_port.peer }}"
+    ovs_tunnel_mesh_port_attach_argv: >-
+      {{ (['--if-exists', 'del-port', ovs_tunnel_mesh_port.name, '--']
+          if ovs_tunnel_mesh_port_bridge.rc == 0 else [])
+         + ['--may-exist', 'add-port', ovs_tunnel_mesh_port.bridge,
+            ovs_tunnel_mesh_port.name]
+         + ovs_tunnel_mesh_port_set_argv }}
+    ovs_tunnel_mesh_port_change_argv: >-
+      {{ ovs_tunnel_mesh_port_attach_argv
+         if ovs_tunnel_mesh_port_bridge.rc != 0
+            or ovs_tunnel_mesh_port_bridge.stdout != ovs_tunnel_mesh_port.bridge
+         else (['clear', 'Interface', ovs_tunnel_mesh_port.name, 'options']
+               + ovs_tunnel_mesh_port_set_argv)
+         if not ovs_tunnel_mesh_port_configured else [] }}
+  ansible.builtin.set_fact:
+    ovs_tunnel_mesh_port_argv: >-
+      {{ ['ovs-vsctl'] + ovs_tunnel_mesh_port_change_argv }}
+    ovs_tunnel_mesh_updated: >-
+      {{ ovs_tunnel_mesh_updated
+         or ovs_tunnel_mesh_port_change_argv | length > 0 }}
+  changed_when: false
+
+- name: Reconcile OVS tunnel port {{ ovs_tunnel_mesh_port.name }}
+  when: ovs_tunnel_mesh_port_argv | length > 1
+  ansible.builtin.command:
+    argv: "{{ ovs_tunnel_mesh_port_argv }}"
+  changed_when: true

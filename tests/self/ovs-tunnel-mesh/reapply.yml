@@ -1,0 +1,11 @@
+- name: Reapply initial OVS tunnel meshes
+  ansible.builtin.import_playbook: initial.yml
+
+- name: Verify identical OVS tunnel meshes are unchanged
+  hosts: all
+  become: true
+  tasks:
+    - name: Verify no OVS tunnel mesh was updated
+      ansible.builtin.assert:
+        that:
+          - not ovs_tunnel_mesh_updated

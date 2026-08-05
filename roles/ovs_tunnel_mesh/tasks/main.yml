@@ -1,16 +1,81 @@
-- name: Verify OVS tunnel mesh states
+- name: Verify OVS tunnel mesh configuration
   ansible.builtin.assert:
     that:
-      - >-
-        ovs_tunnel_mesh_definitions
-        | map(attribute='state', default='present')
-        | difference(['present', 'absent'])
-        | length == 0
-    fail_msg: "OVS tunnel mesh states must be present or absent."
+      - ovs_tunnel_mesh_definitions is sequence
+      - ovs_tunnel_mesh_definitions is not string
+      - ovs_tunnel_mesh_definitions is not mapping
+    fail_msg: "OVS tunnel mesh configuration is invalid."
 
-- name: Configure OVS tunnel meshes
-  ansible.builtin.include_tasks: mesh.yml
+- name: Verify OVS tunnel mesh definitions
+  ansible.builtin.include_tasks: validate.yml
+  loop: "{{ ovs_tunnel_mesh_definitions }}"
+  loop_control:
+    loop_var: ovs_tunnel_mesh
+    label: >-
+      {{ ovs_tunnel_mesh.name | default('unnamed')
+         if ovs_tunnel_mesh is mapping else 'invalid' }}
+
+- name: Verify OVS tunnel mesh names are unique
+  vars:
+    ovs_tunnel_mesh_names: >-
+      {{ ovs_tunnel_mesh_definitions | map(attribute='name') | list }}
+  ansible.builtin.assert:
+    that:
+      - ovs_tunnel_mesh_names | unique | length == ovs_tunnel_mesh_names | length
+    fail_msg: "OVS tunnel mesh configuration is invalid."
+
+- name: Initialize OVS tunnel mesh reconciliation
+  ansible.builtin.set_fact:
+    ovs_tunnel_mesh_desired_bridges: []
+    ovs_tunnel_mesh_desired_ports: []
+    ovs_tunnel_mesh_updated: false
+  changed_when: false
+
+- name: Build desired OVS tunnel mesh state
+  ansible.builtin.include_tasks: desired.yml
   loop: "{{ ovs_tunnel_mesh_definitions }}"
   loop_control:
     loop_var: ovs_tunnel_mesh
     label: "{{ ovs_tunnel_mesh.name }}"
+
+- name: Verify desired OVS tunnel ports are unambiguous
+  vars:
+    ovs_tunnel_mesh_port_names: >-
+      {{ ovs_tunnel_mesh_desired_ports | map(attribute='name') | list }}
+    ovs_tunnel_mesh_port_identities: >-
+      {{ ovs_tunnel_mesh_desired_ports | map(attribute='identity') | list }}
+  ansible.builtin.assert:
+    that:
+      - >-
+        ovs_tunnel_mesh_port_names | unique | length
+        == ovs_tunnel_mesh_port_names | length
+      - >-
+        ovs_tunnel_mesh_port_identities | unique | length
+        == ovs_tunnel_mesh_port_identities | length
+    fail_msg: "OVS tunnel mesh configuration creates duplicate tunnel ports."
+
+- name: Create OVS tunnel mesh bridges
+  ansible.builtin.include_role:
+    name: ovs_bridges
+  vars:
+    ovs_bridges: "{{ ovs_tunnel_mesh_desired_bridges | unique }}"
+
+- name: Record OVS tunnel mesh bridge updates
+  ansible.builtin.set_fact:
+    ovs_tunnel_mesh_updated: >-
+      {{ ovs_tunnel_mesh_updated or ovs_bridges_updated }}
+  changed_when: false
+
+- name: Remove stale OVS tunnel mesh ports
+  ansible.builtin.include_tasks: cleanup.yml
+  loop: "{{ ovs_tunnel_mesh_definitions }}"
+  loop_control:
+    loop_var: ovs_tunnel_mesh
+    label: "{{ ovs_tunnel_mesh.name }}"
+
+- name: Reconcile OVS tunnel mesh ports
+  ansible.builtin.include_tasks: port.yml
+  loop: "{{ ovs_tunnel_mesh_desired_ports }}"
+  loop_control:
+    loop_var: ovs_tunnel_mesh_port
+    label: "{{ ovs_tunnel_mesh_port.name }}"

@@ -1,0 +1,20 @@
+- name: Reconfigure OVS tunnel meshes
+  ansible.builtin.import_playbook: ../../../playbooks/ovs-tunnel-mesh.yml
+  vars:
+    ovs_tunnel_mesh_hosts: all
+    ovs_tunnel_mesh_definitions:
+      - name: self-full
+        hosts:
+          - mesh-1
+          - mesh-2
+        bridge: self-full-b
+        key: 201
+      - name: self-hub
+        state: absent
+      - name: self-gre
+        state: absent
+
+- name: Move OVS tunnel mesh endpoints
+  ansible.builtin.import_playbook: endpoints.yml
+  vars:
+    ovs_tunnel_mesh_test_bridge: self-full-b

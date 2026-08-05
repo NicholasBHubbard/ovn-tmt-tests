@@ -1,0 +1,23 @@
+- name: Record bridge for OVS tunnel mesh {{ ovs_tunnel_mesh.name }}
+  when:
+    - ovs_tunnel_mesh.state | default('present') == 'present'
+    - inventory_hostname in ovs_tunnel_mesh.hosts
+  ansible.builtin.set_fact:
+    ovs_tunnel_mesh_desired_bridges: >-
+      {{ ovs_tunnel_mesh_desired_bridges + [ovs_tunnel_mesh.bridge] }}
+  changed_when: false
+
+- name: Build ports for OVS tunnel mesh {{ ovs_tunnel_mesh.name }}
+  when:
+    - ovs_tunnel_mesh.state | default('present') == 'present'
+    - inventory_hostname in ovs_tunnel_mesh.hosts
+    - ovs_tunnel_mesh_peer != inventory_hostname
+  ansible.builtin.include_tasks: desired-port.yml
+  loop: >-
+    {{ ovs_tunnel_mesh.hosts
+       if ovs_tunnel_mesh.hub is not defined
+          or inventory_hostname == ovs_tunnel_mesh.hub
+       else [ovs_tunnel_mesh.hub] }}
+  loop_control:
+    loop_var: ovs_tunnel_mesh_peer
+    label: "{{ ovs_tunnel_mesh_peer }}"

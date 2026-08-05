@@ -1,0 +1,23 @@
+- name: Record port to {{ ovs_tunnel_mesh_peer }}
+  vars:
+    ovs_tunnel_mesh_remote_ip: >-
+      {{ (ovs_tunnel_mesh.addresses | default({})).get(
+           ovs_tunnel_mesh_peer,
+           hostvars[ovs_tunnel_mesh_peer].ansible_host) }}
+    ovs_tunnel_mesh_type: "{{ ovs_tunnel_mesh.type | default('geneve') }}"
+    ovs_tunnel_mesh_key: "{{ ovs_tunnel_mesh.key | string }}"
+  ansible.builtin.set_fact:
+    ovs_tunnel_mesh_desired_ports: >-
+      {{ ovs_tunnel_mesh_desired_ports
+         + [{'name': 'tm' ~ ((ovs_tunnel_mesh.name ~ ':'
+                              ~ ovs_tunnel_mesh_peer) | hash('sha1'))[:10],
+             'mesh': ovs_tunnel_mesh.name,
+             'peer': ovs_tunnel_mesh_peer,
+             'bridge': ovs_tunnel_mesh.bridge,
+             'type': ovs_tunnel_mesh_type,
+             'key': ovs_tunnel_mesh_key,
+             'remote_ip': ovs_tunnel_mesh_remote_ip,
+             'identity': (ovs_tunnel_mesh_type ~ ':'
+                          ~ ovs_tunnel_mesh_remote_ip ~ ':'
+                          ~ ovs_tunnel_mesh_key)}] }}
+  changed_when: false

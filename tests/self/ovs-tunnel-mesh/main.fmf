@@ -1,0 +1,6 @@
+summary: Verify OVS tunnel mesh lifecycle
+test: python3 -m pytest ./test.py::TestResult
+duration: 5m
+require+:
+  - iproute
+  - iputils

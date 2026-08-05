@@ -1,0 +1,29 @@
+- name: Apply initial OVS tunnel meshes
+  ansible.builtin.import_playbook: ../../../playbooks/ovs-tunnel-mesh.yml
+  vars:
+    ovs_tunnel_mesh_hosts: all
+    ovs_tunnel_mesh_definitions:
+      - name: self-full
+        hosts:
+          - mesh-1
+          - mesh-2
+        bridge: self-full-a
+        key: 101
+      - name: self-hub
+        hosts:
+          - mesh-1
+          - mesh-2
+        hub: mesh-1
+        bridge: self-hub
+        type: vxlan
+        key: 102
+        addresses:
+          mesh-1: 127.0.0.11
+          mesh-2: 127.0.0.12
+      - name: self-gre
+        hosts:
+          - mesh-1
+          - mesh-2
+        bridge: self-gre
+        type: gre
+        key: 16777216

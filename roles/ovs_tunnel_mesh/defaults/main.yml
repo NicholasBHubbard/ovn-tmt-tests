@@ -3,3 +3,7 @@
 # addresses can override the inventory address for individual hosts.
 # Listed meshes are authoritative for their own managed tunnel ports.
 ovs_tunnel_mesh_definitions: []
+
+# The public playbook sets this from its host pattern. Direct role use defaults
+# to the hosts in the current play.
+ovs_tunnel_mesh_scope: "{{ ansible_play_hosts_all }}"

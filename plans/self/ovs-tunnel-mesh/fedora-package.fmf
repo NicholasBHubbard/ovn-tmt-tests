@@ -1,0 +1,70 @@
+summary: Test OVS tunnel meshes on Fedora
+
+provision:
+  - name: mesh-1
+    role: mesh
+    how: virtual
+    image: fedora
+    connection: system
+  - name: mesh-2
+    role: mesh
+    how: virtual
+    image: fedora
+    connection: system
+prepare:
+  - name: Install OVS
+    how: install
+    order: 20
+    package:
+      - openvswitch
+
+  - name: Set up OVS
+    how: ansible
+    order: 70
+    playbook: playbooks/ovs-setup.yml
+
+  - name: Check OVS tunnel mesh preconditions
+    how: shell
+    order: 78
+    script: >-
+      python3 -m pytest
+      ./tests/self/ovs-tunnel-mesh/test.py::TestPreconditions
+
+  - name: Verify invalid OVS tunnel meshes
+    how: ansible
+    order: 79
+    playbook: tests/self/ovs-tunnel-mesh/invalid-configuration.yml
+
+  - name: Apply initial OVS tunnel meshes
+    how: ansible
+    order: 80
+    playbook: tests/self/ovs-tunnel-mesh/initial.yml
+
+  - name: Create OVS tunnel mesh endpoints
+    how: ansible
+    order: 81
+    playbook: tests/self/ovs-tunnel-mesh/endpoints.yml
+
+  - name: Verify initial OVS tunnel meshes
+    how: shell
+    order: 82
+    script: >-
+      python3 -m pytest
+      ./tests/self/ovs-tunnel-mesh/test.py::TestInitial
+
+  - name: Reapply OVS tunnel meshes
+    how: ansible
+    order: 83
+    playbook: tests/self/ovs-tunnel-mesh/reapply.yml
+
+  - name: Verify reapplied OVS tunnel meshes
+    how: shell
+    order: 84
+    script: >-
+      python3 -m pytest
+      ./tests/self/ovs-tunnel-mesh/test.py::TestReapplied
+
+  - name: Reconfigure OVS tunnel meshes
+    how: ansible
+    order: 85
+    playbook: tests/self/ovs-tunnel-mesh/reconfigure.yml

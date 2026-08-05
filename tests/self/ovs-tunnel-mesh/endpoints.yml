@@ -1,0 +1,17 @@
+- name: Create OVS tunnel mesh endpoints
+  ansible.builtin.import_playbook: ../../../playbooks/ovs-endpoints.yml
+  vars:
+    ovs_endpoint_hosts: all
+    ovs_endpoints:
+      - name: self-mesh-1
+        host: mesh-1
+        bridge: "{{ ovs_tunnel_mesh_test_bridge | default('self-full-a') }}"
+        mac: "02:00:00:00:50:01"
+        addresses:
+          - 192.0.2.1/24
+      - name: self-mesh-2
+        host: mesh-2
+        bridge: "{{ ovs_tunnel_mesh_test_bridge | default('self-full-a') }}"
+        mac: "02:00:00:00:50:02"
+        addresses:
+          - 192.0.2.2/24

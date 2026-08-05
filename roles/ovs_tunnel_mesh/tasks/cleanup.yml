@@ -1,0 +1,41 @@
+- name: Find managed ports for OVS tunnel mesh {{ ovs_tunnel_mesh.name }}
+  ansible.builtin.command:
+    argv:
+      - ovs-vsctl
+      - --data=bare
+      - --no-heading
+      - --columns=name
+      - find
+      - Interface
+      - "external_ids:ovn-tmt-tests-mesh={{ ovs_tunnel_mesh.name }}"
+  register: ovs_tunnel_mesh_managed_ports
+  changed_when: false
+
+- name: Remove stale ports from OVS tunnel mesh {{ ovs_tunnel_mesh.name }}
+  vars:
+    ovs_tunnel_mesh_expected_ports: >-
+      {{ ovs_tunnel_mesh_desired_ports
+         | selectattr('mesh', 'equalto', ovs_tunnel_mesh.name)
+         | map(attribute='name') | list }}
+  ansible.builtin.command:
+    argv:
+      - ovs-vsctl
+      - --if-exists
+      - del-port
+      - "{{ ovs_tunnel_mesh_stale_port }}"
+  loop: >-
+    {{ ovs_tunnel_mesh_managed_ports.stdout_lines
+       | difference(ovs_tunnel_mesh_expected_ports) }}
+  loop_control:
+    loop_var: ovs_tunnel_mesh_stale_port
+    label: "{{ ovs_tunnel_mesh_stale_port }}"
+  register: ovs_tunnel_mesh_stale_removals
+  changed_when: true
+
+- name: Record stale OVS tunnel mesh port removal
+  when: >-
+    ovs_tunnel_mesh_stale_removals.results | default([])
+    | selectattr('changed') | list | length > 0
+  ansible.builtin.set_fact:
+    ovs_tunnel_mesh_updated: true
+  changed_when: false

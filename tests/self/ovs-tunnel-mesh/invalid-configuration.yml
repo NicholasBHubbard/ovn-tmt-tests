@@ -1,0 +1,190 @@
+- name: Verify invalid OVS tunnel mesh configuration
+  hosts: all
+  become: true
+  tasks:
+    - name: Verify invalid OVS tunnel meshes are rejected
+      ansible.builtin.include_tasks: invalid-case.yml
+      loop:
+        - name: non-list configuration
+          meshes: invalid
+        - name: duplicate mesh names
+          meshes:
+            - name: duplicate
+              state: absent
+            - name: duplicate
+              state: absent
+        - name: missing present fields
+          meshes:
+            - name: missing
+        - name: duplicate hosts
+          meshes:
+            - name: duplicate-hosts
+              hosts:
+                - mesh-1
+                - mesh-1
+              bridge: self-invalid
+              key: 1
+        - name: invalid state
+          meshes:
+            - name: invalid-state
+              state: invalid
+        - name: unsupported tunnel type
+          meshes:
+            - name: invalid-type
+              hosts:
+                - mesh-1
+                - mesh-2
+              bridge: self-invalid
+              type: invalid
+              key: 1
+        - name: out-of-range tunnel key
+          meshes:
+            - name: invalid-key
+              hosts:
+                - mesh-1
+                - mesh-2
+              bridge: self-invalid
+              key: 16777216
+        - name: unknown host
+          meshes:
+            - name: unknown-host
+              hosts:
+                - mesh-1
+                - missing-host
+              bridge: self-invalid
+              key: 1
+          message: >-
+            OVS tunnel mesh hosts must be unique inventory hosts in the play
+            scope.
+        - name: address for unknown mesh host
+          meshes:
+            - name: unknown-address
+              hosts:
+                - mesh-1
+                - mesh-2
+              bridge: self-invalid
+              key: 1
+              addresses:
+                mesh-3: 192.0.2.3
+        - name: DNS tunnel address
+          meshes:
+            - name: dns-address
+              hosts:
+                - mesh-1
+                - mesh-2
+              bridge: self-invalid
+              key: 1
+              addresses:
+                mesh-1: example.com
+                mesh-2: 192.0.2.2
+          message: >-
+            OVS tunnel mesh addresses must be literal IPv4 or IPv6 addresses.
+        - name: later invalid definition
+          meshes:
+            - name: validation-safety
+              hosts:
+                - mesh-1
+                - mesh-2
+              bridge: self-validation-safety
+              key: 1
+            - name: invalid-later
+              hosts:
+                - mesh-1
+                - mesh-2
+              bridge: self-invalid
+              key: invalid
+        - name: duplicate tunnel identity
+          meshes:
+            - name: identity-a
+              hosts:
+                - mesh-1
+                - mesh-2
+              bridge: self-identity-a
+              key: 1
+            - name: identity-b
+              hosts:
+                - mesh-1
+                - mesh-2
+              bridge: self-identity-b
+              key: 1
+          message: >-
+            OVS tunnel mesh configuration creates duplicate tunnel ports.
+      loop_control:
+        loop_var: ovs_tunnel_mesh_negative_case
+        label: "{{ ovs_tunnel_mesh_negative_case.name }}"
+
+    - name: Check validation safety bridges
+      ansible.builtin.command:
+        argv:
+          - ovs-vsctl
+          - br-exists
+          - "{{ ovs_tunnel_mesh_validation_bridge }}"
+      loop:
+        - self-validation-safety
+        - self-identity-a
+        - self-identity-b
+      loop_control:
+        loop_var: ovs_tunnel_mesh_validation_bridge
+        label: "{{ ovs_tunnel_mesh_validation_bridge }}"
+      register: ovs_tunnel_mesh_validation_bridges
+      failed_when: false
+      changed_when: false
+
+    - name: Verify rejected configurations preserved OVS state
+      ansible.builtin.assert:
+        that:
+          - >-
+            ovs_tunnel_mesh_validation_bridges.results
+            | rejectattr('rc', 'equalto', 2) | list | length == 0
+
+- name: Verify partial OVS tunnel mesh execution is rejected
+  hosts: mesh-1
+  become: true
+  tasks:
+    - name: Require rejection of partial mesh execution
+      block:
+        - name: Apply a mesh outside the play scope
+          ansible.builtin.include_role:
+            name: ovs_tunnel_mesh
+          vars:
+            ovs_tunnel_mesh_definitions:
+              - name: partial
+                hosts:
+                  - mesh-1
+                  - mesh-2
+                bridge: self-partial
+                key: 1
+
+        - name: Fail if partial mesh execution was accepted
+          ansible.builtin.fail:
+            msg: "Partial OVS tunnel mesh execution was accepted."
+      rescue:
+        - name: Verify expected partial mesh validation failure
+          ansible.builtin.assert:
+            that:
+              - >-
+                ansible_failed_result.msg
+                == 'OVS tunnel mesh hosts must be unique inventory hosts in the play scope.'
+                or
+                ansible_failed_result.results | default([])
+                | selectattr(
+                    'msg',
+                    'equalto',
+                    'OVS tunnel mesh hosts must be unique inventory hosts in the play scope.'
+                  )
+                | list | length > 0
+
+    - name: Check partial mesh bridge
+      ansible.builtin.command:
+        argv:
+          - ovs-vsctl
+          - br-exists
+          - self-partial
+      register: ovs_tunnel_mesh_partial_bridge
+      failed_when: false
+      changed_when: false
+
+    - name: Verify partial mesh did not change OVS
+      ansible.builtin.assert:
+        that:
+          - ovs_tunnel_mesh_partial_bridge.rc == 2
