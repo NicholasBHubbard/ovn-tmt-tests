@@ -1,7 +1,7 @@
 import shlex
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Optional, Union
+from typing import Union
 
 from ovn_test.topology import Topology
 
@@ -48,7 +48,7 @@ def driver_ssh_options(environment: Mapping[str, str]) -> list[str]:
 def read_bool(
     environment: Mapping[str, str], name: str, default: Union[bool, str]
 ) -> bool:
-    value = str(environment.get(name, default)).lower()
+    value = str(environment.get(name, default)).strip().lower()
     if value in {"true", "yes", "1"}:
         return True
     if value in {"false", "no", "0"}:
@@ -57,7 +57,26 @@ def read_bool(
 
 
 def read_list(environment: Mapping[str, str], name: str, default: str) -> list[str]:
-    return [value.strip() for value in environment.get(name, default).split(",")]
+    value = environment.get(name, default)
+    if not value.strip():
+        return []
+    result = [item.strip() for item in value.split(",")]
+    if any(not item for item in result):
+        raise ValueError(f"{name} must be a comma-separated list")
+    return result
+
+
+def _port(environment: Mapping[str, str], name: str, default: int) -> int:
+    port = read_int(environment, name, default)
+    if not 1 <= port <= 65535:
+        raise ValueError(f"{name} must be between 1 and 65535")
+    return port
+
+
+def _remote(protocol: str, address: str, port: int) -> str:
+    if ":" in address and not address.startswith("["):
+        address = f"[{address}]"
+    return f"{protocol}:{address}:{port}"
 
 
 def database_environment(
@@ -66,22 +85,23 @@ def database_environment(
     if not read_bool(environment, "OTT_CLUSTERED", False):
         return {}
 
-    members = topology.role("central") + topology.data["roles"].get(
-        "central-follower", []
+    roles = topology.data["roles"]
+    members = list(
+        dict.fromkeys(roles.get("central", []) + roles.get("central-follower", []))
     )
     if not members:
         raise ValueError("clustered OVN requires at least one central guest")
 
     protocol = "ssl" if read_bool(environment, "OTT_SSL_ENABLED", False) else "tcp"
 
-    def remotes(port: Optional[str]) -> str:
+    def remotes(port: int) -> str:
         return ",".join(
-            f"{protocol}:{topology.hostname(member)}:{port}" for member in members
+            _remote(protocol, topology.hostname(member), port) for member in members
         )
 
     result = {
-        "OVN_NB_DB": remotes(environment.get("OTT_NB_PORT", "6641")),
-        "OVN_SB_DB": remotes(environment.get("OTT_SB_PORT", "6642")),
+        "OVN_NB_DB": remotes(_port(environment, "OTT_NB_PORT", 6641)),
+        "OVN_SB_DB": remotes(_port(environment, "OTT_SB_PORT", 6642)),
     }
     if protocol == "ssl":
         directory = Path(environment.get("OTT_PKI_REMOTE_DIR", "/run/ovn-test-pki"))

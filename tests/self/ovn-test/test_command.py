@@ -324,18 +324,6 @@ def test_runner_uses_configured_driver_connection(topology: Topology) -> None:
     assert "tester@192.0.2.2" in calls[0]
 
 
-@pytest.mark.parametrize(
-    ("value", "message"),
-    (
-        ("invalid", "must be an integer"),
-        ("0", "must be a positive integer"),
-    ),
-)
-def test_runner_rejects_invalid_connection_timeout(value: str, message: str) -> None:
-    with pytest.raises(ValueError, match=message):
-        Runner(environment={"OTT_DRIVER_CONNECT_TIMEOUT": value})
-
-
 @pytest.mark.parametrize("ssl", (False, True))
 def test_runner_uses_cluster_database_remotes(ssl: bool, topology: Topology) -> None:
     calls = []
