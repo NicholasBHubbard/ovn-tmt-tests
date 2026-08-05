@@ -146,12 +146,10 @@ class TestResult:
         ansible = Ansible.from_environment(topology=topology)
         ansible.run("tests/self/multihost/ansible-execution.yml")
         marker = "TASK [Confirm test-scoped Ansible execution reaches each guest]"
-        assert marker in (test_data / "setup.log").read_text()
-        for guest in topology.guests():
-            log = (test_data / f"setup-{guest}.log").read_text()
-            assert marker in log
-            recaps = [line.split()[0] for line in log.splitlines() if " : ok=" in line]
-            assert recaps == [guest]
+        log = (test_data / "setup.log").read_text()
+        assert marker in log
+        recaps = {line.split()[0] for line in log.splitlines() if " : ok=" in line}
+        assert recaps == set(topology.guests())
 
     def test_central_services(self, runner: Runner) -> None:
         assert processes(runner, "ovsdb-server")

@@ -47,8 +47,11 @@ jobs:
           ruff format --check .
           ty check
 
-      - name: Run Python contract tests
-        run: python3 -m pytest tests/self/contracts
+      - name: Run Python tests
+        run: >-
+          python3 -m pytest
+          tests/self/contracts
+          tests/self/ovn-test
 
   actionlint:
     name: GitHub Actions lint

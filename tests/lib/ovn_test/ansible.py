@@ -1,9 +1,10 @@
 import os
 import subprocess
 from collections.abc import Mapping
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Callable, Optional, Union
+
+import yaml
 
 from ovn_test.config import driver_connection, read_bool
 from ovn_test.topology import Topology
@@ -54,23 +55,31 @@ class Ansible:
         )
 
     def inventory(self, path: Optional[Union[str, os.PathLike[str]]] = None) -> Path:
-        path = Path(path or self.data / "ansible-inventory.ini")
+        path = Path(path or self.data / "ansible-inventory.yml")
         path.parent.mkdir(parents=True, exist_ok=True)
         ssh_options = (
             "-o BatchMode=yes -o ConnectTimeout=30 -o LogLevel=ERROR "
-            "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+            "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "
+            "-o IdentitiesOnly=yes"
         )
-        lines = ["[all]"]
-        for guest in self.topology.guests():
-            lines.append(
-                f"{guest} ansible_host={self.topology.hostname(guest)} "
-                f"ansible_user={self.user} "
-                f"ansible_ssh_private_key_file={self.key} "
-                f"ansible_ssh_common_args='{ssh_options}'"
-            )
-        for role in self.topology.roles():
-            lines.extend(("", f"[{role}]", *self.topology.role(role)))
-        path.write_text("\n".join(lines) + "\n")
+        inventory = {
+            "all": {
+                "hosts": {
+                    guest: {
+                        "ansible_host": self.topology.hostname(guest),
+                        "ansible_user": self.user,
+                        "ansible_ssh_private_key_file": self.key,
+                        "ansible_ssh_common_args": ssh_options,
+                    }
+                    for guest in self.topology.guests()
+                },
+                "children": {
+                    role: {"hosts": {guest: {} for guest in self.topology.role(role)}}
+                    for role in self.topology.roles()
+                },
+            }
+        }
+        path.write_text(yaml.safe_dump(inventory, sort_keys=False))
         return path
 
     def run(
@@ -79,7 +88,7 @@ class Ansible:
         *arguments: object,
         debug: Optional[bool] = None,
         log: Union[str, os.PathLike[str]] = "setup.log",
-    ) -> dict[str, subprocess.CompletedProcess[str]]:
+    ) -> subprocess.CompletedProcess[str]:
         inventory = self.inventory()
         if debug is None:
             debug = read_bool(self.environment, "OTT_TEST_DEBUG", False)
@@ -91,48 +100,37 @@ class Ansible:
             "ANSIBLE_ROLES_PATH": str(self.tree / "roles"),
         }
 
-        def run_guest(guest: str) -> subprocess.CompletedProcess[str]:
-            command = [
-                "ansible-playbook",
-                *verbosity,
-                "-i",
-                str(inventory),
-                "--limit",
-                guest,
-                playbook,
-                *arguments,
-            ]
-            return self.execute(
-                command,
-                text=True,
-                check=False,
-                capture_output=True,
-                cwd=self.tree,
-                env=environment,
-            )
-
-        guests = self.topology.guests()
-        with ThreadPoolExecutor(max_workers=len(guests)) as executor:
-            results = dict(zip(guests, executor.map(run_guest, guests)))
+        command = [
+            "ansible-playbook",
+            *verbosity,
+            "-i",
+            str(inventory),
+            playbook,
+            *arguments,
+        ]
+        result = self.execute(
+            command,
+            text=True,
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            cwd=self.tree,
+            env=environment,
+        )
 
         log = Path(log)
         if not log.is_absolute():
             log = self.data / log
         log.parent.mkdir(parents=True, exist_ok=True)
-        combined = []
-        for guest, result in results.items():
-            output = (result.stdout or "") + (result.stderr or "")
-            log.with_name(f"{log.stem}-{guest}{log.suffix}").write_text(output)
-            combined.append(f"\n===== {guest} =====\n{output}")
-        log.write_text("".join(combined))
-        print(log.read_text(), end="", flush=True)
+        output = result.stdout or ""
+        log.write_text(output)
+        print(output, end="", flush=True)
 
-        for result in results.values():
-            if result.returncode:
-                raise subprocess.CalledProcessError(
-                    result.returncode,
-                    result.args,
-                    output=result.stdout,
-                    stderr=result.stderr,
-                )
-        return results
+        if result.returncode:
+            raise subprocess.CalledProcessError(
+                result.returncode,
+                result.args,
+                output=result.stdout,
+                stderr=result.stderr,
+            )
+        return result

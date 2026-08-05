@@ -35,6 +35,7 @@ extend-select = [
 "roles/**/files/*.py" = ["ANN401", "TID251"]
 "tests/**/test.py" = ["ANN401", "TID251"]
 "tests/self/contracts/*.py" = ["ANN401", "TID251"]
+"tests/self/ovn-test/*.py" = ["ANN401", "TID251"]
 "tools/*.py" = ["ANN401", "TID251"]
 # These reusable modules are the narrow JSON, YAML and OVSDB boundaries.
 "tests/lib/ovn_test/{namespace,scale,topology,workload}.py" = ["TID251"]

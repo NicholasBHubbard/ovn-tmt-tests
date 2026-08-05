@@ -1,0 +1,12 @@
+summary: Verify the reusable Python test library
+
+provision:
+  how: local
+
+discover:
+  how: fmf
+  test:
+    - /tests/self/ovn-test$
+
+execute:
+  how: tmt

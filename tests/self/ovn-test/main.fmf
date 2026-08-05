@@ -1,0 +1,3 @@
+summary: Verify the reusable Python test library
+test: python3 -m pytest .
+duration: 1m

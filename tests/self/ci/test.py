@@ -65,7 +65,9 @@ class TestResult:
         assert 'python-version: "3.9"\n            runner: ubuntu-24.04' in text
         assert 'python-version: "3.x"\n            runner: ubuntu-26.04' in text
         assert "if: matrix.python-version == '3.x'" in text
-        assert "run: python3 -m pytest tests/self/contracts" in text
+        assert "python3 -m pytest" in text
+        assert "tests/self/contracts" in text
+        assert "tests/self/ovn-test" in text
         assert "ubuntu-26.04" in text
         assert "ubuntu-latest" not in text
 
