@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Callable, Optional, TypeVar, Union
 
 from ovn_test.command import Runner
-from ovn_test.load_balancer import replace, socket
+from ovn_test.load_balancer import DEFAULT_OPTIONS, LoadBalancers, socket
 
 T = TypeVar("T")
 
@@ -145,6 +145,7 @@ class Workload:
         self.base_ports_per_worker = base_ports_per_worker
         self.endpoints = []
         self.load_balancers = []
+        self._load_balancer_manager = LoadBalancers(runner, name)
         self.cleaned = False
 
         suffix = name.replace("-", "_")
@@ -455,25 +456,29 @@ class Workload:
         self,
         name: str,
         protocol: str,
-        vips: Optional[Mapping[str, Sequence[str]]] = None,
-        switches: Iterable[str] = (),
-        routers: Iterable[str] = (),
+        vips: Optional[Mapping[str, Union[str, Sequence[str]]]] = None,
+        switches: Union[str, Iterable[str]] = (),
+        routers: Union[str, Iterable[str]] = (),
         group: Optional[str] = None,
+        options: Mapping[str, str] = DEFAULT_OPTIONS,
     ) -> None:
         if name not in self.load_balancers:
             self.load_balancers.append(name)
-        replace(
-            self.runner,
-            self.name,
+        self._load_balancer_manager.replace(
             name,
             protocol,
             vips,
             switches,
             routers,
             group,
+            options,
         )
 
-    def add_background_load_balancers(self, protocols: Sequence[str]) -> None:
+    def add_background_load_balancers(
+        self,
+        protocols: Sequence[str],
+        options: Mapping[str, str] = DEFAULT_OPTIONS,
+    ) -> None:
         if not self.workers:
             raise RuntimeError("background load balancers need a scale topology")
 
@@ -508,15 +513,23 @@ class Workload:
                     vips,
                     switches=(worker["switch"] for worker in self.workers),
                     routers=(worker["gateway_router"] for worker in self.workers),
+                    options=options,
                 )
                 for worker in self.workers:
                     self.replace_load_balancer(
                         f"lb-{worker['gateway_router']}{suffix}-{protocol}",
                         protocol,
                         routers=[worker["gateway_router"]],
+                        options=options,
                     )
 
-    def add_service(self, service: int, backend: int, protocols: Sequence[str]) -> None:
+    def add_service(
+        self,
+        service: int,
+        backend: int,
+        protocols: Sequence[str],
+        options: Mapping[str, str] = DEFAULT_OPTIONS,
+    ) -> None:
         endpoint = self.endpoint(backend)
         group = None
         if self.load_balancer_group:
@@ -548,6 +561,7 @@ class Workload:
                     },
                     switches=[] if group else [self.name],
                     group=group,
+                    options=options,
                 )
 
     def verify_connectivity(
@@ -642,11 +656,7 @@ class Workload:
                 continue
             attempt(lambda endpoint=endpoint: self._remove_endpoint(endpoint))
         for load_balancer in self.load_balancers:
-            attempt(
-                lambda name=load_balancer: self.runner.run(
-                    "ovn-nbctl", "--if-exists", "lb-del", name
-                )
-            )
+            attempt(lambda name=load_balancer: self._load_balancer_manager.delete(name))
         if not self.workers:
             attempt(
                 lambda: self.runner.run("ovn-nbctl", "--if-exists", "ls-del", self.name)
@@ -687,7 +697,12 @@ class Workload:
                 "--columns=name",
                 "find",
                 table,
-                f"name={name}",
+                f"name={json.dumps(name)}",
+                *(
+                    [f"external_ids:ovn-tmt-tests-owner={json.dumps(self.name)}"]
+                    if table == "Load_Balancer"
+                    else []
+                ),
             )
             if output:
                 raise AssertionError(f"{table} remains after cleanup: {name}")

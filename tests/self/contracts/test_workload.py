@@ -383,9 +383,9 @@ def test_workload_adds_every_service_load_balancer(tmp_path: Path) -> None:
     )
     assert command[:4] == (
         "ovn-nbctl",
-        "--if-exists",
-        "lb-del",
-        "density-heavy-00003-tcp-v4",
+        "--id=@lb",
+        "create",
+        "Load_Balancer",
     )
     assert 'vips:"100.0.0.4:80"="10.240.0.8:8080"' in command
     assert 'options:hairpin_snat_ip="169.254.169.5 fd69::5"' in command
@@ -445,9 +445,12 @@ def test_workload_reproduces_scale_background_load_balancers(tmp_path: Path) -> 
     workload.add_background_load_balancers(["tcp", "udp", "sctp"])
 
     commands = [call[1] for call in runner.calls]
-    assert len(commands) == 18
+    load_balancers = [
+        command for command in commands if contains(command, "create", "Load_Balancer")
+    ]
+    assert len(load_balancers) == 18
     cluster = next(
-        command for command in commands if 'name="lb-cluster1-tcp"' in command
+        command for command in load_balancers if 'name="lb-cluster1-tcp"' in command
     )
     assert len([argument for argument in cluster if argument.startswith("vips:")]) == 65
     assert (
@@ -478,7 +481,9 @@ def test_workload_reproduces_scale_background_load_balancers(tmp_path: Path) -> 
         "@lb",
     )
     gateway = next(
-        command for command in commands if 'name="lb-gwrouter-worker-06-tcp"' in command
+        command
+        for command in load_balancers
+        if 'name="lb-gwrouter-worker-06-tcp"' in command
     )
     assert not [argument for argument in gateway if argument.startswith("vips:")]
 
@@ -535,7 +540,7 @@ def test_workload_reproduces_service_route_load_balancers(
     created = [
         command for command in commands if contains(command, "create", "Load_Balancer")
     ]
-    assert len(created) == 12
+    assert len(created) == 6
     assert len(workload.load_balancers) == 6
     cluster = next(
         command for command in created if 'name="slb-cluster-0-tcp"' in command
@@ -636,13 +641,24 @@ def test_cleanup_attempts_every_object_after_a_failure(tmp_path: Path) -> None:
     )
     workload.endpoints = [workload.endpoint(0), workload.endpoint(1)]
     workload.load_balancers = ["lb-one", "lb-two"]
-    runner.fail.add(("ovn-nbctl", "--if-exists", "lb-del", "lb-one"))
+    find_managed = (
+        "ovn-nbctl",
+        "--format=csv",
+        "--data=bare",
+        "--no-headings",
+        "--columns=_uuid,name",
+        "find",
+        "Load_Balancer",
+        'external_ids:ovn-tmt-tests-owner="density-heavy"',
+    )
+    runner.outputs[(None, find_managed)] = "lb-one-uuid,lb-one\nlb-two-uuid,lb-two\n"
+    runner.fail.add(("ovn-nbctl", "destroy", "Load_Balancer", "lb-one-uuid"))
 
     with pytest.raises(subprocess.CalledProcessError):
         workload.cleanup()
 
     commands = [call[1] for call in runner.calls]
-    assert ("ovn-nbctl", "--if-exists", "lb-del", "lb-two") in commands
+    assert ("ovn-nbctl", "destroy", "Load_Balancer", "lb-two-uuid") in commands
     assert ("ovn-nbctl", "--if-exists", "ls-del", "density-heavy") in commands
     assert (
         len(

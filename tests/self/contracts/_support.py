@@ -41,10 +41,10 @@ class FakeRunner(Runner):
         stdout = ""
         if command[:3] == ("ovn-nbctl", "create", "Address_Set"):
             stdout = f"uuid-{len(self.calls)}\n"
+        if command[:4] == ("ovn-nbctl", "--id=@lb", "create", "Load_Balancer"):
+            stdout = f"load-balancer-{len(self.calls)}\n"
         if "Load_Balancer_Group" in command and "--columns=_uuid" in command:
             stdout = "load-balancer-group-uuid\n"
-        elif "Load_Balancer" in command and "--columns=_uuid" in command:
-            stdout = "load-balancer-uuid\n"
         if "Logical_Switch" in command and command[-1] in {
             'name="switch-0"',
             'name="switch-1"',

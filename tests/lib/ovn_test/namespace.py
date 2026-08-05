@@ -1,13 +1,16 @@
 import ipaddress
 import json
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from ovn_test.command import Runner
-from ovn_test.load_balancer import replace, socket
-
-VALID_PROTOCOLS = {"tcp", "udp", "sctp"}
+from ovn_test.load_balancer import (
+    DEFAULT_OPTIONS,
+    VALID_PROTOCOLS,
+    LoadBalancers,
+    socket,
+)
 
 
 @dataclass
@@ -104,6 +107,7 @@ class OvnNamespace:
         self.address_set_ids: dict[int, str] = {}
         self.groups: dict[str, _NamespaceGroup] = {}
         self.load_balancers: list[str] = []
+        self._load_balancer_manager = LoadBalancers(runner, owner)
         self.endpoints: list[dict[str, Any]] = []
         self.acls: dict[str, tuple[str, str, int, str, str]] = {}
         self.enforcing = False
@@ -425,6 +429,7 @@ class OvnNamespace:
         endpoints: Sequence[dict[str, Any]],
         protocols: Sequence[str],
         group: str,
+        options: Mapping[str, str] = DEFAULT_OPTIONS,
     ) -> None:
         if len(endpoints) < 4:
             raise ValueError("namespace services require at least four endpoints")
@@ -441,13 +446,12 @@ class OvnNamespace:
         for protocol in protocols:
             name = f"lb_{self.name}-{protocol}"
             self.load_balancers.append(name)
-            replace(
-                self.runner,
-                self.owner,
+            self._load_balancer_manager.replace(
                 name,
                 protocol,
                 vips,
                 group=group,
+                options=options,
             )
 
     def cleanup(self) -> None:
@@ -464,14 +468,7 @@ class OvnNamespace:
                     first_error = error
 
         for name in self.load_balancers:
-            attempt(
-                lambda name=name: self.runner.run(
-                    "ovn-nbctl",
-                    "--if-exists",
-                    "lb-del",
-                    name,
-                )
-            )
+            attempt(lambda name=name: self._load_balancer_manager.delete(name))
         for group in self.groups.values():
             attempt(
                 lambda group=group: self._destroy_named("Port_Group", group.port_group)
@@ -525,6 +522,11 @@ class OvnNamespace:
                     "find",
                     table,
                     f"name={json.dumps(name)}",
+                    *(
+                        [f"external_ids:ovn-tmt-tests-owner={json.dumps(self.owner)}"]
+                        if table == "Load_Balancer"
+                        else []
+                    ),
                 )
                 if output:
                     raise AssertionError(f"{table} remains after cleanup: {name}")
