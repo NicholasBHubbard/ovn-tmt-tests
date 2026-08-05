@@ -11,9 +11,8 @@ from ovn_test.command import Runner
 from ovn_test.network import Network
 ```
 
-`tests/conftest.py` adds `tests/lib` to the Python import path. Some test
-families also load fixtures from `ovn_test.pytest_build` or
-`ovn_test.pytest_multihost` through their own `conftest.py`.
+`tests/conftest.py` adds `tests/lib` to the Python import path. Fixtures that
+belong to one test family live in that family's `conftest.py`.
 
 ## Module Organization
 
@@ -28,9 +27,6 @@ families also load fixtures from `ovn_test.pytest_build` or
 - `scale_topology`, `scale`, `cluster_density`, and `workload` implement shared
   OVN scale-test topology and workload behavior. `_scale_topology_apply` is an
   internal implementation module.
-- `pytest_build` and `pytest_multihost` provide fixtures for their respective
-  test families.
-
 ## Boundaries
 
 Put code here when multiple tests need the same behavior or when it represents
