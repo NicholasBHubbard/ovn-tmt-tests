@@ -5,6 +5,7 @@ summary: Base configuration for OVN CI plans
 
 environment:
   OTT_MAKE_CHECK_TESTSUITEFLAGS: ""
+  OTT_MAKE_JOBS: ""
   OTT_CC: gcc
   OTT_CONFIGURE_FLAGS: ""
   OTT_DPDK: "false"

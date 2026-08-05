@@ -464,11 +464,15 @@ def test_make_check_configuration_is_top_down(tree: Path) -> None:
     plan = plan_metadata(tree, "plans/ovn-ci/main.fmf")
 
     assert plan["environment"]["OTT_MAKE_CHECK_TESTSUITEFLAGS"] == ""
+    assert plan["environment"]["OTT_MAKE_JOBS"] == ""
     assert_contains(
         tree,
         "tests/ovn-ci/make-check/test.py",
         'os.environ.get("OTT_MAKE_CHECK_TESTSUITEFLAGS")',
     )
+    assert_contains(tree, "tests/lib/ovn_test/pytest_build.py", '"OTT_MAKE_JOBS"')
+    for path in ("tests/ovn-ci/make-check/test.py", "tests/ovn-ci/distcheck/test.py"):
+        assert_contains(tree, path, "jobs=make_jobs")
 
 
 def test_multihost_children_inherit_base(tree: Path) -> None:

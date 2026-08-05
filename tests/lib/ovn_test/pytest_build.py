@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from typing import Optional
 
 import pytest
 
@@ -19,3 +20,9 @@ def source() -> Path:
 @pytest.fixture
 def test_data() -> Path:
     return Path(os.environ["TMT_TEST_DATA"])
+
+
+@pytest.fixture
+def make_jobs() -> Optional[int]:
+    value = os.environ.get("OTT_MAKE_JOBS")
+    return int(value) if value else None
