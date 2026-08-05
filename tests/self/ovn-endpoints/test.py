@@ -122,8 +122,8 @@ class TestInitial:
             "dhcpv4_options",
             "dhcpv6_options",
         )
-        dhcp4 = nb.managed("DHCP_Options", "self-dhcp", "_uuid")
-        dhcp6 = nb.managed("DHCP_Options", "self-dhcp-v6", "_uuid")
+        dhcp4 = nb.by_id("DHCP_Options", "self-dhcp", "_uuid")
+        dhcp6 = nb.by_id("DHCP_Options", "self-dhcp-v6", "_uuid")
         assert port["dhcpv4_options"] == dhcp4["_uuid"]
         assert port["dhcpv6_options"] == dhcp6["_uuid"]
 

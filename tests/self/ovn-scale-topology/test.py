@@ -247,7 +247,7 @@ class TestInitial:
             "30::ffff:ffff:ffff:fffd/64",
         ]
 
-        route = nb.managed(
+        route = nb.by_id(
             "Logical_Router_Static_Route",
             "self-scale:ovn-scale-0:worker-v4",
             "ip_prefix",
@@ -259,7 +259,7 @@ class TestInitial:
             "nexthop": "30.0.255.253",
             "policy": "src-ip",
         }
-        nat = nb.managed(
+        nat = nb.by_id(
             "NAT",
             "self-scale:ovn-scale-0:snat-v4",
             "type",

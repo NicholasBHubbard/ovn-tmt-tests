@@ -202,8 +202,8 @@ class TestInitial:
         snapshots.save("gateway", gateway["_uuid"])
 
     def test_dhcp_options(self, nb: Ovsdb, snapshots: Snapshots) -> None:
-        dhcp = nb.managed("DHCP_Options", "self-dhcp", "_uuid", "cidr", "options")
-        dhcp_v6 = nb.managed("DHCP_Options", "self-dhcp-v6", "_uuid", "cidr", "options")
+        dhcp = nb.by_id("DHCP_Options", "self-dhcp", "_uuid", "cidr", "options")
+        dhcp_v6 = nb.by_id("DHCP_Options", "self-dhcp-v6", "_uuid", "cidr", "options")
 
         assert dhcp["cidr"] == "192.0.2.0/24"
         assert dhcp["options"]["lease_time"] == "3600"
@@ -215,7 +215,7 @@ class TestInitial:
         snapshots.save("dhcp-v6", dhcp_v6["_uuid"])
 
     def test_nat_load_balancer_and_route(self, nb: Ovsdb, snapshots: Snapshots) -> None:
-        nat = nb.managed(
+        nat = nb.by_id(
             "NAT",
             "self-nat",
             "_uuid",
@@ -232,7 +232,7 @@ class TestInitial:
             "priority",
             "options",
         )
-        load_balancer = nb.managed(
+        load_balancer = nb.by_id(
             "Load_Balancer",
             "self-lb",
             "_uuid",
@@ -241,7 +241,7 @@ class TestInitial:
             "options",
             "selection_fields",
         )
-        route = nb.managed(
+        route = nb.by_id(
             "Logical_Router_Static_Route",
             "self-route",
             "_uuid",
@@ -277,7 +277,7 @@ class TestInitial:
         assert nat["options"] == {"add_route": "true", "stateless": "true"}
         assert nb.referring_names("Logical_Router", "nat", nat["_uuid"]) == ["self-r1"]
 
-        snat = nb.managed(
+        snat = nb.by_id(
             "NAT",
             "self-nat-snat",
             "_uuid",
@@ -342,7 +342,7 @@ class TestInitial:
         snapshots.save("route", route["_uuid"])
 
     def test_acls(self, nb: Ovsdb, snapshots: Snapshots) -> None:
-        acl = nb.managed(
+        acl = nb.by_id(
             "ACL",
             "self-acl",
             "_uuid",
@@ -420,7 +420,7 @@ class TestReconfigured:
     ) -> None:
         snapshots.save(
             snapshot,
-            nb.managed(table, identifier, "_uuid")["_uuid"],
+            nb.by_id(table, identifier, "_uuid")["_uuid"],
         )
 
 
@@ -578,8 +578,8 @@ class TestResult:
         assert nb.exists("Logical_Switch_Port", "name=self-localnet-unmanaged")
 
     def test_dhcp_reconfiguration(self, nb: Ovsdb, snapshots: Snapshots) -> None:
-        dhcp = nb.managed("DHCP_Options", "self-dhcp", "_uuid", "cidr", "options")
-        dhcp_v6 = nb.managed("DHCP_Options", "self-dhcp-v6", "_uuid", "cidr", "options")
+        dhcp = nb.by_id("DHCP_Options", "self-dhcp", "_uuid", "cidr", "options")
+        dhcp_v6 = nb.by_id("DHCP_Options", "self-dhcp-v6", "_uuid", "cidr", "options")
 
         assert dhcp["cidr"] == "198.51.100.0/24"
         assert dhcp["options"] == {
@@ -598,7 +598,7 @@ class TestResult:
         assert nb.exists("DHCP_Options", "cidr=10.10.0.0/24")
 
     def test_acl_reconfiguration(self, nb: Ovsdb, snapshots: Snapshots) -> None:
-        acl = nb.managed(
+        acl = nb.by_id(
             "ACL",
             "self-acl",
             "_uuid",
@@ -644,7 +644,7 @@ class TestResult:
         ]
 
     def test_nat_load_balancer_and_route(self, nb: Ovsdb, snapshots: Snapshots) -> None:
-        nat = nb.managed(
+        nat = nb.by_id(
             "NAT",
             "self-nat",
             "_uuid",
@@ -661,7 +661,7 @@ class TestResult:
             "priority",
             "options",
         )
-        load_balancer = nb.managed(
+        load_balancer = nb.by_id(
             "Load_Balancer",
             "self-lb",
             "_uuid",
@@ -671,7 +671,7 @@ class TestResult:
             "options",
             "selection_fields",
         )
-        route = nb.managed(
+        route = nb.by_id(
             "Logical_Router_Static_Route",
             "self-route",
             "_uuid",
@@ -704,7 +704,7 @@ class TestResult:
         assert nat["_uuid"] == snapshots.load("nat-moved")
         assert nb.referring_names("Logical_Router", "nat", nat["_uuid"]) == ["self-r3"]
         assert not nb.exists("NAT", f"{MANAGED}{json.dumps(SPECIAL_NAT_ID)}")
-        snat = nb.managed(
+        snat = nb.by_id(
             "NAT",
             "self-nat-snat",
             "_uuid",
