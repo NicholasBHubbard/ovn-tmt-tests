@@ -3,8 +3,7 @@ from collections import Counter
 from collections.abc import Mapping, Sequence
 from typing import Any, Optional, TypedDict, Union
 
-from ovn_test._scale_topology_apply import apply as apply_database
-from ovn_test._scale_topology_apply import apply_load_balancer_group
+from ovn_test._scale_topology_apply import apply as _apply_topology
 from ovn_test.command import Runner
 from ovn_test.config import read_bool, read_int
 from ovn_test.ovsdb import Ovsdb
@@ -14,17 +13,18 @@ Network = Union[ipaddress.IPv4Network, ipaddress.IPv6Network]
 
 class Family(TypedDict):
     version: int
-    internal: str
-    external: str
+    internal: Network
+    external: Network
     join: Network
-    cluster: str
+    cluster: Network
     default: str
 
 
-def _next(network: str, index: int) -> Network:
-    parsed = ipaddress.ip_network(network)
-    address = int(parsed.network_address) + index * parsed.num_addresses
-    return ipaddress.ip_network((address, parsed.prefixlen))
+def _next(network: Network, index: int) -> Network:
+    address = int(network.network_address) + index * network.num_addresses
+    if network.version == 4:
+        return ipaddress.IPv4Network((address, network.prefixlen))
+    return ipaddress.IPv6Network((address, network.prefixlen))
 
 
 def _address(network: Network, index: int) -> str:
@@ -37,13 +37,43 @@ def _mac(kind: int, index: int) -> str:
     return "02:00:" + ":".join(f"{octet:02x}" for octet in octets)
 
 
+def _text(value: object, label: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"{label} must be a non-empty string")
+    return value
+
+
+def _network(value: object, version: int, label: str) -> Network:
+    if not isinstance(value, str):
+        raise ValueError(f"{label} must be an IPv{version} network")
+    try:
+        network = ipaddress.ip_network(value)
+    except ValueError as error:
+        raise ValueError(f"{label} must be an IPv{version} network") from error
+    if network.version != version:
+        raise ValueError(f"{label} must be an IPv{version} network")
+    return network
+
+
+def _unique(values: Sequence[Any], label: str) -> None:
+    if len(values) != len(set(values)):
+        raise ValueError(f"{label} must be unique")
+
+
 def generate(config: dict[str, Any]) -> dict[str, Any]:
     count = config["worker_count"]
-    names = config["workers"] or [
-        f"{config['worker_prefix']}-{index}" for index in range(count)
-    ]
+    if isinstance(count, bool) or not isinstance(count, int) or count < 1:
+        raise ValueError("worker_count must be a positive integer")
+
+    workers = config["workers"]
+    if not isinstance(workers, list) or not all(
+        isinstance(name, str) and name for name in workers
+    ):
+        raise ValueError("workers must be a list of non-empty names")
+    prefix = _text(config["worker_prefix"], "worker_prefix")
+    names = workers or [f"{prefix}-{index}" for index in range(count)]
     chassis = config["chassis"]
-    if not names or len(names) != len(set(names)):
+    if len(names) != len(set(names)):
         raise ValueError("workers must contain unique names")
     if (
         not isinstance(chassis, list)
@@ -51,8 +81,8 @@ def generate(config: dict[str, Any]) -> dict[str, Any]:
         or not all(isinstance(name, str) and name for name in chassis)
     ):
         raise ValueError("chassis must contain unique non-empty names")
-    if count < 1:
-        raise ValueError("worker_count must be positive")
+    if not isinstance(config["ipv4"], bool) or not isinstance(config["ipv6"], bool):
+        raise ValueError("ipv4 and ipv6 must be booleans")
     if not config["ipv4"] and not config["ipv6"]:
         raise ValueError("at least one IP family must be enabled")
 
@@ -70,30 +100,61 @@ def generate(config: dict[str, Any]) -> dict[str, Any]:
     for version in (4, 6):
         if not config[f"ipv{version}"]:
             continue
+        internal = _network(
+            config[f"internal_ipv{version}"], version, f"internal_ipv{version}"
+        )
+        external = _network(
+            config[f"external_ipv{version}"], version, f"external_ipv{version}"
+        )
+        join = _network(config[f"join_ipv{version}"], version, f"join_ipv{version}")
+        cluster = _network(
+            config[f"cluster_ipv{version}"], version, f"cluster_ipv{version}"
+        )
+        if internal.num_addresses < 2:
+            raise ValueError(f"internal_ipv{version} is too small")
+        if external.num_addresses < 3:
+            raise ValueError(f"external_ipv{version} is too small")
+        if join.num_addresses < len(names) + 2:
+            raise ValueError(f"join_ipv{version} is too small for the workers")
+        try:
+            _next(internal, len(names) - 1)
+            _next(external, len(names) - 1)
+        except ValueError as error:
+            raise ValueError(
+                f"IPv{version} worker networks exceed the address family"
+            ) from error
         families.append(
             {
                 "version": version,
-                "internal": config[f"internal_ipv{version}"],
-                "external": config[f"external_ipv{version}"],
-                "join": ipaddress.ip_network(config[f"join_ipv{version}"]),
-                "cluster": config[f"cluster_ipv{version}"],
+                "internal": internal,
+                "external": external,
+                "join": join,
+                "cluster": cluster,
                 "default": "0.0.0.0/0" if version == 4 else "::/0",
             }
         )
 
-    owner = config["id"]
-    cluster_router = config["cluster_router"]
-    join_switch = config["join_switch"]
+    owner = _text(config["id"], "id")
+    cluster_router = _text(config["cluster_router"], "cluster_router")
+    join_switch = _text(config["join_switch"], "join_switch")
+    load_balancer_group = _text(config["load_balancer_group"], "load_balancer_group")
+    physical_bridge = _text(config["physical_bridge"], "physical_bridge")
+    physical_network = _text(config["physical_network"], "physical_network")
     snat_ct_zone = config.get("snat_ct_zone", "")
     if snat_ct_zone != "":
-        snat_ct_zone = int(snat_ct_zone)
+        if isinstance(snat_ct_zone, bool):
+            raise ValueError("snat_ct_zone must be between 0 and 65535")
+        try:
+            snat_ct_zone = int(snat_ct_zone)
+        except (TypeError, ValueError) as error:
+            raise ValueError("snat_ct_zone must be between 0 and 65535") from error
         if not 0 <= snat_ct_zone <= 65535:
             raise ValueError("snat_ct_zone must be between 0 and 65535")
     cluster_join_port = f"rtr-to-{join_switch}"
-    result = {
+    result: dict[str, Any] = {
         "owner": owner,
-        "physical_bridge": config["physical_bridge"],
-        "physical_network": config["physical_network"],
+        "physical_bridge": physical_bridge,
+        "physical_network": physical_network,
         "switches": [{"name": join_switch}],
         "routers": [
             {
@@ -184,7 +245,7 @@ def generate(config: dict[str, Any]) -> dict[str, Any]:
                     {
                         "id": f"{owner}:{name}:cluster-v{version}",
                         "router": gateway_router,
-                        "prefix": family["cluster"],
+                        "prefix": str(family["cluster"]),
                         "nexthop": cluster_join,
                     },
                     {
@@ -208,7 +269,7 @@ def generate(config: dict[str, Any]) -> dict[str, Any]:
                     "router": gateway_router,
                     "type": "snat",
                     "external_ip": gateway_join,
-                    "logical_ip": family["cluster"],
+                    "logical_ip": str(family["cluster"]),
                 }
             )
 
@@ -248,10 +309,10 @@ def generate(config: dict[str, Any]) -> dict[str, Any]:
                 "priority": 10,
             }
         )
-        localnet = {
+        localnet: dict[str, Any] = {
             "name": f"provnet-{name}",
             "switch": external_switch,
-            "network": config["physical_network"],
+            "network": physical_network,
         }
         if external_vlan is not None:
             localnet["tag"] = external_vlan
@@ -260,12 +321,23 @@ def generate(config: dict[str, Any]) -> dict[str, Any]:
 
     result["load_balancer_groups"] = [
         {
-            "id": config["load_balancer_group"],
+            "id": load_balancer_group,
             "switches": [worker["switch"] for worker in result["workers"]],
             "routers": [worker["gateway_router"] for worker in result["workers"]],
         }
     ]
-    result["load_balancer_group"] = config["load_balancer_group"]
+    result["load_balancer_group"] = load_balancer_group
+    _unique([item["name"] for item in result["switches"]], "logical switch names")
+    _unique([item["name"] for item in result["routers"]], "logical router names")
+    _unique(
+        [item["name"] for item in result["router_ports"]],
+        "logical router port names",
+    )
+    _unique(
+        [item["switch_port"] for item in result["router_ports"]]
+        + [item["name"] for item in result["localnet_ports"]],
+        "logical switch port names",
+    )
     result["managed"] = {
         "switches": [item["name"] for item in result["switches"]],
         "routers": [item["name"] for item in result["routers"]],
@@ -282,7 +354,12 @@ def generate(config: dict[str, Any]) -> dict[str, Any]:
 
 
 def _names(value: str) -> list[str]:
-    return [item.strip() for item in value.split(",") if item.strip()]
+    if not value.strip():
+        return []
+    names = [item.strip() for item in value.split(",")]
+    if any(not name for name in names):
+        raise ValueError("OTT_SCALE_WORKER_NAMES contains an empty name")
+    return names
 
 
 def configuration(
@@ -325,8 +402,10 @@ class ScaleTopology:
         wait: bool = True,
         timeout: int = 120,
     ) -> None:
-        if timeout < 1:
-            raise ValueError("scale topology timeout must be positive")
+        if isinstance(timeout, bool) or not isinstance(timeout, int) or timeout < 1:
+            raise ValueError("scale topology timeout must be a positive integer")
+        if not isinstance(wait, bool):
+            raise ValueError("scale topology wait must be a boolean")
         self.runner = runner
         self.config = config
         self.wait = wait
@@ -358,14 +437,7 @@ class ScaleTopology:
             config = {**config, "worker_count": worker_count, "workers": []}
         data = generate(config)
         self.data = data
-        apply_database(self.runner, data)
-        group = data["load_balancer_groups"][0]
-        apply_load_balancer_group(
-            self.runner,
-            group["id"],
-            group["switches"],
-            group["routers"],
-        )
+        _apply_topology(self.runner, data)
         if self.wait:
             self._converge(data["southbound"])
         return data
@@ -384,6 +456,8 @@ class ScaleTopology:
             "gateway_chassis": [],
             "static_routes": [],
             "nat_rules": [],
+            "load_balancer_groups": [],
+            "load_balancer_group": group,
             "managed": {"switches": [], "routers": [], "router_ports": []},
             "southbound": {
                 "datapaths": [],
@@ -392,10 +466,19 @@ class ScaleTopology:
                 "absent_ports": [],
             },
         }
-        apply_database(self.runner, empty)
-        apply_load_balancer_group(self.runner, group, [], [], present=False)
+        first_error = None
+        try:
+            _apply_topology(self.runner, empty)
+        except Exception as error:
+            first_error = error
         if self.wait:
-            self._converge(empty["southbound"])
+            try:
+                self._converge(empty["southbound"])
+            except Exception as error:
+                if first_error is None:
+                    first_error = error
+        if first_error is not None:
+            raise first_error
         self.data = None
 
     def _converge(self, expected: dict[str, Any]) -> None:

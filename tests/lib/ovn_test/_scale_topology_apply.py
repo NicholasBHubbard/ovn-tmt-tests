@@ -1,6 +1,7 @@
 import json
 import time
 from collections.abc import Mapping, Sequence
+from hashlib import sha256
 from typing import Any
 
 from ovn_test.command import Runner
@@ -9,6 +10,7 @@ from ovn_test.ovsdb import Ovsdb
 OWNER = "ovn-tmt-tests-owner"
 IDENTIFIER = "ovn-tmt-tests-id"
 SCOPE = "ovn-tmt-tests-scope"
+GROUP_OWNER = "ovn-tmt-tests-load-balancer-group-owner"
 
 
 class _Database:
@@ -51,12 +53,21 @@ def _external_id(key: str, value: Any) -> str:
     return f"external_ids:{key}={_quoted(value)}"
 
 
+def _option_value(value: object) -> str:
+    return str(value).lower() if isinstance(value, bool) else str(value)
+
+
 def _options(
     table: str, name: str, column: str, values: Mapping[str, Any]
 ) -> list[list[str]]:
     commands = [["clear", table, name, column]]
     commands.extend(
-        ["set", table, name, f"{column}:{key}={_quoted(str(value).lower())}"]
+        [
+            "set",
+            table,
+            name,
+            f"{column}:{key}={_quoted(_option_value(value))}",
+        ]
         for key, value in values.items()
     )
     return commands
@@ -72,6 +83,25 @@ def _identified(rows: Sequence[dict[str, Any]]) -> dict[str, dict[str, Any]]:
         for row in rows
         if row.get("external_ids", {}).get(IDENTIFIER)
     }
+
+
+def _reject_collisions(
+    rows: Sequence[dict[str, Any]],
+    names: Sequence[str],
+    owner: str,
+    label: str,
+) -> None:
+    wanted = set(names)
+    found = {}
+    for row in rows:
+        name = row["name"]
+        if name not in wanted:
+            continue
+        if name in found:
+            raise RuntimeError(f"{label} {name!r} is not unique")
+        found[name] = row
+        if row.get("external_ids", {}).get(OWNER) != owner:
+            raise RuntimeError(f"{label} {name!r} is not owned by {owner!r}")
 
 
 def _configure_roots(db: _Database, topology: dict[str, Any], owner: str) -> None:
@@ -311,6 +341,7 @@ def _configure_gateway_chassis(
                         f"name={_quoted(name)}",
                         f"chassis_name={_quoted(assignment['chassis'])}",
                         f"priority={assignment.get('priority', 0)}",
+                        _external_id(OWNER, topology["owner"]),
                     ],
                     [
                         "add",
@@ -330,6 +361,7 @@ def _configure_gateway_chassis(
                     f"name={_quoted(name)}",
                     f"chassis_name={_quoted(assignment['chassis'])}",
                     f"priority={assignment.get('priority', 0)}",
+                    _external_id(OWNER, topology["owner"]),
                 ]
             )
         groups.append(commands)
@@ -485,8 +517,8 @@ def _cleanup(
     groups = []
 
     gateway_parent = _references(state["router_ports"], "gateway_chassis")
-    for row in state["gateway_chassis"]:
-        if row["name"].startswith(f"{owner}:") and row["name"] not in desired_gateway:
+    for row in _managed(state["gateway_chassis"], owner):
+        if row["name"] not in desired_gateway:
             groups.append(
                 [
                     [
@@ -565,15 +597,26 @@ def _record_removed(topology: dict[str, Any], state: dict[str, Any]) -> None:
     expected["absent_ports"] = sorted(previous_ports - set(expected["ports"]))
 
 
-def apply_load_balancer_group(
+def _group_owner_key(name: str) -> str:
+    digest = sha256(name.encode()).hexdigest()
+    return f"{GROUP_OWNER}-{digest}"
+
+
+def _apply_load_balancer_group(
     runner: Runner,
     name: str,
     switches: Sequence[str],
     routers: Sequence[str],
+    owner: str,
     *,
     present: bool = True,
 ) -> None:
     db = _Database(runner)
+    owner_key = _group_owner_key(name)
+    global_rows = db.rows("NB_Global", "external_ids")
+    if len(global_rows) != 1:
+        raise RuntimeError(f"expected one NB_Global row, found {len(global_rows)}")
+    claimed_by = global_rows[0]["external_ids"].get(owner_key)
     matches = [
         row
         for row in db.rows("Load_Balancer_Group", "_uuid", "name")
@@ -581,7 +624,19 @@ def apply_load_balancer_group(
     ]
     if len(matches) > 1:
         raise RuntimeError(f"load balancer group {name!r} is not unique")
+    if matches and claimed_by != owner:
+        raise RuntimeError(f"load balancer group {name!r} is not owned by {owner!r}")
+    if claimed_by not in (None, owner):
+        raise RuntimeError(f"load balancer group {name!r} is not owned by {owner!r}")
     if not matches and not present:
+        if claimed_by == owner:
+            db.batch(
+                [
+                    [
+                        ["remove", "NB_Global", ".", "external_ids", owner_key],
+                    ]
+                ]
+            )
         return
 
     commands = []
@@ -601,12 +656,15 @@ def apply_load_balancer_group(
         target = "@group"
         current_switches = set()
         current_routers = set()
-        commands.append(
+        commands.extend(
             [
-                "--id=@group",
-                "create",
-                "Load_Balancer_Group",
-                f"name={_quoted(name)}",
+                [
+                    "--id=@group",
+                    "create",
+                    "Load_Balancer_Group",
+                    f"name={_quoted(name)}",
+                ],
+                ["set", "NB_Global", ".", _external_id(owner_key, owner)],
             ]
         )
 
@@ -629,14 +687,34 @@ def apply_load_balancer_group(
         for item in sorted(wanted_routers - current_routers)
     )
     if not present:
-        commands.append(["destroy", "Load_Balancer_Group", target])
+        commands.extend(
+            [
+                ["destroy", "Load_Balancer_Group", target],
+                ["remove", "NB_Global", ".", "external_ids", owner_key],
+            ]
+        )
     db.batch([commands])
 
 
-def apply(runner: Runner, topology: dict[str, Any]) -> None:
+def _apply_database(runner: Runner, topology: dict[str, Any]) -> None:
     db = _Database(runner)
     owner = topology["owner"]
     topology["southbound"]["started_ns"] = time.monotonic_ns()
+
+    existing_switches = db.rows("Logical_Switch", "name", "external_ids")
+    existing_routers = db.rows("Logical_Router", "name", "external_ids")
+    _reject_collisions(
+        existing_switches,
+        [item["name"] for item in topology["switches"]],
+        owner,
+        "logical switch",
+    )
+    _reject_collisions(
+        existing_routers,
+        [item["name"] for item in topology["routers"]],
+        owner,
+        "logical router",
+    )
     _configure_roots(db, topology, owner)
 
     switches = db.rows("Logical_Switch", "_uuid", "name", "external_ids", "ports")
@@ -659,7 +737,27 @@ def apply(runner: Runner, topology: dict[str, Any]) -> None:
     switch_ports = db.rows("Logical_Switch_Port", "_uuid", "name", "external_ids")
     routes = db.rows("Logical_Router_Static_Route", "_uuid", "external_ids")
     nat = db.rows("NAT", "_uuid", "external_ids")
-    gateway_chassis = db.rows("Gateway_Chassis", "_uuid", "name")
+    gateway_chassis = db.rows("Gateway_Chassis", "_uuid", "name", "external_ids")
+
+    _reject_collisions(
+        router_ports,
+        [item["name"] for item in topology["router_ports"]],
+        owner,
+        "logical router port",
+    )
+    _reject_collisions(
+        switch_ports,
+        [item["switch_port"] for item in topology["router_ports"]]
+        + [item["name"] for item in topology["localnet_ports"]],
+        owner,
+        "logical switch port",
+    )
+    _reject_collisions(
+        gateway_chassis,
+        [item["id"] for item in topology["gateway_chassis"]],
+        owner,
+        "gateway chassis",
+    )
 
     _configure_ports(
         db,
@@ -699,3 +797,43 @@ def apply(runner: Runner, topology: dict[str, Any]) -> None:
             }
         )
     )
+
+
+def apply(runner: Runner, topology: dict[str, Any]) -> None:
+    groups = topology["load_balancer_groups"]
+    if len(groups) > 1:
+        raise ValueError("scale topology supports one load balancer group")
+
+    if groups:
+        group = groups[0]
+        if group["id"] != topology["load_balancer_group"]:
+            raise ValueError("load balancer group identifiers do not match")
+        _apply_database(runner, topology)
+        _apply_load_balancer_group(
+            runner,
+            group["id"],
+            group["switches"],
+            group["routers"],
+            topology["owner"],
+        )
+        return
+
+    first_error = None
+    try:
+        _apply_database(runner, topology)
+    except Exception as error:
+        first_error = error
+    try:
+        _apply_load_balancer_group(
+            runner,
+            topology["load_balancer_group"],
+            [],
+            [],
+            topology["owner"],
+            present=False,
+        )
+    except Exception as error:
+        if first_error is None:
+            first_error = error
+    if first_error is not None:
+        raise first_error
