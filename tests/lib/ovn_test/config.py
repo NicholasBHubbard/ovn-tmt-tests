@@ -66,14 +66,14 @@ def read_list(environment: Mapping[str, str], name: str, default: str) -> list[s
     return result
 
 
-def _port(environment: Mapping[str, str], name: str, default: int) -> int:
+def read_port(environment: Mapping[str, str], name: str, default: int) -> int:
     port = read_int(environment, name, default)
     if not 1 <= port <= 65535:
         raise ValueError(f"{name} must be between 1 and 65535")
     return port
 
 
-def _remote(protocol: str, address: str, port: int) -> str:
+def database_remote(protocol: str, address: str, port: int) -> str:
     if ":" in address and not address.startswith("["):
         address = f"[{address}]"
     return f"{protocol}:{address}:{port}"
@@ -96,12 +96,13 @@ def database_environment(
 
     def remotes(port: int) -> str:
         return ",".join(
-            _remote(protocol, topology.hostname(member), port) for member in members
+            database_remote(protocol, topology.hostname(member), port)
+            for member in members
         )
 
     result = {
-        "OVN_NB_DB": remotes(_port(environment, "OTT_NB_PORT", 6641)),
-        "OVN_SB_DB": remotes(_port(environment, "OTT_SB_PORT", 6642)),
+        "OVN_NB_DB": remotes(read_port(environment, "OTT_NB_PORT", 6641)),
+        "OVN_SB_DB": remotes(read_port(environment, "OTT_SB_PORT", 6642)),
     }
     if protocol == "ssl":
         directory = Path(environment.get("OTT_PKI_REMOTE_DIR", "/run/ovn-test-pki"))

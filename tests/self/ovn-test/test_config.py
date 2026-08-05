@@ -4,11 +4,13 @@ from typing import Any
 import pytest
 from ovn_test.config import (
     database_environment,
+    database_remote,
     driver_connection,
     driver_ssh_options,
     read_bool,
     read_int,
     read_list,
+    read_port,
 )
 from ovn_test.topology import Topology
 
@@ -25,6 +27,8 @@ def test_environment_configuration_is_parsed() -> None:
     assert read_list(environment, "PROTOCOLS", "tcp") == ["tcp", "udp", "sctp"]
     assert read_int(environment, "MISSING", 3) == 3
     assert read_list({}, "MISSING", "") == []
+    assert read_port(environment, "COUNT", 1) == 7
+    assert database_remote("ssl", "2001:db8::1", 6642) == "ssl:[2001:db8::1]:6642"
 
 
 def test_environment_integer_rejects_invalid_values() -> None:
