@@ -83,7 +83,7 @@ class TestInitial:
         assert iface_id(runner, "self-direct-p") == "self direct initial"
 
     def test_long_endpoint(self, network: Network) -> None:
-        link = network.link("inside0", "self-long-endpoint-name")
+        link = network.require_link("inside0", "self-long-endpoint-name")
         assert link["address"] == "02:00:00:00:20:07"
 
     @pytest.mark.parametrize(
@@ -91,11 +91,11 @@ class TestInitial:
         (("self-direct", 1400), ("self-peer", 1450)),
     )
     def test_mtu(self, network: Network, endpoint: Any, mtu: int) -> None:
-        assert network.link(f"{endpoint}-p")["mtu"] == mtu
-        assert network.link(endpoint, endpoint)["mtu"] == mtu
+        assert network.require_link(f"{endpoint}-p")["mtu"] == mtu
+        assert network.require_link(endpoint, endpoint)["mtu"] == mtu
 
     def test_direct_endpoint(self, runner: Runner, network: Network) -> None:
-        link = network.link("self-direct", "self-direct")
+        link = network.require_link("self-direct", "self-direct")
         assert link["address"] == "02:00:00:00:20:01"
         assert sorted(
             network.addresses("self-direct", "self-direct", scope="global")
@@ -157,7 +157,7 @@ class TestResult:
         self, runner: Runner, network: Network
     ) -> None:
         assert bridge(runner, long_host_interface()) == "self-br-b"
-        link = network.link("endpoint0", "self-long-endpoint-name")
+        link = network.require_link("endpoint0", "self-long-endpoint-name")
         assert link["address"] == "02:00:00:00:20:17"
         runner.namespace(
             "self-long-endpoint-name",
@@ -174,13 +174,13 @@ class TestResult:
         (("self-direct", 1500), ("self-peer", 1300)),
     )
     def test_mtu(self, network: Network, endpoint: Any, mtu: int) -> None:
-        assert network.link(f"{endpoint}-p")["mtu"] == mtu
-        assert network.link(endpoint, endpoint)["mtu"] == mtu
+        assert network.require_link(f"{endpoint}-p")["mtu"] == mtu
+        assert network.require_link(endpoint, endpoint)["mtu"] == mtu
 
     def test_direct_endpoint_reconfigured(
         self, runner: Runner, network: Network
     ) -> None:
-        link = network.link("self-direct", "self-direct")
+        link = network.require_link("self-direct", "self-direct")
         assert link["address"] == "02:00:00:00:20:11"
         assert network.addresses("self-direct", "self-direct", scope="global") == [
             "203.0.113.10/24"
@@ -220,4 +220,4 @@ class TestResult:
         self, runner: Runner, network: Network
     ) -> None:
         assert bridge(runner, "self-keep-p") == "self-br-a"
-        assert network.link("self-keep", "self-keep")["mtu"] == 1450
+        assert network.require_link("self-keep", "self-keep")["mtu"] == 1450

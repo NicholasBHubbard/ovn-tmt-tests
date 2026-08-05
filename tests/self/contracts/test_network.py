@@ -125,7 +125,7 @@ def test_network_treats_a_missing_route_table_as_empty() -> None:
             command,
             2,
             "[]\n",
-            "Error: ipv4: FIB table does not exist.\nDump terminated\n",
+            "localized missing table message\n",
         )
         if kwargs["check"]:
             raise subprocess.CalledProcessError(
@@ -220,13 +220,16 @@ def test_external_peers_exercise_worker_gateway_paths() -> None:
     )
     peers.cleanup()
 
+    peer = peers.peers["worker-0"]
+    namespace = peer["namespace"]
+    interface = peer["interface"]
     create_guest, create = runner.batches[0]
     assert create_guest == "compute-1"
     commands = [command for command, _ in create]
     assert (
         "ip",
         "-n",
-        "dhe00000",
+        namespace,
         "address",
         "replace",
         "172.16.0.253/24",
@@ -236,7 +239,7 @@ def test_external_peers_exercise_worker_gateway_paths() -> None:
     assert (
         "ip",
         "-n",
-        "dhe00000",
+        namespace,
         "-6",
         "route",
         "replace",
@@ -249,11 +252,11 @@ def test_external_peers_exercise_worker_gateway_paths() -> None:
         "--may-exist",
         "add-port",
         "br-provider",
-        "dhe00000-p",
+        interface,
         "--",
         "set",
         "Port",
-        "dhe00000-p",
+        interface,
         "tag=37",
     ) in commands
     assert [wait[0][-1] for wait in runner.waits] == [
@@ -262,8 +265,6 @@ def test_external_peers_exercise_worker_gateway_paths() -> None:
         "10.0.0.1",
         "fd10::1",
     ]
-    assert runner.waits[-1][0][3] == "dhe00000"
+    assert runner.waits[-1][0][3] == namespace
 
-    runner.returncodes[("ip", "netns", "exec", "dhe00000", "true")] = 1
-    runner.returncodes[("ovs-vsctl", "port-to-br", "dhe00000-p")] = 1
     peers.verify_cleanup()

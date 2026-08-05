@@ -93,8 +93,8 @@ class TestInitial:
         (("self-vm1", 1400), ("self-vm2", 1450)),
     )
     def test_mtu(self, network: Network, endpoint: Any, mtu: int) -> None:
-        assert network.link(f"{endpoint}-p")["mtu"] == mtu
-        assert network.link(endpoint, endpoint)["mtu"] == mtu
+        assert network.require_link(f"{endpoint}-p")["mtu"] == mtu
+        assert network.require_link(endpoint, endpoint)["mtu"] == mtu
 
     def test_identity_is_recorded(self, runner: Runner, snapshots: Snapshots) -> None:
         snapshots.save(
@@ -191,7 +191,10 @@ class TestResult:
             )["iface-id"]
             == "self-port1"
         )
-        assert network.link("self-vm1", "self-vm1")["address"] == "02:00:00:00:01:02"
+        assert (
+            network.require_link("self-vm1", "self-vm1")["address"]
+            == "02:00:00:00:01:02"
+        )
         assert sorted(network.addresses("self-vm1", "self-vm1", scope="global")) == [
             "192.0.2.10/24",
             "2001:db8:2::1/64",
@@ -232,7 +235,8 @@ class TestResult:
             == "self-port3"
         )
         assert (
-            network.link("self-remote", "self-remote")["address"] == "02:00:00:00:03:02"
+            network.require_link("self-remote", "self-remote")["address"]
+            == "02:00:00:00:03:02"
         )
         assert network.addresses("self-remote", "self-remote", scope="global") == []
 
@@ -241,8 +245,8 @@ class TestResult:
         (("self-vm1", 1500), ("self-remote", 1300)),
     )
     def test_mtu(self, network: Network, endpoint: Any, mtu: int) -> None:
-        assert network.link(f"{endpoint}-p")["mtu"] == mtu
-        assert network.link(endpoint, endpoint)["mtu"] == mtu
+        assert network.require_link(f"{endpoint}-p")["mtu"] == mtu
+        assert network.require_link(endpoint, endpoint)["mtu"] == mtu
 
     def test_deleted_port_and_dhcp_links(self, nb: Ovsdb) -> None:
         assert not nb.exists("Logical_Switch_Port", "name=self-port4")
