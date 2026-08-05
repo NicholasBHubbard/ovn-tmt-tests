@@ -7,7 +7,7 @@ from typing import Any
 import pytest
 from ovn_test.command import Runner
 from ovn_test.config import read_bool, read_int, read_list
-from ovn_test.namespace import OvnNamespace
+from ovn_test.namespace import NamespaceResources, OvnNamespace
 from ovn_test.scale import ScaleBaseline, verify_scale_environment
 from ovn_test.scale_topology import ScaleTopology
 from ovn_test.topology import Topology
@@ -169,6 +169,7 @@ def workload(request: pytest.FixtureRequest) -> Iterator[Any]:
 
 def test_np_cross_namespace(workload: Any) -> None:
     instance, namespaces, config = workload
+    resources = NamespaceResources(instance.runner, instance.name)
     pods = config["pods_per_namespace"]
 
     def create_namespace(namespace: OvnNamespace, index: int) -> None:
@@ -198,6 +199,7 @@ def test_np_cross_namespace(workload: Any) -> None:
             index,
             ipv4=config["ipv4"],
             ipv6=config["ipv6"],
+            resources=resources,
         )
         namespaces.append(namespace)
         instance.measure(

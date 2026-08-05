@@ -5,9 +5,13 @@ from pathlib import Path
 from typing import Any, Callable
 
 import pytest
+from ovn_test.cluster_density import (
+    add_namespace_services,
+    validate_cluster_density,
+)
 from ovn_test.command import Runner
 from ovn_test.config import read_bool, read_int, read_list
-from ovn_test.namespace import OvnNamespace, validate_cluster_density
+from ovn_test.namespace import NamespaceResources, OvnNamespace
 from ovn_test.ovsdb import Ovsdb
 from ovn_test.scale import ScaleBaseline, verify_scale_environment
 from ovn_test.scale_topology import ScaleTopology
@@ -57,6 +61,14 @@ def workload(request: pytest.FixtureRequest) -> Iterator[Any]:
             "OTT_SCALE_SYNC_TIMEOUT",
             1800,
         ),
+        "ipv4_vip_network": os.environ.get(
+            "OTT_SCALE_SERVICE_VIP_IPV4_NETWORK", "30.0.0.0/16"
+        ),
+        "ipv6_vip_network": os.environ.get(
+            "OTT_SCALE_SERVICE_VIP_IPV6_NETWORK", "30::/32"
+        ),
+        "vip_port": read_int(os.environ, "OTT_SCALE_SERVICE_VIP_PORT", 80),
+        "backend_port": read_int(os.environ, "OTT_SCALE_SERVICE_BACKEND_PORT", 8080),
     }
     validate_cluster_density(
         **{key: value for key, value in config.items() if key != "sync_timeout"}
@@ -128,6 +140,7 @@ def workload(request: pytest.FixtureRequest) -> Iterator[Any]:
 
 def test_cluster_density(workload: Any) -> None:
     instance, namespaces, config, group, baseline = workload
+    resources = NamespaceResources(instance.runner, instance.name)
     next_endpoint = 0
 
     def add_pods(count: int, phase: str, passive: bool) -> list[dict[str, Any]]:
@@ -159,13 +172,23 @@ def test_cluster_density(workload: Any) -> None:
 
         service = add_pods(config["test_pods"], phase, passive)
         namespace.add_endpoints(service)
-        namespace.add_services(service, config["protocols"], group)
+        add_namespace_services(
+            namespace,
+            service,
+            config["protocols"],
+            group,
+            ipv4_vip_network=config["ipv4_vip_network"],
+            ipv6_vip_network=config["ipv6_vip_network"],
+            vip_port=config["vip_port"],
+            backend_port=config["backend_port"],
+        )
 
         if not passive:
             for endpoint in [*build, *service]:
                 baseline.external.verify(endpoint)
             for endpoint in build:
                 instance.remove_endpoint(endpoint)
+            namespace.remove_endpoints(build)
 
     for namespace_index in range(config["total"]):
         phase = "startup" if namespace_index < config["startup"] else "iteration"
@@ -177,6 +200,7 @@ def test_cluster_density(workload: Any) -> None:
             namespace_index,
             ipv4=config["ipv4"],
             ipv6=config["ipv6"],
+            resources=resources,
         )
         namespaces.append(namespace)
 

@@ -25,9 +25,9 @@ families also load fixtures from `ovn_test.pytest_build` or
   primitives.
 - `build`, `files`, `system`, and `state` provide focused build, filesystem,
   system-inspection, and result-state helpers.
-- `scale_topology`, `scale`, and `workload` implement shared OVN scale-test
-  topology and workload behavior. `_scale_topology_apply` is an internal
-  implementation module.
+- `scale_topology`, `scale`, `cluster_density`, and `workload` implement shared
+  OVN scale-test topology and workload behavior. `_scale_topology_apply` is an
+  internal implementation module.
 - `pytest_build` and `pytest_multihost` provide fixtures for their respective
   test families.
 

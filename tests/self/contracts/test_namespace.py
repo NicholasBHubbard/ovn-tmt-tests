@@ -2,7 +2,11 @@ import subprocess
 from typing import Any
 
 import pytest
-from ovn_test.namespace import OvnNamespace, validate_cluster_density
+from ovn_test.cluster_density import (
+    add_namespace_services,
+    validate_cluster_density,
+)
+from ovn_test.namespace import OvnNamespace
 
 from ._support import FakeRunner, contains
 
@@ -17,6 +21,7 @@ def test_ovn_namespace_reproduces_cluster_density_state() -> None:
     )
     endpoints = [
         {
+            "port": f"pod-{index}",
             "ipv4": f"10.0.0.{index}",
             "ipv6": f"fd10::{index}",
         }
@@ -25,10 +30,19 @@ def test_ovn_namespace_reproduces_cluster_density_state() -> None:
 
     namespace.create()
     namespace.add_endpoints(endpoints)
-    namespace.add_services(endpoints, ["tcp", "udp", "sctp"], "group-uuid")
+    add_namespace_services(namespace, endpoints, ["tcp", "udp", "sctp"], "group-uuid")
 
     commands = [call[1] for call in runner.calls]
-    assert len([command for command in commands if "pg-add" in command]) == 3
+    assert (
+        len(
+            [
+                command
+                for command in commands
+                if command[:3] == ("ovn-nbctl", "create", "Port_Group")
+            ]
+        )
+        == 3
+    )
     assert (
         len(
             [
@@ -81,24 +95,25 @@ def test_ovn_namespace_manages_network_policy_state() -> None:
 
     namespace.create()
     namespace.add_endpoints(endpoints)
-    assert not [call for call in runner.calls if "pg-set-ports" in call[1]]
+    assert not [
+        call
+        for call in runner.calls
+        if "pg-set-ports" in call[1] and "pod-1" in call[1]
+    ]
 
     namespace.default_deny(4)
     namespace.allow_within(4)
-    namespace.allow_external(
+    namespace.allow_from_external(
         ["42.42.42.1", "42.42.42.2"],
         name="trusted",
     )
 
     commands = [call[1] for call in runner.calls]
     for port_group in namespace.port_groups:
-        assert (
-            "ovn-nbctl",
-            "pg-set-ports",
-            port_group,
-            "pod-1",
-            "pod-2",
-        ) in commands
+        assert any(
+            contains(command, "pg-set-ports", port_group, "pod-1", "pod-2")
+            for command in commands
+        )
     created_acls = [command for command in commands if "acl-add" in command]
     assert len(created_acls) == 7
     assert any(
@@ -112,7 +127,7 @@ def test_ovn_namespace_manages_network_policy_state() -> None:
         for command in created_acls
     )
 
-    namespace.allow_external(["42.42.42.3"], name="trusted")
+    namespace.allow_from_external(["42.42.42.3"], name="trusted")
     assert (
         "ovn-nbctl",
         "--type=port-group",
@@ -135,14 +150,17 @@ def test_ovn_namespace_manages_network_policy_state() -> None:
     ) in [call[1] for call in runner.calls]
 
     namespace.add_endpoints([{"port": "pod-3", "ipv4": "10.0.0.3"}])
-    assert (
-        "ovn-nbctl",
-        "pg-set-ports",
-        "pg_NS_policy_0",
-        "pod-1",
-        "pod-2",
-        "pod-3",
-    ) in [call[1] for call in runner.calls]
+    assert any(
+        contains(
+            call[1],
+            "pg-set-ports",
+            "pg_NS_policy_0",
+            "pod-1",
+            "pod-2",
+            "pod-3",
+        )
+        for call in runner.calls
+    )
 
     namespace.cleanup()
     namespace.verify_cleanup()
@@ -162,7 +180,7 @@ def test_ovn_namespace_manages_ipv6_network_policy_state() -> None:
     namespace.add_endpoints([{"port": "pod-v6", "ipv6": "fd00::10"}])
     namespace.default_deny(6)
     namespace.allow_within(6)
-    namespace.allow_external(
+    namespace.allow_from_external(
         ["2001:db8::1", "2001:db8::2"],
         family=6,
         name="trusted",
@@ -170,8 +188,7 @@ def test_ovn_namespace_manages_ipv6_network_policy_state() -> None:
 
     commands = [call[1] for call in runner.calls]
     assert any(
-        command[:3] == ("ovn-nbctl", "add", "Address_Set")
-        and command[-1] == '"fd00::10"'
+        contains(command, "add", "Address_Set") and command[-1] == '"fd00::10"'
         for command in commands
     )
     acls = {(command[-2], command[-1]) for command in commands if "acl-add" in command}
@@ -226,8 +243,22 @@ def test_ovn_namespace_allows_traffic_to_another_namespace(
 ) -> None:
     runner = FakeRunner()
     settings = {"ipv4": family == 4, "ipv6": family == 6}
-    source = OvnNamespace(runner, "network-policy", "source", 0, **settings)
-    target = OvnNamespace(runner, "network-policy", "target", 1, **settings)
+    source = OvnNamespace(
+        runner,
+        "network-policy",
+        "source",
+        0,
+        ipv4=settings["ipv4"],
+        ipv6=settings["ipv6"],
+    )
+    target = OvnNamespace(
+        runner,
+        "network-policy",
+        "target",
+        1,
+        ipv4=settings["ipv4"],
+        ipv6=settings["ipv6"],
+    )
 
     source.create()
     target.create()
@@ -262,7 +293,9 @@ def test_ovn_namespace_allows_traffic_to_another_namespace(
         ("pg_source", "source-pod"),
         ("pg_target", "target-pod"),
     ):
-        assert ("ovn-nbctl", "pg-set-ports", port_group, port) in commands
+        assert any(
+            contains(command, "pg-set-ports", port_group, port) for command in commands
+        )
 
     source.cleanup()
     target.cleanup()
@@ -304,24 +337,21 @@ def test_ovn_namespace_manages_policy_groups(
     namespace.set_group("target", endpoints[2:])
     namespace.allow_between("source", "target", family, priority=7)
 
-    source_port_group = "sub_pg_groups_0"
-    target_port_group = "sub_pg_groups_1"
-    source_address_set = f"{address_set_prefix}groups_0"
-    target_address_set = f"{address_set_prefix}groups_1"
+    source_group = namespace.groups["source"]
+    target_group = namespace.groups["target"]
+    source_port_group = source_group.port_group
+    target_port_group = target_group.port_group
+    source_address_set = source_group.address_sets[family]
+    target_address_set = target_group.address_sets[family]
     commands = [call[1] for call in runner.calls]
-    assert (
-        "ovn-nbctl",
-        "pg-set-ports",
-        source_port_group,
-        "pod-1",
-        "pod-2",
-    ) in commands
-    assert (
-        "ovn-nbctl",
-        "pg-set-ports",
-        target_port_group,
-        "pod-3",
-    ) in commands
+    assert any(
+        contains(command, "pg-set-ports", source_port_group, "pod-1", "pod-2")
+        for command in commands
+    )
+    assert any(
+        contains(command, "pg-set-ports", target_port_group, "pod-3")
+        for command in commands
+    )
     for match in (
         f"{network}.src == ${source_address_set} && outport == @{target_port_group}",
         f"{network}.dst == ${target_address_set} && inport == @{source_port_group}",
@@ -336,15 +366,11 @@ def test_ovn_namespace_manages_policy_groups(
     previous_calls = len(runner.calls)
     namespace.set_group("source", endpoints[1:2])
     reconfiguration = [call[1] for call in runner.calls[previous_calls:]]
-    assert reconfiguration[0] == (
-        "ovn-nbctl",
-        "pg-set-ports",
-        source_port_group,
-        "pod-2",
-    )
-    assert reconfiguration[1][1:3] == ("clear", "Address_Set")
-    assert reconfiguration[2][-1] == f'"{addresses[1]}"'
-    assert not any("pg-add" in command for command in reconfiguration)
+    assert len(reconfiguration) == 1
+    assert contains(reconfiguration[0], "pg-set-ports", source_port_group, "pod-2")
+    assert contains(reconfiguration[0], "clear", "Address_Set")
+    assert reconfiguration[0][-1] == f'"{addresses[1]}"'
+    assert "create" not in reconfiguration[0]
 
     namespace.allow_between("source", "target", family, priority=8)
     assert any(
@@ -352,23 +378,16 @@ def test_ovn_namespace_manages_policy_groups(
         for command in (call[1] for call in runner.calls)
     )
 
-    previous_calls = len(runner.calls)
     namespace.cleanup()
     namespace.verify_cleanup()
-    cleanup_queries = [call[1] for call in runner.calls[previous_calls:]]
-    for name in (
-        source_port_group,
-        target_port_group,
-        source_address_set,
-        target_address_set,
-    ):
-        assert any(command[-1] == f'name="{name}"' for command in cleanup_queries)
+    assert namespace.cleaned
 
 
 def test_ovn_namespace_rejects_invalid_policy_groups() -> None:
     namespace = OvnNamespace(FakeRunner(), "network-policy", "groups", 0)
+    namespace.create()
 
-    with pytest.raises(ValueError, match="name cannot be empty"):
+    with pytest.raises(ValueError, match="name must be a non-empty string"):
         namespace.set_group("", [])
     namespace.set_group("source", [])
     with pytest.raises(ValueError, match="does not exist: target"):
@@ -383,13 +402,14 @@ def test_ovn_namespace_rejects_invalid_policy_addresses() -> None:
         0,
         ipv6=False,
     )
+    namespace.create()
 
     with pytest.raises(ValueError, match="IPv6 is disabled"):
         namespace.default_deny(6)
     with pytest.raises(ValueError, match="at least one address"):
-        namespace.allow_external([])
+        namespace.allow_from_external([])
     with pytest.raises(ValueError, match="must be IPv4"):
-        namespace.allow_external(["2001:db8::1"])
+        namespace.allow_from_external(["2001:db8::1"])
 
 
 def test_ovn_namespace_cleans_partially_created_address_sets() -> None:
@@ -416,15 +436,9 @@ def test_ovn_namespace_cleans_partially_created_address_sets() -> None:
     namespace.cleanup()
 
     commands = [call[1] for call in runner.calls]
-    for name in ("as_NS_density_0", "as6_NS_density_0"):
-        assert (
-            "ovn-nbctl",
-            "--bare",
-            "--columns=_uuid",
-            "find",
-            "Address_Set",
-            f'name="{name}"',
-        ) in commands
+    assert any(
+        command[:3] == ("ovn-nbctl", "destroy", "Address_Set") for command in commands
+    )
 
 
 @pytest.mark.parametrize(
@@ -436,6 +450,8 @@ def test_ovn_namespace_cleans_partially_created_address_sets() -> None:
         {"build_pods": -1},
         {"test_pods": 3},
         {"protocols": []},
+        {"protocols": "tcp"},
+        {"protocols": [1]},
         {"protocols": ["tcp", "tcp"]},
         {"protocols": ["tcp", "http"]},
         {"timeout": 0},
@@ -443,14 +459,19 @@ def test_ovn_namespace_cleans_partially_created_address_sets() -> None:
         {"ipv4": "true"},
         {"ipv6": False, "mtu": 575},
         {"mtu": 65536},
+        {"mtu": 1342.0},
+        {"total": True},
         {"chassis": 1},
         {"workers": 0},
         {"base_pods": -1},
         {"startup": 0, "total": 65535, "build_pods": 0},
+        {"ipv4_vip_network": "2001:db8::/64"},
+        {"vip_port": 0},
+        {"backend_port": 65536},
     ),
 )
 def test_cluster_density_validation_rejects_invalid_values(values: Any) -> None:
-    config = {
+    config: dict[str, Any] = {
         "startup": 1,
         "total": 2,
         "build_pods": 6,

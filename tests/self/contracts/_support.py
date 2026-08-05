@@ -39,7 +39,10 @@ class FakeRunner(Runner):
         if command in self.fail:
             raise subprocess.CalledProcessError(1, command)
         stdout = ""
-        if command[:3] == ("ovn-nbctl", "create", "Address_Set"):
+        if command[:3] in {
+            ("ovn-nbctl", "create", "Address_Set"),
+            ("ovn-nbctl", "create", "Port_Group"),
+        }:
             stdout = f"uuid-{len(self.calls)}\n"
         if command[:4] == ("ovn-nbctl", "--id=@lb", "create", "Load_Balancer"):
             stdout = f"load-balancer-{len(self.calls)}\n"

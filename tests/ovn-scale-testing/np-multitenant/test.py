@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 from ovn_test.command import Runner
 from ovn_test.config import read_bool, read_int, read_list
-from ovn_test.namespace import OvnNamespace
+from ovn_test.namespace import NamespaceResources, OvnNamespace
 from ovn_test.scale import ScaleBaseline, verify_scale_environment
 from ovn_test.scale_topology import ScaleTopology
 from ovn_test.topology import Topology
@@ -233,6 +233,7 @@ def workload(request: pytest.FixtureRequest) -> Iterator[Any]:
 
 def test_np_multitenant(workload: Any) -> None:
     instance, namespaces, config, baseline = workload
+    resources = NamespaceResources(instance.runner, instance.name)
     external = baseline.external
     next_endpoint = 0
 
@@ -259,13 +260,13 @@ def test_np_multitenant(workload: Any) -> None:
                 config["control_priority"],
             )
             namespace.allow_within(family, config["allow_priority"])
-            namespace.allow_external(
+            namespace.allow_from_external(
                 config["external_addresses"][family]["small"],
                 family,
                 "small",
                 config["allow_priority"],
             )
-            namespace.allow_external(
+            namespace.allow_from_external(
                 [
                     *config["external_addresses"][family]["large"],
                     external.address(endpoints[0], family),
@@ -290,6 +291,7 @@ def test_np_multitenant(workload: Any) -> None:
             namespace_index,
             ipv4=config["ipv4"],
             ipv6=config["ipv6"],
+            resources=resources,
         )
         namespaces.append(namespace)
         instance.measure(

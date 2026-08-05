@@ -189,3 +189,6 @@ class LoadBalancers:
         if uuid is not None:
             self.runner.run("ovn-nbctl", "destroy", "Load_Balancer", uuid)
             del uuids[name]
+
+    def contains(self, name: str) -> bool:
+        return _text(name, "load-balancer name") in self._load()

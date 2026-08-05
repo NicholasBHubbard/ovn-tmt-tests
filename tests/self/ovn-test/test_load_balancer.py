@@ -258,8 +258,11 @@ def test_replace_propagates_ovn_failure() -> None:
 
 def test_delete_only_removes_the_owner_scoped_row() -> None:
     runner, _ = _runner("managed-uuid,service\n")
+    load_balancers = LoadBalancers(runner, "owner")
 
-    LoadBalancers(runner, "owner").delete("service")
+    assert load_balancers.contains("service")
+    load_balancers.delete("service")
+    assert not load_balancers.contains("service")
 
     runner.output.assert_called_once_with(
         "ovn-nbctl",
