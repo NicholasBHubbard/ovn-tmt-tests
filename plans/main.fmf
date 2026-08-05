@@ -24,6 +24,7 @@
     OTT_DPDK_SOURCE_DIR: /usr/src/dpdk
     OTT_DPDK_VERSION: 24.11.1
     OTT_DIAGNOSTICS: "true"
+    OTT_DIAGNOSTICS_JOURNAL_LINES: "100000"
     OTT_DIAGNOSTICS_LOG_BYTES: "10485760"
     OTT_DIAGNOSTICS_RUNTIME_DIR: /run/ovn-tmt-tests/diagnostics
     OTT_DRIVER_KEY_PATH: ""
@@ -174,6 +175,7 @@
       extra-args: >-
         -e run_diagnostics_enabled=$OTT_DIAGNOSTICS
         -e 'run_diagnostics_runtime_dir=$OTT_DIAGNOSTICS_RUNTIME_DIR'
+        -e run_diagnostics_journal_lines=$OTT_DIAGNOSTICS_JOURNAL_LINES
         -e run_diagnostics_log_bytes=$OTT_DIAGNOSTICS_LOG_BYTES
         -e 'run_diagnostics_output_dir=$TMT_PLAN_DATA/diagnostics'
 

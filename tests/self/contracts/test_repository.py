@@ -311,6 +311,7 @@ def test_multihost_diagnostics_are_general_and_top_down(tree: Path) -> None:
     assert extra_variables(collect) == {
         "run_diagnostics_enabled": "$OTT_DIAGNOSTICS",
         "run_diagnostics_runtime_dir": "$OTT_DIAGNOSTICS_RUNTIME_DIR",
+        "run_diagnostics_journal_lines": "$OTT_DIAGNOSTICS_JOURNAL_LINES",
         "run_diagnostics_log_bytes": "$OTT_DIAGNOSTICS_LOG_BYTES",
         "run_diagnostics_output_dir": "$TMT_PLAN_DATA/diagnostics",
     }

@@ -1,21 +1,17 @@
-- name: Create diagnostics output directory
-  ansible.builtin.file:
-    path: "{{ run_diagnostics_output_dir }}"
-    state: directory
-    mode: "0700"
-  failed_when: false
-
 - name: Reset diagnostics collection
   ansible.builtin.file:
     path: "{{ run_diagnostics_runtime_dir }}/collected"
     state: absent
   failed_when: false
 
-- name: Create diagnostics collection directory
+- name: Create diagnostics directories
   ansible.builtin.file:
-    path: "{{ run_diagnostics_runtime_dir }}/collected"
+    path: "{{ item }}"
     state: directory
     mode: "0700"
+  loop:
+    - "{{ run_diagnostics_runtime_dir }}/collected"
+    - "{{ run_diagnostics_output_dir }}"
   failed_when: false
 
 - name: Read diagnostics start time
@@ -30,19 +26,35 @@
       {{ run_diagnostics_start_time.content | default('') | b64decode | trim }}
 
 - name: Collect system journal
-  ansible.builtin.command:
-    argv:
-      - journalctl
-      - --no-pager
-      - --output=short-precise
-      - "{{ '--since=@' ~ run_diagnostics_since if run_diagnostics_since else '--boot' }}"
+  ansible.builtin.shell:
+    cmd: >-
+      umask 077 && journalctl --no-pager --output=short-precise
+      --lines={{ run_diagnostics_journal_lines }}
+      "$RUN_DIAGNOSTICS_SINCE" > "$RUN_DIAGNOSTICS_OUTPUT" 2>&1
+  environment:
+    RUN_DIAGNOSTICS_OUTPUT: >-
+      {{ run_diagnostics_runtime_dir }}/collected/system-journal.log
+    RUN_DIAGNOSTICS_SINCE: >-
+      {{ '--since=@' ~ run_diagnostics_since
+         if run_diagnostics_since else '--boot' }}
   register: run_diagnostics_journal
-  changed_when: false
+  changed_when: true
   failed_when: false
 
+- name: Report system journal collection failure
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: System journal collection exited with status
+      {{ run_diagnostics_journal.rc | default('unknown') }}; its error output
+      was preserved in system-journal.log.
+  when: run_diagnostics_journal.rc | default(1) != 0
+
 - name: Collect system state
-  ansible.builtin.command:
-    argv: "{{ item.command }}"
+  ansible.builtin.shell:
+    cmd: >-
+      umask 077 && {{ item.command | map('quote') | join(' ') }}
+      > {{ (run_diagnostics_runtime_dir ~ '/collected/' ~ item.name) | quote }}
+      2>&1
   loop:
     - name: processes.txt
       command: [ps, auxww]
@@ -59,29 +71,18 @@
   loop_control:
     label: "{{ item.name }}"
   register: run_diagnostics_commands
-  changed_when: false
+  changed_when: true
   failed_when: false
 
-- name: Store system journal
-  ansible.builtin.copy:
-    content: |-
-      {{ run_diagnostics_journal.stdout | default('') }}
-      {{ run_diagnostics_journal.stderr | default('') }}
-    dest: "{{ run_diagnostics_runtime_dir }}/collected/system-journal.log"
-    mode: "0600"
-  failed_when: false
-
-- name: Store system state
-  ansible.builtin.copy:
-    content: |-
-      {{ item.stdout | default('') }}
-      {{ item.stderr | default('') }}
-    dest: "{{ run_diagnostics_runtime_dir }}/collected/{{ item.item.name }}"
-    mode: "0600"
+- name: Report system state collection failures
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: Diagnostics command for {{ item.item.name }} exited with status
+      {{ item.rc | default('unknown') }}; its error output was preserved.
   loop: "{{ run_diagnostics_commands.results | default([]) }}"
   loop_control:
     label: "{{ item.item.name }}"
-  failed_when: false
+  when: item.rc | default(1) != 0
 
 - name: Find OVN and OVS logs
   ansible.builtin.find:
@@ -92,42 +93,105 @@
   register: run_diagnostics_log_files
   failed_when: false
 
-- name: Read tails of OVN and OVS logs
-  ansible.builtin.command:
-    argv:
-      - tail
-      - --bytes={{ run_diagnostics_log_bytes }}
-      - "{{ item.path }}"
+- name: Create diagnostic log directories
+  ansible.builtin.file:
+    path: >-
+      {{ (run_diagnostics_runtime_dir ~ '/collected/logs/' ~
+          (item.path | regex_replace('^/', ''))) | dirname }}
+    state: directory
+    mode: "0700"
+  loop: "{{ run_diagnostics_log_files.files | default([]) }}"
+  loop_control:
+    label: "{{ item.path }}"
+  failed_when: false
+
+- name: Collect tails of OVN and OVS logs
+  ansible.builtin.shell:
+    cmd: >-
+      umask 077 && tail --bytes="$RUN_DIAGNOSTICS_BYTES"
+      -- "$RUN_DIAGNOSTICS_SOURCE"
+      > "$RUN_DIAGNOSTICS_OUTPUT" 2>&1
+  environment:
+    RUN_DIAGNOSTICS_BYTES: "{{ run_diagnostics_log_bytes }}"
+    RUN_DIAGNOSTICS_SOURCE: "{{ item.path }}"
+    RUN_DIAGNOSTICS_OUTPUT: >-
+      {{ run_diagnostics_runtime_dir }}/collected/logs/{{
+         item.path | regex_replace('^/', '') }}.tail
   loop: "{{ run_diagnostics_log_files.files | default([]) }}"
   loop_control:
     label: "{{ item.path }}"
   register: run_diagnostics_logs
-  changed_when: false
+  changed_when: true
   failed_when: false
 
-- name: Store tails of OVN and OVS logs
-  ansible.builtin.copy:
-    content: |-
-      {{ item.stdout | default('') }}
-      {{ item.stderr | default('') }}
-    dest: >-
-      {{ run_diagnostics_runtime_dir }}/collected/{{
-         item.item.path | regex_replace('^/', '') | replace('/', '__') }}.tail
-    mode: "0600"
+- name: Report diagnostic log collection failures
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: Diagnostics collection for {{ item.item.path }} exited with
+      status {{ item.rc | default('unknown') }}; its error output was
+      preserved.
   loop: "{{ run_diagnostics_logs.results | default([]) }}"
   loop_control:
     label: "{{ item.item.path }}"
+  when: item.rc | default(1) != 0
+
+- name: Remove stale temporary diagnostics archive
+  ansible.builtin.file:
+    path: >-
+      {{ run_diagnostics_output_dir }}/.{{ inventory_hostname }}.tar.gz.tmp
+    state: absent
   failed_when: false
 
-- name: Archive guest diagnostics
+- name: Create temporary guest diagnostics archive
   ansible.builtin.command:
     argv:
       - tar
       - --create
       - --gzip
-      - --file={{ run_diagnostics_output_dir }}/{{ inventory_hostname }}.tar.gz
+      - >-
+        --file={{ run_diagnostics_output_dir
+                  }}/.{{ inventory_hostname }}.tar.gz.tmp
       - --directory={{ run_diagnostics_runtime_dir }}
       - collected
   register: run_diagnostics_archive
-  changed_when: run_diagnostics_archive.rc == 0
+  changed_when: run_diagnostics_archive.rc | default(1) == 0
   failed_when: false
+
+- name: Publish guest diagnostics archive
+  ansible.builtin.command:
+    argv:
+      - mv
+      - --force
+      - --no-target-directory
+      - >-
+        {{ run_diagnostics_output_dir }}/.{{ inventory_hostname }}.tar.gz.tmp
+      - >-
+        {{ run_diagnostics_output_dir }}/{{ inventory_hostname }}.tar.gz
+  when: run_diagnostics_archive.rc | default(1) == 0
+  register: run_diagnostics_publish
+  changed_when: run_diagnostics_publish.rc | default(1) == 0
+  failed_when: false
+
+- name: Remove failed temporary diagnostics archive
+  ansible.builtin.file:
+    path: >-
+      {{ run_diagnostics_output_dir }}/.{{ inventory_hostname }}.tar.gz.tmp
+    state: absent
+  when: >-
+    run_diagnostics_archive.rc | default(1) != 0 or
+    run_diagnostics_publish.rc | default(1) != 0
+  failed_when: false
+
+- name: Report diagnostics archive failure
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: Guest diagnostics archive was not created at
+      {{ run_diagnostics_output_dir }}/{{ inventory_hostname }}.tar.gz:
+      {{ run_diagnostics_archive.stderr |
+         default(run_diagnostics_archive.msg, true) |
+         default(run_diagnostics_publish.stderr, true) |
+         default(run_diagnostics_publish.msg, true) |
+         default('archive command failed', true) }}
+  when: >-
+    run_diagnostics_archive.rc | default(1) != 0 or
+    run_diagnostics_publish.rc | default(1) != 0

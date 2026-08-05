@@ -1,9 +1,46 @@
-- name: Verify diagnostics action
+- name: Verify diagnostics enabled setting
+  ansible.builtin.assert:
+    that:
+      - run_diagnostics_enabled | string | lower in ['true', 'false']
+    fail_msg: "run_diagnostics_enabled must be true or false."
+
+- name: Verify diagnostics configuration
   when: run_diagnostics_enabled | bool
   ansible.builtin.assert:
     that:
+      - run_diagnostics_action is string
       - run_diagnostics_action in ['start', 'collect']
-    fail_msg: "run_diagnostics_action must be start or collect."
+      - run_diagnostics_runtime_dir is string
+      - run_diagnostics_runtime_dir | ansible.builtin.normpath is match('^/.+')
+      - run_diagnostics_output_dir is string
+      - run_diagnostics_output_dir | ansible.builtin.normpath is match('^/.+')
+      - run_diagnostics_journal_lines | string is match('^[0-9]+$')
+      - run_diagnostics_log_bytes | string is match('^[0-9]+$')
+      - run_diagnostics_log_directories is sequence
+      - run_diagnostics_log_directories is not string
+      - run_diagnostics_log_directories is not mapping
+      - >-
+        run_diagnostics_output_dir | ansible.builtin.normpath !=
+        (run_diagnostics_runtime_dir | ansible.builtin.normpath) ~
+        '/collected' and
+        not (run_diagnostics_output_dir | ansible.builtin.normpath).startswith(
+          (run_diagnostics_runtime_dir | ansible.builtin.normpath) ~
+          '/collected/')
+    fail_msg: >-
+      Diagnostics require an action of start or collect, safe absolute paths,
+      non-negative integer limits, and a list of log directories. The output
+      directory cannot be inside the collection directory.
+
+- name: Verify diagnostics log directories
+  when: run_diagnostics_enabled | bool
+  ansible.builtin.assert:
+    that:
+      - item is string
+      - item | ansible.builtin.normpath is match('^/.+')
+    fail_msg: "Each diagnostics log directory must be a safe absolute path."
+  loop: "{{ run_diagnostics_log_directories }}"
+  loop_control:
+    label: "{{ item }}"
 
 - name: Run diagnostics action
   when: run_diagnostics_enabled | bool
