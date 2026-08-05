@@ -1,4 +1,5 @@
 import os
+import shlex
 import subprocess
 from collections.abc import Mapping
 from pathlib import Path
@@ -6,7 +7,7 @@ from typing import Callable, Optional, Union
 
 import yaml
 
-from ovn_test.config import driver_connection, read_bool
+from ovn_test.config import driver_connection, driver_ssh_options, read_bool
 from ovn_test.topology import Topology
 
 
@@ -57,11 +58,7 @@ class Ansible:
     def inventory(self, path: Optional[Union[str, os.PathLike[str]]] = None) -> Path:
         path = Path(path or self.data / "ansible-inventory.yml")
         path.parent.mkdir(parents=True, exist_ok=True)
-        ssh_options = (
-            "-o BatchMode=yes -o ConnectTimeout=30 -o LogLevel=ERROR "
-            "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "
-            "-o IdentitiesOnly=yes"
-        )
+        ssh_options = shlex.join(driver_ssh_options(self.environment))
         inventory = {
             "all": {
                 "hosts": {

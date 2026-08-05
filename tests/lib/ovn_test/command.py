@@ -8,7 +8,11 @@ from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import Callable, Optional, Union
 
-from ovn_test.config import database_environment, driver_connection
+from ovn_test.config import (
+    database_environment,
+    driver_connection,
+    driver_ssh_options,
+)
 from ovn_test.topology import Topology
 
 RUN_MANY = """\
@@ -22,7 +26,9 @@ for command, check in json.load(sys.stdin):
     shown = f"{label}: + {shlex.join(command)}"
     if check:
         print(shown, flush=True)
-        subprocess.run(command, check=True, stderr=subprocess.STDOUT)
+        result = subprocess.run(command, stderr=subprocess.STDOUT)
+        if result.returncode:
+            raise SystemExit(result.returncode)
         continue
 
     result = subprocess.run(
@@ -56,6 +62,7 @@ class Runner:
         self.key = configured_key if key is None else key
         self.sleep = sleep
         self.user = configured_user if user is None else user
+        self.ssh_options = driver_ssh_options(environment)
         self.database_environment = (
             database_environment(topology, environment) if topology else {}
         )
@@ -72,31 +79,39 @@ class Runner:
     ) -> subprocess.CompletedProcess[str]:
         arguments = [str(part) for part in command]
         shown = arguments
-        if self.database_environment:
-            env = {**os.environ, **self.database_environment, **(env or {})}
+        command_environment = {**self.database_environment, **(env or {})}
         if guest is not None:
             if self.topology is None:
                 raise ValueError("guest execution requires a tmt topology")
             if not self.topology.is_local(guest):
-                remote = shlex.join(arguments)
+                remote_arguments = arguments
+                if command_environment:
+                    remote_arguments = [
+                        "env",
+                        *(
+                            f"{name}={value}"
+                            for name, value in command_environment.items()
+                        ),
+                        *arguments,
+                    ]
+                remote = shlex.join(remote_arguments)
+                if cwd is not None:
+                    remote = f"cd {shlex.quote(str(cwd))} && {remote}"
                 arguments = [
                     "ssh",
                     "-i",
                     self.key,
-                    "-o",
-                    "BatchMode=yes",
-                    "-o",
-                    "ConnectTimeout=30",
-                    "-o",
-                    "LogLevel=ERROR",
-                    "-o",
-                    "StrictHostKeyChecking=no",
-                    "-o",
-                    "UserKnownHostsFile=/dev/null",
+                    *self.ssh_options,
                     f"{self.user}@{self.topology.hostname(guest)}",
                     remote,
                 ]
                 shown = ["ssh", guest, "--", *shown]
+                cwd = None
+                env = None
+            elif env is not None or self.database_environment:
+                env = {**os.environ, **command_environment}
+        elif env is not None or self.database_environment:
+            env = {**os.environ, **command_environment}
 
         if announce:
             print(f"+ {shlex.join(shown)}", flush=True)

@@ -25,6 +25,26 @@ def read_int(
         raise ValueError(f"{name} must be an integer") from error
 
 
+def driver_ssh_options(environment: Mapping[str, str]) -> list[str]:
+    timeout = read_int(environment, "OTT_DRIVER_CONNECT_TIMEOUT", 30)
+    if timeout < 1:
+        raise ValueError("OTT_DRIVER_CONNECT_TIMEOUT must be a positive integer")
+    return [
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        f"ConnectTimeout={timeout}",
+        "-o",
+        "LogLevel=ERROR",
+        "-o",
+        "StrictHostKeyChecking=no",
+        "-o",
+        "UserKnownHostsFile=/dev/null",
+        "-o",
+        "IdentitiesOnly=yes",
+    ]
+
+
 def read_bool(
     environment: Mapping[str, str], name: str, default: Union[bool, str]
 ) -> bool:

@@ -1,6 +1,9 @@
 import json
+import os
+import shlex
 import subprocess
 import sys
+from copy import deepcopy
 from pathlib import Path
 from typing import Any, NoReturn
 
@@ -8,10 +11,10 @@ import pytest
 from ovn_test.command import Runner
 from ovn_test.topology import Topology
 
-from ._support import topology_data
 
-
-def test_runner_conveniences(capsys: pytest.CaptureFixture[str]) -> None:
+def test_runner_conveniences(
+    capsys: pytest.CaptureFixture[str], topology: Topology
+) -> None:
     calls = []
     responses = iter(
         [
@@ -25,7 +28,7 @@ def test_runner_conveniences(capsys: pytest.CaptureFixture[str]) -> None:
         calls.append((command, kwargs))
         return next(responses)
 
-    runner = Runner(Topology(topology_data()), execute=execute)
+    runner = Runner(topology, execute=execute, environment={})
 
     assert runner.output("get-value", cwd="/work", env={"EXAMPLE": "value"}) == "value"
     assert runner.output("get-raw", strip=False) == "raw\n"
@@ -41,16 +44,18 @@ def test_runner_conveniences(capsys: pytest.CaptureFixture[str]) -> None:
         "show",
     ]
     assert calls[0][1]["cwd"] == "/work"
-    assert calls[0][1]["env"] == {"EXAMPLE": "value"}
+    assert calls[0][1]["env"]["EXAMPLE"] == "value"
+    assert calls[0][1]["env"]["PATH"] == os.environ["PATH"]
     assert "+ ip netns exec sandbox ip link show" in capsys.readouterr().out
 
 
-def test_runner_reports_command_success() -> None:
+def test_runner_reports_command_success(topology: Topology) -> None:
     runner = Runner(
-        Topology(topology_data()),
+        topology,
         execute=lambda command, **kwargs: subprocess.CompletedProcess(
             command, int(command == ["false"]), "", ""
         ),
+        environment={},
     )
 
     assert runner.succeeds("true")
@@ -95,11 +100,13 @@ def test_runner_normalizes_arguments_and_wait_options() -> None:
 
     assert calls[0][0] == ["/usr/bin/true", "1"]
     assert calls[1][1]["cwd"] == "/work"
-    assert calls[1][1]["env"] == {"EXAMPLE": "value"}
+    assert calls[1][1]["env"]["EXAMPLE"] == "value"
+    assert calls[1][1]["env"]["PATH"] == os.environ["PATH"]
 
 
 def test_runner_serializes_remote_command_batches(
     capsys: pytest.CaptureFixture[str],
+    topology: Topology,
 ) -> None:
     calls = []
 
@@ -107,7 +114,7 @@ def test_runner_serializes_remote_command_batches(
         calls.append((command, kwargs))
         return subprocess.CompletedProcess(command, 0, "", "")
 
-    Runner(Topology(topology_data()), execute=execute).run_many(
+    Runner(topology, execute=execute, environment={}).run_many(
         [
             (["true", 1], True),
             (["false"], False),
@@ -145,9 +152,12 @@ def test_runner_command_batches_honor_error_handling(
     assert "[nonfatal 0]" not in output
     assert "local: command batch completed successfully" in output
 
-    with pytest.raises(subprocess.CalledProcessError):
-        Runner().run_many([([python, "-c", "raise SystemExit(1)"], True)])
-    assert "local: command batch failed (exit status 1)" in capsys.readouterr().out
+    with pytest.raises(subprocess.CalledProcessError) as error:
+        Runner().run_many([([python, "-c", "raise SystemExit(7)"], True)])
+    output = capsys.readouterr().out
+    assert error.value.returncode == 7
+    assert "Traceback" not in output
+    assert "local: command batch failed (exit status 7)" in output
 
 
 def test_runner_command_batches_keep_errors_with_commands(
@@ -176,7 +186,7 @@ def test_runner_command_batches_keep_errors_with_commands(
     assert marker < error < next_command
 
 
-def test_runner_waits_for_a_result() -> None:
+def test_runner_waits_for_a_result(topology: Topology) -> None:
     results = iter(
         [
             subprocess.CompletedProcess([], 1, "", "not yet\n"),
@@ -187,9 +197,10 @@ def test_runner_waits_for_a_result() -> None:
     sleeps = []
 
     runner = Runner(
-        Topology(topology_data()),
+        topology,
         execute=lambda command, **kwargs: next(results),
         sleep=sleeps.append,
+        environment={},
     )
 
     result = runner.wait(
@@ -203,7 +214,7 @@ def test_runner_waits_for_a_result() -> None:
     assert sleeps == [0.25, 0.25]
 
 
-def test_runner_wait_reports_timeout() -> None:
+def test_runner_wait_reports_timeout(topology: Topology) -> None:
     calls = 0
 
     def execute(command: Any, **kwargs: Any) -> Any:
@@ -212,9 +223,10 @@ def test_runner_wait_reports_timeout() -> None:
         return subprocess.CompletedProcess(command, 1, "", "still unavailable\n")
 
     runner = Runner(
-        Topology(topology_data()),
+        topology,
         execute=execute,
         sleep=lambda interval: None,
+        environment={},
     )
 
     with pytest.raises(TimeoutError, match=r"probe.*3 attempts"):
@@ -227,6 +239,7 @@ def test_runner_wait_reports_timeout() -> None:
 
 def test_runner_executes_locally_and_over_ssh(
     capsys: pytest.CaptureFixture[str],
+    topology: Topology,
 ) -> None:
     calls = []
 
@@ -234,7 +247,7 @@ def test_runner_executes_locally_and_over_ssh(
         calls.append((command, kwargs))
         return subprocess.CompletedProcess(command, 0, "ok\n", "")
 
-    runner = Runner(Topology(topology_data()), execute=execute)
+    runner = Runner(topology, execute=execute, environment={})
 
     assert runner.run("ovn-nbctl", "show").stdout == "ok\n"
     runner.run("ip", "link", "show", guest="compute-1", input="stdin")
@@ -254,6 +267,8 @@ def test_runner_executes_locally_and_over_ssh(
         "StrictHostKeyChecking=no",
         "-o",
         "UserKnownHostsFile=/dev/null",
+        "-o",
+        "IdentitiesOnly=yes",
         "root@192.0.2.2",
         "ip link show",
     ]
@@ -261,7 +276,31 @@ def test_runner_executes_locally_and_over_ssh(
     assert "+ ovn-nbctl show" in capsys.readouterr().out
 
 
-def test_runner_uses_configured_driver_connection() -> None:
+def test_runner_applies_working_directory_and_environment_remotely(
+    topology: Topology,
+) -> None:
+    calls = []
+
+    def execute(command: Any, **kwargs: Any) -> Any:
+        calls.append((command, kwargs))
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    Runner(topology, execute=execute, environment={}).run(
+        "printenv",
+        "EXAMPLE",
+        guest="compute-1",
+        cwd="/remote work",
+        env={"EXAMPLE": "some value"},
+    )
+
+    assert calls[0][0][-1] == (
+        "cd '/remote work' && env 'EXAMPLE=some value' printenv EXAMPLE"
+    )
+    assert calls[0][1]["cwd"] is None
+    assert calls[0][1]["env"] is None
+
+
+def test_runner_uses_configured_driver_connection(topology: Topology) -> None:
     calls = []
 
     def execute(command: Any, **kwargs: Any) -> Any:
@@ -269,9 +308,10 @@ def test_runner_uses_configured_driver_connection() -> None:
         return subprocess.CompletedProcess(command, 0, "", "")
 
     runner = Runner(
-        Topology(topology_data()),
+        topology,
         execute=execute,
         environment={
+            "OTT_DRIVER_CONNECT_TIMEOUT": "45",
             "OTT_DRIVER_USER": "tester",
             "OTT_DRIVER_RUNTIME_DIR": "/custom/driver",
         },
@@ -279,13 +319,27 @@ def test_runner_uses_configured_driver_connection() -> None:
     runner.run("true", guest="compute-1")
 
     assert calls[0][calls[0].index("-i") + 1] == "/custom/driver/id_ed25519"
+    assert "ConnectTimeout=45" in calls[0]
+    assert "IdentitiesOnly=yes" in calls[0]
     assert "tester@192.0.2.2" in calls[0]
 
 
+@pytest.mark.parametrize(
+    ("value", "message"),
+    (
+        ("invalid", "must be an integer"),
+        ("0", "must be a positive integer"),
+    ),
+)
+def test_runner_rejects_invalid_connection_timeout(value: str, message: str) -> None:
+    with pytest.raises(ValueError, match=message):
+        Runner(environment={"OTT_DRIVER_CONNECT_TIMEOUT": value})
+
+
 @pytest.mark.parametrize("ssl", (False, True))
-def test_runner_uses_cluster_database_remotes(ssl: bool) -> None:
+def test_runner_uses_cluster_database_remotes(ssl: bool, topology: Topology) -> None:
     calls = []
-    data = topology_data()
+    data = deepcopy(topology.data)
     data["guests"]["central-2"] = {
         "name": "central-2",
         "hostname": "198.51.100.2",
@@ -309,6 +363,7 @@ def test_runner_uses_cluster_database_remotes(ssl: bool) -> None:
         environment=environment,
     )
     runner.run("ovn-nbctl", "show")
+    runner.run("ovn-nbctl", "show", guest="compute-1")
 
     command_environment = calls[0][1]["env"]
     protocol = "ssl" if ssl else "tcp"
@@ -328,3 +383,10 @@ def test_runner_uses_cluster_database_remotes(ssl: bool) -> None:
     else:
         assert "OVN_NBCTL_OPTIONS" not in command_environment
         assert "OVN_SBCTL_OPTIONS" not in command_environment
+
+    remote_arguments = shlex.split(calls[1][0][-1])
+    assert remote_arguments[0] == "env"
+    for name, value in runner.database_environment.items():
+        assert f"{name}={value}" in remote_arguments
+    assert remote_arguments[-2:] == ["ovn-nbctl", "show"]
+    assert calls[1][1]["env"] is None

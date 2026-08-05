@@ -18,6 +18,7 @@ def test_inventory_is_valid_and_preserves_connection_values(
         data=tmp_path / "data",
         key="/custom key",
         user="tester",
+        environment={"OTT_DRIVER_CONNECT_TIMEOUT": "45"},
     )
     inventory_path = ansible.inventory(tmp_path / "nested/inventory.yml")
 
@@ -32,6 +33,7 @@ def test_inventory_is_valid_and_preserves_connection_values(
     assert compute["ansible_host"] == "192.0.2.2"
     assert compute["ansible_user"] == "tester"
     assert compute["ansible_ssh_private_key_file"] == "/custom key"
+    assert "ConnectTimeout=45" in compute["ansible_ssh_common_args"]
     assert "IdentitiesOnly=yes" in compute["ansible_ssh_common_args"]
     assert set(inventory["all"]["children"]["compute"]["hosts"]) == {
         "compute-1",

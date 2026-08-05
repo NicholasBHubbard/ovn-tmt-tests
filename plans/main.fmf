@@ -27,6 +27,7 @@
     OTT_DIAGNOSTICS_JOURNAL_LINES: "100000"
     OTT_DIAGNOSTICS_LOG_BYTES: "10485760"
     OTT_DIAGNOSTICS_RUNTIME_DIR: /run/ovn-tmt-tests/diagnostics
+    OTT_DRIVER_CONNECT_TIMEOUT: "30"
     OTT_DRIVER_KEY_PATH: ""
     OTT_DRIVER_RUNTIME_DIR: /run/ovn-tmt-tests/multihost-driver
     OTT_DRIVER_USER: root

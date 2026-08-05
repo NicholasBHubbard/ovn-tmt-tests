@@ -361,6 +361,7 @@ def test_multihost_tls_contract(tree: Path) -> None:
 
 def test_multihost_runtime_configuration_is_complete(tree: Path) -> None:
     path = "plans/main.fmf"
+    environment = plan_metadata(tree, path, node="ovn-fake-multinode")["environment"]
     driver = extra_variables(
         prepare_phase(
             tree, path, "Set up cross-guest test driver", node="ovn-fake-multinode"
@@ -379,6 +380,7 @@ def test_multihost_runtime_configuration_is_complete(tree: Path) -> None:
     )
 
     assert driver["multihost_driver_user"] == "$OTT_DRIVER_USER"
+    assert environment["OTT_DRIVER_CONNECT_TIMEOUT"] == "30"
     assert driver["multihost_driver_runtime_dir"] == "$OTT_DRIVER_RUNTIME_DIR"
     assert "$OTT_DRIVER_KEY_PATH" in driver["multihost_driver_key_path"]
     assert "$OTT_DRIVER_RUNTIME_DIR" in driver["multihost_driver_key_path"]
