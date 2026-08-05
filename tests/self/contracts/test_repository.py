@@ -138,6 +138,24 @@ def test_every_self_test_is_referenced_by_a_plan(tree: Path) -> None:
         assert find_text(plans, f"/tests/self/{test_dir.name}")
 
 
+def test_role_readmes_follow_common_structure(tree: Path) -> None:
+    readmes = sorted((tree / "roles").glob("*/README.md"))
+    assert readmes
+    for readme in readmes:
+        text = readme.read_text()
+        assert text.startswith(f"# {readme.parent.name}\n")
+        assert "playbooks/" not in text
+        sections = [
+            text.index(f"## {name}")
+            for name in (
+                "Purpose",
+                "Configuration",
+                "Usage",
+            )
+        ]
+        assert sections == sorted(sections)
+
+
 def test_pytest_prepare_phases_run_after_test_dependencies(tree: Path) -> None:
     for path in (tree / "plans/self").rglob("*.fmf"):
         prepare = (yaml.safe_load(path.read_text()) or {}).get("prepare", [])
