@@ -85,6 +85,7 @@
   ansible.builtin.command:
     argv:
       - ovs-vsctl
+      - --bare
       - --if-exists
       - get
       - Interface
@@ -96,7 +97,7 @@
 - name: Record current OVS interface ID for {{ ovs_endpoint.name }}
   ansible.builtin.set_fact:
     ovs_endpoint_current_iface_id: >-
-      {{ (ovs_endpoint_iface_id.stdout | trim | from_json)
+      {{ (ovs_endpoint_iface_id.stdout | trim)
          if not (ovs_endpoint_iface_id.skipped | default(false))
             and ovs_endpoint_iface_id.stdout | trim | length > 0
          else [] }}
@@ -328,7 +329,7 @@
 - name: Record namespace update for {{ ovs_endpoint.name }}
   ansible.builtin.set_fact:
     ovs_endpoints_updated: >-
-      {{ ovs_endpoints_updated
+      {{ ovs_endpoints_updated | default(false)
          or ovs_endpoint_namespace_created.changed | default(false)
          or ovs_endpoint_veth_created.changed | default(false)
          or ovs_endpoint_veth_moved.changed | default(false)

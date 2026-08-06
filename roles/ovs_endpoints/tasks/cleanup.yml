@@ -36,7 +36,7 @@
 - name: Record OVS endpoint removal {{ ovs_endpoint.name }}
   ansible.builtin.set_fact:
     ovs_endpoints_updated: >-
-      {{ ovs_endpoints_updated
+      {{ ovs_endpoints_updated | default(false)
          or ovs_endpoint_detached.changed | default(false)
          or ovs_endpoint_host_interface_deleted.changed | default(false)
          or ovs_endpoint_namespace_deleted.changed | default(false) }}

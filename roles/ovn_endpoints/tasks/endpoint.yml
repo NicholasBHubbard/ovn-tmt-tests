@@ -10,6 +10,13 @@
       {{ ovn_endpoint | combine({'bridge': ovn_endpoints_bridge}) }}
     ovs_endpoints_mtu: "{{ ovn_endpoints_mtu }}"
 
+- name: Configure routes for {{ ovn_endpoint.name }}
+  ansible.builtin.include_role:
+    name: ovs_endpoints
+    tasks_from: routes.yml
+  vars:
+    ovs_endpoint: "{{ ovn_endpoint }}"
+
 - name: Create DHCP runtime directory for {{ ovn_endpoint.name }}
   when: ovn_endpoint.dhcp4 | default(false)
   ansible.builtin.file:
@@ -67,10 +74,3 @@
         {{ ovn_endpoints_runtime_dir }}/{{ ovn_endpoint.name }}-dhclient4.leases
       - "{{ ovn_endpoint.name }}"
   changed_when: true
-
-- name: Configure routes for {{ ovn_endpoint.name }}
-  ansible.builtin.include_role:
-    name: ovs_endpoints
-    tasks_from: routes.yml
-  vars:
-    ovs_endpoint: "{{ ovn_endpoint }}"
