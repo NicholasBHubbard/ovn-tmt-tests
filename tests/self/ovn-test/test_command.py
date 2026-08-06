@@ -3,7 +3,6 @@ import os
 import shlex
 import subprocess
 import sys
-from copy import deepcopy
 from pathlib import Path
 from typing import Any, NoReturn
 
@@ -327,12 +326,14 @@ def test_runner_uses_configured_driver_connection(topology: Topology) -> None:
 @pytest.mark.parametrize("ssl", (False, True))
 def test_runner_uses_cluster_database_remotes(ssl: bool, topology: Topology) -> None:
     calls = []
-    data = deepcopy(topology.data)
+    data = topology.to_dict()
     data["guests"]["central-2"] = {
         "name": "central-2",
         "hostname": "198.51.100.2",
         "role": "central-follower",
     }
+    data["guest-names"].append("central-2")
+    data["role-names"].append("central-follower")
     data["roles"]["central-follower"] = ["central-2"]
     environment = {
         "OTT_CLUSTERED": "true",

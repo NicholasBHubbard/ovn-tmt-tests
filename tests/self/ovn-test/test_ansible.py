@@ -45,7 +45,7 @@ def test_from_environment_loads_topology_and_connection_defaults(
     tmp_path: Path, topology: Topology, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     topology_path = tmp_path / "topology.yml"
-    topology_path.write_text(yaml.safe_dump(topology.data))
+    topology_path.write_text(yaml.safe_dump(topology.to_dict()))
     monkeypatch.setenv("TMT_TREE", str(tmp_path / "tree"))
     monkeypatch.setenv("TMT_TEST_DATA", str(tmp_path / "data"))
     monkeypatch.setenv("TMT_TOPOLOGY_YAML", str(topology_path))
@@ -56,7 +56,7 @@ def test_from_environment_loads_topology_and_connection_defaults(
 
     assert ansible.tree == tmp_path / "tree"
     assert ansible.data == tmp_path / "data"
-    assert ansible.topology.guests() == ["central", "compute-1", "compute-2"]
+    assert ansible.topology.guests() == ["compute-1", "central", "compute-2"]
     assert ansible.key == "/custom/driver/id_ed25519"
     assert ansible.user == "tester"
 

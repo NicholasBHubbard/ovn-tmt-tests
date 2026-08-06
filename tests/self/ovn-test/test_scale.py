@@ -1,5 +1,4 @@
 import json
-from copy import deepcopy
 from pathlib import Path
 from typing import Any, Optional
 from unittest.mock import Mock
@@ -23,13 +22,16 @@ def external_ids_response(values: dict[str, str]) -> str:
 def test_scale_environment_honors_cluster_tls_ports_and_ipv6(
     topology: Topology, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    data = deepcopy(topology.data)
+    data = topology.to_dict()
     data["guests"]["central"]["hostname"] = "2001:db8::1"
+    data["guest"]["hostname"] = "2001:db8::1"
     data["guests"]["central-2"] = {
         "name": "central-2",
         "hostname": "2001:db8::2",
         "role": "central-follower",
     }
+    data["guest-names"].append("central-2")
+    data["role-names"].append("central-follower")
     data["roles"]["central-follower"] = ["central-2"]
     topology = Topology(data)
     environment = {

@@ -8,6 +8,7 @@ from ovn_test.topology import Topology
 def topology() -> Topology:
     data: dict[str, Any] = {
         "guest": {"name": "central", "hostname": "192.0.2.1", "role": "central"},
+        "guest-names": ["compute-1", "central", "compute-2"],
         "guests": {
             "central": {
                 "name": "central",
@@ -25,6 +26,7 @@ def topology() -> Topology:
                 "role": "compute",
             },
         },
+        "role-names": ["compute", "central"],
         "roles": {"central": ["central"], "compute": ["compute-1", "compute-2"]},
     }
     return Topology(data)

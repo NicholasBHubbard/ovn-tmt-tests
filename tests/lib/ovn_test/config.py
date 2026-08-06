@@ -85,10 +85,13 @@ def database_environment(
     if not read_bool(environment, "OTT_CLUSTERED", False):
         return {}
 
-    roles = topology.data["roles"]
-    members = list(
-        dict.fromkeys(roles.get("central", []) + roles.get("central-follower", []))
-    )
+    roles = set(topology.roles())
+    members = [
+        guest
+        for role in ("central", "central-follower")
+        if role in roles
+        for guest in topology.role(role)
+    ]
     if not members:
         raise ValueError("clustered OVN requires at least one central guest")
 

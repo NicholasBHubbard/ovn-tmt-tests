@@ -1,4 +1,3 @@
-from copy import deepcopy
 from typing import Any
 
 import pytest
@@ -102,13 +101,15 @@ def test_database_environment_is_disabled_by_default(topology: Topology) -> None
 def test_database_environment_builds_cluster_remotes(
     topology: Topology, ssl: bool
 ) -> None:
-    data = deepcopy(topology.data)
+    data = topology.to_dict()
     data["guests"]["central-2"] = {
         "name": "central-2",
         "hostname": "198.51.100.2",
         "role": "central-follower",
     }
-    data["roles"]["central-follower"] = ["central", "central-2"]
+    data["guest-names"].append("central-2")
+    data["role-names"].append("central-follower")
+    data["roles"]["central-follower"] = ["central-2"]
     protocol = "ssl" if ssl else "tcp"
 
     result = database_environment(
@@ -139,13 +140,16 @@ def test_database_environment_builds_cluster_remotes(
 
 
 def test_database_environment_brackets_ipv6_addresses(topology: Topology) -> None:
-    data = deepcopy(topology.data)
+    data = topology.to_dict()
     data["guests"]["central"]["hostname"] = "2001:db8::1"
+    data["guest"]["hostname"] = "2001:db8::1"
     data["guests"]["central-2"] = {
         "name": "central-2",
         "hostname": "[2001:db8::2]",
         "role": "central-follower",
     }
+    data["guest-names"].append("central-2")
+    data["role-names"].append("central-follower")
     data["roles"]["central-follower"] = ["central-2"]
 
     result = database_environment(Topology(data), clustered_environment())
@@ -154,7 +158,10 @@ def test_database_environment_brackets_ipv6_addresses(topology: Topology) -> Non
 
 
 def test_database_environment_requires_central_guest(topology: Topology) -> None:
-    data = deepcopy(topology.data)
+    data = topology.to_dict()
+    data["guest"]["role"] = None
+    data["guests"]["central"]["role"] = None
+    data["role-names"] = ["compute"]
     data["roles"] = {"compute": data["roles"]["compute"]}
 
     with pytest.raises(ValueError, match="requires at least one central guest"):
