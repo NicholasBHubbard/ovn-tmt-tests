@@ -25,8 +25,7 @@ belong to one test family live in that family's `conftest.py`.
 - `build`, `files`, `system`, and `state` provide focused build, filesystem,
   system-inspection, and result-state helpers.
 - `scale_topology`, `scale`, `cluster_density`, and `workload` implement shared
-  OVN scale-test topology and workload behavior. `_scale_topology_apply` is an
-  internal implementation module.
+  OVN scale-test topology and workload behavior.
 ## Boundaries
 
 Put code here when multiple tests need the same behavior or when it represents

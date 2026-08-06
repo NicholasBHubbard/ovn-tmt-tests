@@ -1,14 +1,21 @@
 import ipaddress
+import json
+import time
 from collections import Counter
 from collections.abc import Mapping, Sequence
+from hashlib import sha256
 from typing import Any, Optional, TypedDict, Union
 
-from ovn_test._scale_topology_apply import apply as _apply_topology
 from ovn_test.command import Runner
 from ovn_test.config import read_bool, read_int
 from ovn_test.ovsdb import Ovsdb
 
 Network = Union[ipaddress.IPv4Network, ipaddress.IPv6Network]
+
+OWNER = "ovn-tmt-tests-owner"
+IDENTIFIER = "ovn-tmt-tests-id"
+SCOPE = "ovn-tmt-tests-scope"
+GROUP_OWNER = "ovn-tmt-tests-load-balancer-group-owner"
 
 
 class Family(TypedDict):
@@ -319,34 +326,23 @@ def generate(config: dict[str, Any]) -> dict[str, Any]:
         result["localnet_ports"].append(localnet)
         result["workers"].append(worker)
 
-    result["load_balancer_groups"] = [
-        {
-            "id": load_balancer_group,
-            "switches": [worker["switch"] for worker in result["workers"]],
-            "routers": [worker["gateway_router"] for worker in result["workers"]],
-        }
-    ]
     result["load_balancer_group"] = load_balancer_group
-    _unique([item["name"] for item in result["switches"]], "logical switch names")
-    _unique([item["name"] for item in result["routers"]], "logical router names")
-    _unique(
-        [item["name"] for item in result["router_ports"]],
-        "logical router port names",
-    )
-    _unique(
-        [item["switch_port"] for item in result["router_ports"]]
-        + [item["name"] for item in result["localnet_ports"]],
-        "logical switch port names",
-    )
-    result["managed"] = {
-        "switches": [item["name"] for item in result["switches"]],
-        "routers": [item["name"] for item in result["routers"]],
-        "router_ports": [item["name"] for item in result["router_ports"]],
-    }
+    switch_names = [item["name"] for item in result["switches"]]
+    router_names = [item["name"] for item in result["routers"]]
+    router_port_names = [item["name"] for item in result["router_ports"]]
+    switch_port_names = [item["switch_port"] for item in result["router_ports"]] + [
+        item["name"] for item in result["localnet_ports"]
+    ]
+    for names, label in (
+        (switch_names, "logical switch names"),
+        (router_names, "logical router names"),
+        (router_port_names, "logical router port names"),
+        (switch_port_names, "logical switch port names"),
+    ):
+        _unique(names, label)
     result["southbound"] = {
-        "datapaths": result["managed"]["switches"] + result["managed"]["routers"],
-        "ports": [item["switch_port"] for item in result["router_ports"]]
-        + [item["name"] for item in result["localnet_ports"]],
+        "datapaths": switch_names + router_names,
+        "ports": switch_port_names,
         "absent_datapaths": [],
         "absent_ports": [],
     }
@@ -393,6 +389,777 @@ def configuration(
     }
 
 
+class _Database:
+    def __init__(self, runner: Runner) -> None:
+        self.runner = runner
+        self.ovsdb = Ovsdb(runner, "ovn-nbctl")
+
+    def run(self, *args: object) -> str:
+        return self.runner.output("ovn-nbctl", *args)
+
+    def rows(self, table: str, *columns: str) -> list[dict[str, Any]]:
+        return self.ovsdb.find(table, columns=columns)
+
+    def batch(self, groups: Sequence[Any], size: int = 50) -> None:
+        for offset in range(0, len(groups), size):
+            arguments = []
+            for group in groups[offset : offset + size]:
+                for command in group:
+                    if arguments:
+                        arguments.append("--")
+                    arguments.extend(command)
+            if arguments:
+                self.run(*arguments)
+
+
+def _references(rows: Sequence[dict[str, Any]], column: str) -> dict[str, str]:
+    result = {}
+    for row in rows:
+        values = row[column]
+        values = values if isinstance(values, list) else [values]
+        result.update({value: row["name"] for value in values if value})
+    return result
+
+
+def _quoted(value: Any) -> str:
+    return json.dumps(value, separators=(",", ":"))
+
+
+def _external_id(key: str, value: Any) -> str:
+    return f"external_ids:{key}={_quoted(value)}"
+
+
+def _option_value(value: object) -> str:
+    return str(value).lower() if isinstance(value, bool) else str(value)
+
+
+def _options(
+    table: str, name: str, column: str, values: Mapping[str, Any]
+) -> list[list[str]]:
+    commands = [["clear", table, name, column]]
+    commands.extend(
+        [
+            "set",
+            table,
+            name,
+            f"{column}:{key}={_quoted(_option_value(value))}",
+        ]
+        for key, value in values.items()
+    )
+    return commands
+
+
+def _managed(rows: Sequence[dict[str, Any]], owner: str) -> list[dict[str, Any]]:
+    return [row for row in rows if row.get("external_ids", {}).get(OWNER) == owner]
+
+
+def _identified(rows: Sequence[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    return {
+        row.get("external_ids", {}).get(IDENTIFIER): row
+        for row in rows
+        if row.get("external_ids", {}).get(IDENTIFIER)
+    }
+
+
+def _reject_collisions(
+    rows: Sequence[dict[str, Any]],
+    names: Sequence[str],
+    owner: str,
+    label: str,
+) -> None:
+    wanted = set(names)
+    found = {}
+    for row in rows:
+        name = row["name"]
+        if name not in wanted:
+            continue
+        if name in found:
+            raise RuntimeError(f"{label} {name!r} is not unique")
+        found[name] = row
+        if row.get("external_ids", {}).get(OWNER) != owner:
+            raise RuntimeError(f"{label} {name!r} is not owned by {owner!r}")
+
+
+def _move_reference(
+    commands: list[list[Any]],
+    table: str,
+    old_parent: Optional[str],
+    new_parent: str,
+    column: str,
+    uuid: str,
+) -> None:
+    if old_parent != new_parent:
+        commands.extend(
+            [
+                ["remove", table, old_parent, column, uuid],
+                ["add", table, new_parent, column, uuid],
+            ]
+        )
+
+
+def _configure_roots(db: _Database, topology: dict[str, Any], owner: str) -> None:
+    groups = []
+    for switch in topology["switches"]:
+        name = switch["name"]
+        groups.append(
+            [
+                ["--may-exist", "ls-add", name],
+                ["set", "Logical_Switch", name, _external_id(OWNER, owner)],
+                *_options(
+                    "Logical_Switch",
+                    name,
+                    "other_config",
+                    switch.get("other_config", {}),
+                ),
+            ]
+        )
+    for router in topology["routers"]:
+        name = router["name"]
+        groups.append(
+            [
+                ["--may-exist", "lr-add", name],
+                ["set", "Logical_Router", name, _external_id(OWNER, owner)],
+                *_options(
+                    "Logical_Router",
+                    name,
+                    "options",
+                    router.get("options", {}),
+                ),
+            ]
+        )
+    db.batch(groups)
+
+
+def _configure_ports(
+    db: _Database,
+    topology: dict[str, Any],
+    owner: str,
+    routers: Sequence[dict[str, Any]],
+    switches: Sequence[dict[str, Any]],
+    router_ports: Sequence[dict[str, Any]],
+    switch_ports: Sequence[dict[str, Any]],
+) -> None:
+    router_parent = _references(routers, "ports")
+    switch_parent = _references(switches, "ports")
+    router_ports_by_name = {row["name"]: row for row in router_ports}
+    switch_ports_by_name = {row["name"]: row for row in switch_ports}
+    groups = []
+
+    for port in topology["router_ports"]:
+        name = port["name"]
+        switch_name = port["switch_port"]
+        commands = []
+        current = router_ports_by_name.get(name)
+        if current:
+            _move_reference(
+                commands,
+                "Logical_Router",
+                router_parent.get(current["_uuid"]),
+                port["router"],
+                "ports",
+                current["_uuid"],
+            )
+        else:
+            commands.append(
+                [
+                    "lrp-add",
+                    port["router"],
+                    name,
+                    port["mac"],
+                    *port.get("networks", []),
+                ]
+            )
+        commands.extend(
+            [
+                [
+                    "set",
+                    "Logical_Router_Port",
+                    name,
+                    f"mac={_quoted(port['mac'])}",
+                    f"networks={_quoted(port.get('networks', []))}",
+                    _external_id(OWNER, owner),
+                ],
+                *_options(
+                    "Logical_Router_Port",
+                    name,
+                    "options",
+                    port.get("options", {}),
+                ),
+            ]
+        )
+
+        current = switch_ports_by_name.get(switch_name)
+        if current:
+            _move_reference(
+                commands,
+                "Logical_Switch",
+                switch_parent.get(current["_uuid"]),
+                port["switch"],
+                "ports",
+                current["_uuid"],
+            )
+        else:
+            commands.append(["lsp-add", port["switch"], switch_name])
+        commands.extend(
+            [
+                ["lsp-set-type", switch_name, "router"],
+                ["lsp-set-addresses", switch_name, "router"],
+                ["lsp-set-options", switch_name, f"router-port={name}"],
+                [
+                    "set",
+                    "Logical_Switch_Port",
+                    switch_name,
+                    _external_id(OWNER, owner),
+                ],
+            ]
+        )
+        groups.append(commands)
+
+    for port in topology["localnet_ports"]:
+        name = port["name"]
+        commands = []
+        current = switch_ports_by_name.get(name)
+        if current:
+            _move_reference(
+                commands,
+                "Logical_Switch",
+                switch_parent.get(current["_uuid"]),
+                port["switch"],
+                "ports",
+                current["_uuid"],
+            )
+        else:
+            commands.append(
+                ["lsp-add-localnet-port", port["switch"], name, port["network"]]
+            )
+        commands.extend(
+            [
+                ["lsp-set-type", name, "localnet"],
+                ["lsp-set-addresses", name, "unknown"],
+                ["lsp-set-options", name, f"network_name={port['network']}"],
+                [
+                    "set",
+                    "Logical_Switch_Port",
+                    name,
+                    f"tag_request={_quoted(port.get('tag', []))}",
+                    _external_id(OWNER, owner),
+                ],
+                ["clear", "Logical_Switch_Port", name, "tag"],
+            ]
+        )
+        groups.append(commands)
+
+    db.batch(groups)
+
+
+def _configure_gateway_chassis(
+    db: _Database,
+    topology: dict[str, Any],
+    router_ports: Sequence[dict[str, Any]],
+    gateway_chassis: Sequence[dict[str, Any]],
+) -> None:
+    parent = _references(router_ports, "gateway_chassis")
+    current = {row["name"]: row for row in gateway_chassis}
+    groups = []
+    for index, assignment in enumerate(topology["gateway_chassis"]):
+        name = assignment["id"]
+        row = current.get(name)
+        commands = []
+        values = [
+            f"name={_quoted(name)}",
+            f"chassis_name={_quoted(assignment['chassis'])}",
+            f"priority={assignment.get('priority', 0)}",
+            _external_id(OWNER, topology["owner"]),
+        ]
+        if row:
+            _move_reference(
+                commands,
+                "Logical_Router_Port",
+                parent.get(row["_uuid"]),
+                assignment["router_port"],
+                "gateway_chassis",
+                row["_uuid"],
+            )
+            target = row["_uuid"]
+        else:
+            target = f"@gateway{index}"
+            commands.extend(
+                [
+                    [
+                        f"--id={target}",
+                        "create",
+                        "Gateway_Chassis",
+                        *values,
+                    ],
+                    [
+                        "add",
+                        "Logical_Router_Port",
+                        assignment["router_port"],
+                        "gateway_chassis",
+                        target,
+                    ],
+                ]
+            )
+        if row:
+            commands.append(
+                [
+                    "set",
+                    "Gateway_Chassis",
+                    target,
+                    *values,
+                ]
+            )
+        groups.append(commands)
+    db.batch(groups)
+
+
+def _configure_routes(
+    db: _Database,
+    topology: dict[str, Any],
+    routers: Sequence[dict[str, Any]],
+    routes: Sequence[dict[str, Any]],
+    owner: str,
+) -> None:
+    parent = _references(routers, "static_routes")
+    current = _identified(routes)
+    groups = []
+    for index, route in enumerate(topology["static_routes"]):
+        row = current.get(route["id"])
+        commands = []
+        values = [
+            f"ip_prefix={_quoted(route['prefix'])}",
+            f"nexthop={_quoted(route['nexthop'])}",
+            f"policy={_quoted(route.get('policy', 'dst-ip'))}",
+            f"route_table={_quoted(route.get('route_table', ''))}",
+            f"output_port={_quoted(route.get('output_port', []))}",
+            _external_id(IDENTIFIER, route["id"]),
+            _external_id(SCOPE, owner),
+        ]
+        if row:
+            _move_reference(
+                commands,
+                "Logical_Router",
+                parent.get(row["_uuid"]),
+                route["router"],
+                "static_routes",
+                row["_uuid"],
+            )
+            target = row["_uuid"]
+        else:
+            target = f"@route{index}"
+            commands.extend(
+                [
+                    [
+                        f"--id={target}",
+                        "create",
+                        "Logical_Router_Static_Route",
+                        *values,
+                    ],
+                    [
+                        "add",
+                        "Logical_Router",
+                        route["router"],
+                        "static_routes",
+                        target,
+                    ],
+                ]
+            )
+        if row:
+            commands.append(
+                [
+                    "set",
+                    "Logical_Router_Static_Route",
+                    target,
+                    *values,
+                ]
+            )
+        groups.append(commands)
+    db.batch(groups)
+
+
+def _configure_nat(
+    db: _Database,
+    topology: dict[str, Any],
+    routers: Sequence[dict[str, Any]],
+    rules: Sequence[dict[str, Any]],
+    owner: str,
+) -> None:
+    parent = _references(routers, "nat")
+    current = _identified(rules)
+    groups = []
+    for index, rule in enumerate(topology["nat_rules"]):
+        row = current.get(rule["id"])
+        commands = []
+        values = [
+            f"type={_quoted(rule['type'])}",
+            f"external_ip={_quoted(rule['external_ip'])}",
+            f"logical_ip={_quoted(rule['logical_ip'])}",
+            _external_id(IDENTIFIER, rule["id"]),
+            _external_id(OWNER, owner),
+        ]
+        if row:
+            _move_reference(
+                commands,
+                "Logical_Router",
+                parent.get(row["_uuid"]),
+                rule["router"],
+                "nat",
+                row["_uuid"],
+            )
+            target = row["_uuid"]
+        else:
+            target = f"@nat{index}"
+            commands.extend(
+                [
+                    [
+                        f"--id={target}",
+                        "create",
+                        "NAT",
+                        *values,
+                    ],
+                    ["add", "Logical_Router", rule["router"], "nat", target],
+                ]
+            )
+        if row:
+            commands.append(
+                [
+                    "set",
+                    "NAT",
+                    target,
+                    *values,
+                ]
+            )
+        groups.append(commands)
+    db.batch(groups)
+
+
+def _cleanup(
+    db: _Database, topology: dict[str, Any], owner: str, state: dict[str, Any]
+) -> None:
+    desired_switches = {item["name"] for item in topology["switches"]}
+    desired_routers = {item["name"] for item in topology["routers"]}
+    desired_router_ports = {item["name"] for item in topology["router_ports"]}
+    desired_switch_ports = {
+        port["switch_port"] for port in topology["router_ports"]
+    } | {port["name"] for port in topology["localnet_ports"]}
+    desired_routes = {route["id"] for route in topology["static_routes"]}
+    desired_nat = {rule["id"] for rule in topology["nat_rules"]}
+    desired_gateway = {item["id"] for item in topology["gateway_chassis"]}
+    groups = []
+
+    gateway_parent = _references(state["router_ports"], "gateway_chassis")
+    for row in _managed(state["gateway_chassis"], owner):
+        if row["name"] not in desired_gateway:
+            groups.append(
+                [
+                    [
+                        "remove",
+                        "Logical_Router_Port",
+                        gateway_parent[row["_uuid"]],
+                        "gateway_chassis",
+                        row["_uuid"],
+                    ]
+                ]
+            )
+
+    for row in _managed(state["switch_ports"], owner):
+        if row["name"] not in desired_switch_ports:
+            groups.append([["--if-exists", "lsp-del", row["name"]]])
+    for row in _managed(state["router_ports"], owner):
+        if row["name"] not in desired_router_ports:
+            groups.append([["--if-exists", "lrp-del", row["name"]]])
+
+    router_route_parent = _references(state["routers"], "static_routes")
+    for row in state["routes"]:
+        external_ids = row.get("external_ids", {})
+        if (
+            external_ids.get(SCOPE) == owner
+            and external_ids.get(IDENTIFIER) not in desired_routes
+        ):
+            groups.append(
+                [
+                    [
+                        "remove",
+                        "Logical_Router",
+                        router_route_parent[row["_uuid"]],
+                        "static_routes",
+                        row["_uuid"],
+                    ]
+                ]
+            )
+
+    router_nat_parent = _references(state["routers"], "nat")
+    for row in _managed(state["nat"], owner):
+        if row.get("external_ids", {}).get(IDENTIFIER) not in desired_nat:
+            groups.append(
+                [
+                    [
+                        "remove",
+                        "Logical_Router",
+                        router_nat_parent[row["_uuid"]],
+                        "nat",
+                        row["_uuid"],
+                    ]
+                ]
+            )
+
+    for row in _managed(state["switches"], owner):
+        if row["name"] not in desired_switches:
+            groups.append([["--if-exists", "ls-del", row["name"]]])
+    for row in _managed(state["routers"], owner):
+        if row["name"] not in desired_routers:
+            groups.append([["--if-exists", "lr-del", row["name"]]])
+    db.batch(groups)
+
+
+def _record_removed(topology: dict[str, Any], state: dict[str, Any]) -> None:
+    expected = topology["southbound"]
+    previous_datapaths = {
+        row["name"]
+        for table in ("switches", "routers")
+        for row in _managed(state[table], topology["owner"])
+    }
+    previous_ports = {
+        row["name"] for row in _managed(state["switch_ports"], topology["owner"])
+    }
+    expected["absent_datapaths"] = sorted(
+        previous_datapaths - set(expected["datapaths"])
+    )
+    expected["absent_ports"] = sorted(previous_ports - set(expected["ports"]))
+
+
+def _group_owner_key(name: str) -> str:
+    digest = sha256(name.encode()).hexdigest()
+    return f"{GROUP_OWNER}-{digest}"
+
+
+def _apply_load_balancer_group(
+    runner: Runner,
+    name: str,
+    switches: Sequence[str],
+    routers: Sequence[str],
+    owner: str,
+    *,
+    present: bool = True,
+) -> None:
+    db = _Database(runner)
+    owner_key = _group_owner_key(name)
+    global_rows = db.rows("NB_Global", "external_ids")
+    if len(global_rows) != 1:
+        raise RuntimeError(f"expected one NB_Global row, found {len(global_rows)}")
+    claimed_by = global_rows[0]["external_ids"].get(owner_key)
+    matches = [
+        row
+        for row in db.rows("Load_Balancer_Group", "_uuid", "name")
+        if row["name"] == name
+    ]
+    if len(matches) > 1:
+        raise RuntimeError(f"load balancer group {name!r} is not unique")
+    if matches and claimed_by != owner:
+        raise RuntimeError(f"load balancer group {name!r} is not owned by {owner!r}")
+    if claimed_by not in (None, owner):
+        raise RuntimeError(f"load balancer group {name!r} is not owned by {owner!r}")
+    if not matches and not present:
+        if claimed_by == owner:
+            db.batch(
+                [
+                    [
+                        ["remove", "NB_Global", ".", "external_ids", owner_key],
+                    ]
+                ]
+            )
+        return
+
+    commands = []
+    if matches:
+        target = matches[0]["_uuid"]
+        current_switches = {
+            row["name"]
+            for row in db.rows("Logical_Switch", "name", "load_balancer_group")
+            if target in row["load_balancer_group"]
+        }
+        current_routers = {
+            row["name"]
+            for row in db.rows("Logical_Router", "name", "load_balancer_group")
+            if target in row["load_balancer_group"]
+        }
+    else:
+        target = "@group"
+        current_switches = set()
+        current_routers = set()
+        commands.extend(
+            [
+                [
+                    "--id=@group",
+                    "create",
+                    "Load_Balancer_Group",
+                    f"name={_quoted(name)}",
+                ],
+                ["set", "NB_Global", ".", _external_id(owner_key, owner)],
+            ]
+        )
+
+    wanted_switches = set(switches) if present else set()
+    wanted_routers = set(routers) if present else set()
+    commands.extend(
+        ["remove", "Logical_Switch", item, "load_balancer_group", target]
+        for item in sorted(current_switches - wanted_switches)
+    )
+    commands.extend(
+        ["add", "Logical_Switch", item, "load_balancer_group", target]
+        for item in sorted(wanted_switches - current_switches)
+    )
+    commands.extend(
+        ["remove", "Logical_Router", item, "load_balancer_group", target]
+        for item in sorted(current_routers - wanted_routers)
+    )
+    commands.extend(
+        ["add", "Logical_Router", item, "load_balancer_group", target]
+        for item in sorted(wanted_routers - current_routers)
+    )
+    if not present:
+        commands.extend(
+            [
+                ["destroy", "Load_Balancer_Group", target],
+                ["remove", "NB_Global", ".", "external_ids", owner_key],
+            ]
+        )
+    db.batch([commands])
+
+
+def _apply_database(runner: Runner, topology: dict[str, Any]) -> None:
+    db = _Database(runner)
+    owner = topology["owner"]
+    topology["southbound"]["started_ns"] = time.monotonic_ns()
+
+    existing_switches = db.rows("Logical_Switch", "name", "external_ids")
+    existing_routers = db.rows("Logical_Router", "name", "external_ids")
+    _reject_collisions(
+        existing_switches,
+        [item["name"] for item in topology["switches"]],
+        owner,
+        "logical switch",
+    )
+    _reject_collisions(
+        existing_routers,
+        [item["name"] for item in topology["routers"]],
+        owner,
+        "logical router",
+    )
+    _configure_roots(db, topology, owner)
+
+    state = {
+        "switches": db.rows("Logical_Switch", "_uuid", "name", "external_ids", "ports"),
+        "routers": db.rows(
+            "Logical_Router",
+            "_uuid",
+            "name",
+            "external_ids",
+            "ports",
+            "static_routes",
+            "nat",
+        ),
+        "router_ports": db.rows(
+            "Logical_Router_Port",
+            "_uuid",
+            "name",
+            "external_ids",
+            "gateway_chassis",
+        ),
+        "switch_ports": db.rows("Logical_Switch_Port", "_uuid", "name", "external_ids"),
+        "routes": db.rows("Logical_Router_Static_Route", "_uuid", "external_ids"),
+        "nat": db.rows("NAT", "_uuid", "external_ids"),
+        "gateway_chassis": db.rows("Gateway_Chassis", "_uuid", "name", "external_ids"),
+    }
+
+    _reject_collisions(
+        state["router_ports"],
+        [item["name"] for item in topology["router_ports"]],
+        owner,
+        "logical router port",
+    )
+    _reject_collisions(
+        state["switch_ports"],
+        [item["switch_port"] for item in topology["router_ports"]]
+        + [item["name"] for item in topology["localnet_ports"]],
+        owner,
+        "logical switch port",
+    )
+    _reject_collisions(
+        state["gateway_chassis"],
+        [item["id"] for item in topology["gateway_chassis"]],
+        owner,
+        "gateway chassis",
+    )
+
+    _configure_ports(
+        db,
+        topology,
+        owner,
+        state["routers"],
+        state["switches"],
+        state["router_ports"],
+        state["switch_ports"],
+    )
+    _configure_gateway_chassis(
+        db, topology, state["router_ports"], state["gateway_chassis"]
+    )
+    _configure_routes(db, topology, state["routers"], state["routes"], owner)
+    _configure_nat(db, topology, state["routers"], state["nat"], owner)
+    _record_removed(topology, state)
+    _cleanup(
+        db,
+        topology,
+        owner,
+        state,
+    )
+
+    print(
+        json.dumps(
+            {
+                "workers": len(topology["workers"]),
+                "switches": len(topology["switches"]),
+                "routers": len(topology["routers"]),
+            }
+        )
+    )
+
+
+def _apply(runner: Runner, topology: dict[str, Any]) -> None:
+    workers = topology["workers"]
+    group = topology["load_balancer_group"]
+    if workers:
+        _apply_database(runner, topology)
+        _apply_load_balancer_group(
+            runner,
+            group,
+            [worker["switch"] for worker in workers],
+            [worker["gateway_router"] for worker in workers],
+            topology["owner"],
+        )
+        return
+
+    first_error = None
+    try:
+        _apply_database(runner, topology)
+    except Exception as error:
+        first_error = error
+    try:
+        _apply_load_balancer_group(
+            runner,
+            group,
+            [],
+            [],
+            topology["owner"],
+            present=False,
+        )
+    except Exception as error:
+        if first_error is None:
+            first_error = error
+    if first_error is not None:
+        raise first_error
+
+
 class ScaleTopology:
     def __init__(
         self,
@@ -437,7 +1204,7 @@ class ScaleTopology:
             config = {**config, "worker_count": worker_count, "workers": []}
         data = generate(config)
         self.data = data
-        _apply_topology(self.runner, data)
+        _apply(self.runner, data)
         if self.wait:
             self._converge(data["southbound"])
         return data
@@ -456,9 +1223,7 @@ class ScaleTopology:
             "gateway_chassis": [],
             "static_routes": [],
             "nat_rules": [],
-            "load_balancer_groups": [],
             "load_balancer_group": group,
-            "managed": {"switches": [], "routers": [], "router_ports": []},
             "southbound": {
                 "datapaths": [],
                 "ports": [],
@@ -468,7 +1233,7 @@ class ScaleTopology:
         }
         first_error = None
         try:
-            _apply_topology(self.runner, empty)
+            _apply(self.runner, empty)
         except Exception as error:
             first_error = error
         if self.wait:

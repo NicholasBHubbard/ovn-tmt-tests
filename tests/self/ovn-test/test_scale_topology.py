@@ -2,7 +2,6 @@ import time
 from typing import Any
 from unittest.mock import Mock
 
-import ovn_test._scale_topology_apply as apply_module
 import ovn_test.scale_topology as topology_module
 import pytest
 from ovn_test.command import Runner
@@ -162,7 +161,7 @@ def test_scale_topology_rejects_invalid_lifecycle_options(
 
 
 def test_options_preserve_strings_and_normalize_booleans() -> None:
-    commands = apply_module._options(
+    commands = topology_module._options(
         "Logical_Router",
         "router",
         "options",
@@ -176,18 +175,34 @@ def test_options_preserve_strings_and_normalize_booleans() -> None:
 def test_rejects_foreign_and_duplicate_named_objects() -> None:
     foreign = [{"name": "switch", "external_ids": {}}]
     duplicates = [
-        {"name": "switch", "external_ids": {apply_module.OWNER: "self-test"}},
-        {"name": "switch", "external_ids": {apply_module.OWNER: "self-test"}},
+        {"name": "switch", "external_ids": {topology_module.OWNER: "self-test"}},
+        {"name": "switch", "external_ids": {topology_module.OWNER: "self-test"}},
     ]
 
     with pytest.raises(RuntimeError, match="not owned"):
-        apply_module._reject_collisions(
+        topology_module._reject_collisions(
             foreign, ["switch"], "self-test", "logical switch"
         )
     with pytest.raises(RuntimeError, match="not unique"):
-        apply_module._reject_collisions(
+        topology_module._reject_collisions(
             duplicates, ["switch"], "self-test", "logical switch"
         )
+
+
+def test_move_reference_only_changes_parent_when_needed() -> None:
+    commands: list[list[Any]] = []
+
+    topology_module._move_reference(
+        commands, "Logical_Router", "old", "old", "ports", "uuid"
+    )
+    topology_module._move_reference(
+        commands, "Logical_Router", "old", "new", "ports", "uuid"
+    )
+
+    assert commands == [
+        ["remove", "Logical_Router", "old", "ports", "uuid"],
+        ["add", "Logical_Router", "new", "ports", "uuid"],
+    ]
 
 
 def test_rejects_unowned_load_balancer_group(
@@ -202,10 +217,10 @@ def test_rejects_unowned_load_balancer_group(
         return [{"_uuid": "group-uuid", "name": "group"}]
 
     database.rows.side_effect = rows
-    monkeypatch.setattr(apply_module, "_Database", lambda _runner: database)
+    monkeypatch.setattr(topology_module, "_Database", lambda _runner: database)
 
     with pytest.raises(RuntimeError, match="not owned"):
-        apply_module._apply_load_balancer_group(
+        topology_module._apply_load_balancer_group(
             Mock(spec=Runner), "group", [], [], "self-test"
         )
 
@@ -219,14 +234,14 @@ def test_new_load_balancer_group_records_ownership(
     database.rows.side_effect = lambda table, *_columns: (
         [{"external_ids": {}}] if table == "NB_Global" else []
     )
-    monkeypatch.setattr(apply_module, "_Database", lambda _runner: database)
+    monkeypatch.setattr(topology_module, "_Database", lambda _runner: database)
 
-    apply_module._apply_load_balancer_group(
+    topology_module._apply_load_balancer_group(
         Mock(spec=Runner), "group", ["switch"], ["router"], "self-test"
     )
 
     commands = database.batch.call_args.args[0][0]
-    owner_key = apply_module._group_owner_key("group")
+    owner_key = topology_module._group_owner_key("group")
     assert [
         "set",
         "NB_Global",
@@ -247,26 +262,26 @@ def test_records_removed_southbound_objects() -> None:
         "switches": [
             {
                 "name": name,
-                "external_ids": {apply_module.OWNER: "self-test"},
+                "external_ids": {topology_module.OWNER: "self-test"},
             }
             for name in ("kept-switch", "old-switch")
         ],
         "routers": [
             {
                 "name": name,
-                "external_ids": {apply_module.OWNER: "self-test"},
+                "external_ids": {topology_module.OWNER: "self-test"},
             }
             for name in ("kept-router", "old-router")
         ],
         "switch_ports": [
             {
                 "name": name,
-                "external_ids": {apply_module.OWNER: "self-test"},
+                "external_ids": {topology_module.OWNER: "self-test"},
             }
             for name in ("kept-port", "old-port")
         ],
     }
-    apply_module._record_removed(topology, state)
+    topology_module._record_removed(topology, state)
 
     assert topology["southbound"]["absent_datapaths"] == [
         "old-router",
@@ -288,8 +303,8 @@ def test_apply_records_convergence_start_before_changes(
         "localnet_ports": [],
         "gateway_chassis": [],
     }
-    monkeypatch.setattr(apply_module, "_configure_roots", lambda *_: None)
-    monkeypatch.setattr(apply_module._Database, "rows", lambda *_: [])
+    monkeypatch.setattr(topology_module, "_configure_roots", lambda *_: None)
+    monkeypatch.setattr(topology_module._Database, "rows", lambda *_: [])
     for name in (
         "_configure_ports",
         "_configure_gateway_chassis",
@@ -298,10 +313,10 @@ def test_apply_records_convergence_start_before_changes(
         "_record_removed",
         "_cleanup",
     ):
-        monkeypatch.setattr(apply_module, name, lambda *_: None)
+        monkeypatch.setattr(topology_module, name, lambda *_: None)
 
     before = time.monotonic_ns()
-    apply_module._apply_database(Mock(spec=Runner), topology)
+    topology_module._apply_database(Mock(spec=Runner), topology)
     after = time.monotonic_ns()
     capsys.readouterr()
 
@@ -314,17 +329,17 @@ def test_cleanup_attempts_database_group_and_convergence(
     database_error = RuntimeError("database cleanup failed")
     group = Mock(side_effect=RuntimeError("group cleanup failed"))
     monkeypatch.setattr(
-        apply_module, "_apply_database", Mock(side_effect=database_error)
+        topology_module, "_apply_database", Mock(side_effect=database_error)
     )
-    monkeypatch.setattr(apply_module, "_apply_load_balancer_group", group)
+    monkeypatch.setattr(topology_module, "_apply_load_balancer_group", group)
     empty = {
         "owner": "self-test",
-        "load_balancer_groups": [],
+        "workers": [],
         "load_balancer_group": "group",
     }
 
     with pytest.raises(RuntimeError, match="database cleanup failed") as error:
-        apply_module.apply(Mock(spec=Runner), empty)
+        topology_module._apply(Mock(spec=Runner), empty)
 
     assert error.value is database_error
     group.assert_called_once()
@@ -336,9 +351,7 @@ def test_cleanup_attempts_database_group_and_convergence(
     }
     converge = Mock(side_effect=RuntimeError("convergence failed"))
     monkeypatch.setattr(topology, "_converge", converge)
-    monkeypatch.setattr(
-        topology_module, "_apply_topology", Mock(side_effect=database_error)
-    )
+    monkeypatch.setattr(topology_module, "_apply", Mock(side_effect=database_error))
 
     with pytest.raises(RuntimeError, match="database cleanup failed") as error:
         topology.cleanup()
