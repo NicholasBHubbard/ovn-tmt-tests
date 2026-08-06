@@ -2,6 +2,12 @@ from typing import Any
 
 import pytest
 from ovn_test.topology import Topology
+from self._support import FakeRunner
+
+
+@pytest.fixture
+def fake_runner() -> FakeRunner:
+    return FakeRunner()
 
 
 @pytest.fixture

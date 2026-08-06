@@ -1,8 +1,8 @@
 # Test library
 
-`ovn_test` contains reusable Python helpers for OVN tests. It keeps command
-execution, topology access, network manipulation, and shared workload logic out
-of individual test files.
+`ovn_test` contains reusable Python helpers for OVN tests. It keeps local and
+remote command execution, tmt topology handling, OVN and OVS inspection,
+network manipulation, and shared scale-test behavior out of individual tests.
 
 Tests import the library normally:
 
@@ -16,23 +16,33 @@ belong to one test family live in that family's `conftest.py`.
 
 ## Module Organization
 
-- `command`, `topology`, `ansible`, `ovsdb`, and `config` provide helpers for
-  running commands, finding test guests by name or role, obtaining their
-  addresses, invoking Ansible, querying OVN databases, and reading test
-  configuration.
-- `network`, `namespace`, and `load_balancer` provide reusable networking
-  primitives.
-- `build`, `files`, `system`, and `state` provide focused build, filesystem,
-  system-inspection, and result-state helpers.
-- `scale_topology`, `scale`, and `workload` implement shared OVN scale-test
-  topology and workload behavior.
+| Module | Responsibility |
+| --- | --- |
+| `ansible` | Build an inventory from the tmt topology and run Ansible with test-scoped logging. |
+| `build` | Run Make targets and preserve Automake testsuite artifacts. |
+| `command` | Run, batch, retry, and report local or remote commands. |
+| `config` | Parse test configuration and construct SSH and clustered-database settings. |
+| `files` | Find text safely in regular UTF-8 files. |
+| `load_balancer` | Reconcile owner-scoped OVN load balancers and format VIPs and backends. |
+| `namespace` | Manage owner-scoped OVN namespace resources, endpoints, policies, and load balancers. |
+| `network` | Inspect Linux network state and manage external test peers. |
+| `ovsdb` | Query OVSDB data and decode its JSON representation. |
+| `scale` | Verify scale-test environments and manage their shared baseline. |
+| `scale_topology` | Generate, reconcile, and clean up configurable OVN scale topologies. |
+| `state` | Save and load small test snapshots in tmt data directories. |
+| `system` | Inspect processes, listeners, and OVSDB control sockets. |
+| `topology` | Validate and query tmt guests, roles, hostnames, and locality. |
+| `workload` | Drive measured scale-workload topology and endpoint lifecycles. |
+
 ## Boundaries
 
 Put code here when multiple tests need the same behavior or when it represents
-a reusable test primitive. Keep scenario-specific setup and assertions in the
-test that owns them. Guest provisioning and persistent system configuration
-belong in Ansible roles rather than this library.
+a reusable OVN or OVS test primitive. Keep scenario-specific configuration,
+setup, and assertions in the test that owns them. Guest provisioning and
+persistent system configuration belong in Ansible roles rather than this
+library.
 
-Focused library tests live in `tests/self/ovn-test`. Integration self-tests
-also exercise the helpers against real OVN and OVS state. The library is
-formatted and linted with Ruff and type-checked with ty in CI.
+Focused module tests live in `tests/self/ovn-test`. Cross-component and
+repository contract tests live in `tests/self/contracts`, and integration
+self-tests exercise the helpers against real OVN and OVS state. The library
+supports Python 3.9 and newer.

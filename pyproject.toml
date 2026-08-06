@@ -34,6 +34,7 @@ extend-select = [
 # Standalone role scripts and tests consume intentionally dynamic external data.
 "roles/**/files/*.py" = ["ANN401", "TID251"]
 "tests/**/test.py" = ["ANN401", "TID251"]
+"tests/self/_support.py" = ["ANN401", "TID251"]
 "tests/self/contracts/*.py" = ["ANN401", "TID251"]
 "tests/self/ovn-test/*.py" = ["ANN401", "TID251"]
 "tools/*.py" = ["ANN401", "TID251"]

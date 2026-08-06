@@ -4,8 +4,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-
-from ._support import load_module
+from self._support import load_module
 
 
 def checker(tree: Path) -> Any:

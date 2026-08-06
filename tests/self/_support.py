@@ -86,32 +86,6 @@ class FakeRunner(Runner):
         return result
 
 
-def topology_data() -> dict[str, Any]:
-    return {
-        "guest": {"name": "central", "hostname": "192.0.2.1", "role": "central"},
-        "guest-names": ["compute-1", "central", "compute-2"],
-        "guests": {
-            "central": {
-                "name": "central",
-                "hostname": "192.0.2.1",
-                "role": "central",
-            },
-            "compute-1": {
-                "name": "compute-1",
-                "hostname": "192.0.2.2",
-                "role": "compute",
-            },
-            "compute-2": {
-                "name": "compute-2",
-                "hostname": "192.0.2.3",
-                "role": "compute",
-            },
-        },
-        "role-names": ["compute", "central"],
-        "roles": {"central": ["central"], "compute": ["compute-1", "compute-2"]},
-    }
-
-
 def contains(command: Any, *parts: Any) -> bool:
     return any(
         command[index : index + len(parts)] == parts

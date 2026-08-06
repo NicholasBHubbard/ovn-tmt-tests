@@ -1,4 +1,5 @@
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent / "lib"))
+tests = Path(__file__).parent
+sys.path[:0] = [str(tests / "lib"), str(tests)]
