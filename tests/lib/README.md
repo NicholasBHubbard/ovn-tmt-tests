@@ -24,8 +24,8 @@ belong to one test family live in that family's `conftest.py`.
   primitives.
 - `build`, `files`, `system`, and `state` provide focused build, filesystem,
   system-inspection, and result-state helpers.
-- `scale_topology`, `scale`, `cluster_density`, and `workload` implement shared
-  OVN scale-test topology and workload behavior.
+- `scale_topology`, `scale`, and `workload` implement shared OVN scale-test
+  topology and workload behavior.
 ## Boundaries
 
 Put code here when multiple tests need the same behavior or when it represents
