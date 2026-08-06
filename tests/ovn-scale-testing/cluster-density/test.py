@@ -75,6 +75,7 @@ def workload(request: pytest.FixtureRequest) -> Iterator[Any]:
     )
     if config["sync_timeout"] < 1:
         raise ValueError("scale sync timeout must be positive")
+    integration_bridge = os.environ.get("OTT_INTEGRATION_BRIDGE", "br-int")
 
     baseline = ScaleBaseline(
         runner,
@@ -90,6 +91,7 @@ def workload(request: pytest.FixtureRequest) -> Iterator[Any]:
         sync_timeout=config["sync_timeout"],
         name="cluster-density-base",
         prefix="cdb",
+        integration_bridge=integration_bridge,
     )
     instance = Workload(
         runner,
@@ -104,6 +106,7 @@ def workload(request: pytest.FixtureRequest) -> Iterator[Any]:
         sync_timeout=config["sync_timeout"],
         scale_topology=scale_topology,
         base_ports_per_worker=config["base_pods"],
+        integration_bridge=integration_bridge,
     )
     group = Ovsdb(runner, "ovn-nbctl").by_name(
         "Load_Balancer_Group",

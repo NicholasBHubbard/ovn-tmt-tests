@@ -32,13 +32,14 @@
     OTT_DRIVER_RUNTIME_DIR: /run/ovn-tmt-tests/multihost-driver
     OTT_DRIVER_USER: root
     OTT_DISTRO_VERSION: latest
-    OTT_GATEWAY_BRIDGES: '["br-int","br-ex"]'
+    OTT_GATEWAY_BRIDGES: '["br-ex"]'
     OTT_GATEWAY_BRIDGE_MAPPINGS: public:br-ex
     OTT_GATEWAY_CHASSIS_NAME: ""
     OTT_GATEWAY_CMS_OPTIONS: '["enable-chassis-as-gw"]'
     OTT_GIT_REPO: https://github.com/ovn-org/ovn.git
     OTT_GIT_VERSION: main
     OTT_INSTALL_METHOD: artifact
+    OTT_INTEGRATION_BRIDGE: br-int
     OTT_MAKE_FLAGS: ""
     OTT_MONITOR_ALL: "false"
     OTT_CENTRAL_LISTEN_ADDRESS: 0.0.0.0
@@ -151,6 +152,7 @@
         -e 'ovn_multihost_pki_dir=$OTT_PKI_REMOTE_DIR'
         -e ovn_multihost_clustered=$OTT_CLUSTERED
         -e ovn_multihost_monitor_all=$OTT_MONITOR_ALL
+        -e ovn_multihost_integration_bridge=$OTT_INTEGRATION_BRIDGE
         -e ovn_multihost_nb_port=$OTT_NB_PORT
         -e ovn_multihost_nb_raft_port=$OTT_NB_RAFT_PORT
         -e ovn_multihost_sb_port=$OTT_SB_PORT
@@ -188,6 +190,8 @@
   environment:
     <<: *multihost_environment
     OTT_SCALE_DURATION: 10m
+    OTT_SCALE_ENDPOINT_IPV4_NETWORK: 10.240.0.0/16
+    OTT_SCALE_ENDPOINT_IPV6_NETWORK: "fd00:240::/64"
     OTT_SCALE_TIMEOUT: "60"
     OTT_SCALE_IPV4: "true"
     OTT_SCALE_IPV6: "true"

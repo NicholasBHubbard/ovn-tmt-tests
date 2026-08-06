@@ -37,6 +37,9 @@ def workload() -> Iterator[Any]:
         ipv6=config["ipv6"],
         mtu=config["mtu"],
         timeout=config["timeout"],
+        integration_bridge=os.environ.get("OTT_INTEGRATION_BRIDGE", "br-int"),
+        ipv4_network=os.environ.get("OTT_SCALE_ENDPOINT_IPV4_NETWORK", "10.240.0.0/16"),
+        ipv6_network=os.environ.get("OTT_SCALE_ENDPOINT_IPV6_NETWORK", "fd00:240::/64"),
     )
     yield instance, config
     instance.cleanup()

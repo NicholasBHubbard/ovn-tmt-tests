@@ -1,15 +1,54 @@
+import ipaddress
 import os
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from pathlib import Path
 from typing import Any
 
 import pytest
 from ovn_test.command import Runner
-from ovn_test.config import read_bool, read_int, read_list
+from ovn_test.config import read_bool, read_int, read_list, read_port
+from ovn_test.load_balancer import socket
 from ovn_test.scale import ScaleBaseline, verify_scale_environment
 from ovn_test.scale_topology import ScaleTopology
 from ovn_test.topology import Topology
-from ovn_test.workload import Workload, validate_heavy
+from ovn_test.workload import Network, Workload, validate_heavy
+
+
+def add_service(
+    workload: Workload,
+    service: int,
+    backend: int,
+    protocols: Sequence[str],
+    networks: dict[int, Network],
+    vip_port: int,
+    backend_port: int,
+) -> None:
+    if isinstance(service, bool) or not isinstance(service, int) or service < 0:
+        raise ValueError("service index must be a non-negative integer")
+    endpoint = workload.endpoint(backend)
+    group = workload.load_balancer_group_id()
+    for family, enabled in (
+        (4, workload.ipv4_enabled),
+        (6, workload.ipv6_enabled),
+    ):
+        if not enabled:
+            continue
+        network = networks[family]
+        value = service + 1
+        if value >= network.num_addresses - (family == 4):
+            raise ValueError(f"{network} service address space is exhausted")
+        vip = socket(str(network[value]), vip_port, family)
+        target = socket(
+            endpoint["ipv4" if family == 4 else "ipv6"], backend_port, family
+        )
+        for protocol in protocols:
+            workload.replace_load_balancer(
+                f"{workload.name}-{service:05d}-{protocol}-v{family}",
+                protocol,
+                {vip: [target]},
+                switches=[] if group else [workload.name],
+                group=group,
+            )
 
 
 @pytest.fixture
@@ -25,6 +64,7 @@ def workload(request: pytest.FixtureRequest) -> Iterator[Any]:
     base_per_worker = read_int(os.environ, "OTT_SCALE_BASE_PODS_PER_WORKER", 10)
     pods_per_service = read_int(os.environ, "OTT_SCALE_PODS_PER_SERVICE", 2)
     sync_timeout = read_int(os.environ, "OTT_SCALE_SYNC_TIMEOUT", 1800)
+    integration_bridge = os.environ.get("OTT_INTEGRATION_BRIDGE", "br-int")
     if base_per_worker < 0:
         raise ValueError("base pods per worker must be non-negative")
     if pods_per_service < 1:
@@ -34,7 +74,7 @@ def workload(request: pytest.FixtureRequest) -> Iterator[Any]:
     measured = total - initial
     if measured % pods_per_service:
         raise ValueError("measured pods must contain complete services")
-    config = {
+    config: dict[str, Any] = {
         "initial": initial,
         "iterations": measured // pods_per_service,
         "pods_per_service": pods_per_service,
@@ -46,10 +86,30 @@ def workload(request: pytest.FixtureRequest) -> Iterator[Any]:
         "chassis": len(computes),
     }
     validate_heavy(**config)
+    service_networks = {
+        4: ipaddress.ip_network(
+            os.environ.get("OTT_SCALE_SERVICE_VIP_IPV4_NETWORK", "100.0.0.0/16")
+        ),
+        6: ipaddress.ip_network(
+            os.environ.get("OTT_SCALE_SERVICE_VIP_IPV6_NETWORK", "100::/64")
+        ),
+    }
+    if service_networks[4].version != 4 or service_networks[6].version != 6:
+        raise ValueError("service VIP networks must match their IP families")
+    service_count = initial // pods_per_service + config["iterations"]
+    for family, enabled in ((4, config["ipv4"]), (6, config["ipv6"])):
+        network = service_networks[family]
+        if enabled and service_count >= network.num_addresses - (family == 4):
+            raise ValueError(f"{network} service address space is too small")
     config["workers"] = len(scale_topology["workers"])
     config["total"] = total
     config["base_per_worker"] = base_per_worker
     config["sync_timeout"] = sync_timeout
+    config["service_networks"] = service_networks
+    config["service_vip_port"] = read_port(os.environ, "OTT_SCALE_SERVICE_VIP_PORT", 80)
+    config["service_backend_port"] = read_port(
+        os.environ, "OTT_SCALE_SERVICE_BACKEND_PORT", 8080
+    )
     baseline = ScaleBaseline(
         runner,
         computes,
@@ -64,6 +124,7 @@ def workload(request: pytest.FixtureRequest) -> Iterator[Any]:
         sync_timeout=config["sync_timeout"],
         name="density-heavy-base",
         prefix="dhb",
+        integration_bridge=integration_bridge,
     )
     instance = Workload(
         runner,
@@ -78,6 +139,7 @@ def workload(request: pytest.FixtureRequest) -> Iterator[Any]:
         sync_timeout=config["sync_timeout"],
         scale_topology=scale_topology,
         base_ports_per_worker=base_per_worker,
+        integration_bridge=integration_bridge,
     )
     try:
         baseline.create()
@@ -107,7 +169,15 @@ def test_density_heavy(workload: Any) -> None:
                     passive=passive,
                     converge=False,
                 )
-            instance.add_service(service, first_pod, config["protocols"])
+            add_service(
+                instance,
+                service,
+                first_pod,
+                config["protocols"],
+                config["service_networks"],
+                config["service_vip_port"],
+                config["service_backend_port"],
+            )
             if not passive:
                 for position, index in enumerate(active):
                     instance.verify_connectivity(

@@ -112,6 +112,7 @@ def workload(request: pytest.FixtureRequest) -> Iterator[Any]:
     scale = ScaleTopology.from_environment(runner, computes, os.environ)
     request.addfinalizer(scale.cleanup)  # noqa: PT021
     scale_topology = scale.create()
+    integration_bridge = os.environ.get("OTT_INTEGRATION_BRIDGE", "br-int")
     config: dict[str, Any] = {
         "mode": os.environ.get("OTT_SCALE_LABEL_MODE", "small"),
         "namespaces": read_int(os.environ, "OTT_SCALE_NAMESPACES", 2),
@@ -151,6 +152,7 @@ def workload(request: pytest.FixtureRequest) -> Iterator[Any]:
         sync_timeout=config["sync_timeout"],
         name=f"np-{mode}-base",
         prefix=f"{prefix}b",
+        integration_bridge=integration_bridge,
     )
     instance = Workload(
         runner,
@@ -165,6 +167,7 @@ def workload(request: pytest.FixtureRequest) -> Iterator[Any]:
         sync_timeout=config["sync_timeout"],
         scale_topology=scale_topology,
         base_ports_per_worker=config["base_pods"],
+        integration_bridge=integration_bridge,
     )
     namespaces: list[OvnNamespace] = []
 

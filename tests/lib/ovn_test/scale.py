@@ -1,3 +1,4 @@
+import ipaddress
 import os
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
@@ -5,7 +6,7 @@ from typing import Any, Optional, Union
 
 from ovn_test.command import Runner
 from ovn_test.config import database_remote, read_bool, read_port
-from ovn_test.load_balancer import VALID_PROTOCOLS
+from ovn_test.load_balancer import VALID_PROTOCOLS, socket
 from ovn_test.network import ExternalPeers
 from ovn_test.ovsdb import Ovsdb
 from ovn_test.system import ovsdb_control_socket
@@ -130,6 +131,7 @@ class ScaleBaseline:
         sync_timeout: int,
         name: str,
         prefix: str,
+        integration_bridge: str = "br-int",
     ) -> None:
         if (
             isinstance(pods_per_worker, bool)
@@ -165,6 +167,7 @@ class ScaleBaseline:
             timeout=timeout,
             sync_timeout=sync_timeout,
             scale_topology=scale_topology,
+            integration_bridge=integration_bridge,
         )
 
     def create(self) -> None:
@@ -172,11 +175,53 @@ class ScaleBaseline:
         self.external.create()
         for index in range(count):
             self.workload.add_endpoint(index, "base", converge=False)
-        self.workload.add_background_load_balancers(self.protocols)
+        self._add_load_balancers()
         self.workload.sync()
         for index in range(count):
             self.workload.verify_connectivity(index, (index + 1) % count)
             self.external.verify(self.workload.endpoint(index))
+
+    def _add_load_balancers(self) -> None:
+        for family, enabled in (
+            (4, self.workload.ipv4_enabled),
+            (6, self.workload.ipv6_enabled),
+        ):
+            if not enabled:
+                continue
+            vip_network = ipaddress.ip_network("4.0.0.0/8" if family == 4 else "4::/32")
+            backend_network = ipaddress.ip_network(
+                "6.0.0.0/8" if family == 4 else "6::/32"
+            )
+            static_backends = [
+                socket(str(backend_network[index]), 8080, family)
+                for index in range(1, 3)
+            ]
+            vips = {
+                socket(str(vip_network[index]), 80, family): list(static_backends)
+                for index in range(1, 66)
+            }
+            vips[next(iter(vips))].extend(
+                socket(endpoint["ipv4" if family == 4 else "ipv6"], 8080, family)
+                for endpoint in self.workload.endpoints
+            )
+            suffix = "" if family == 4 else "6"
+            for protocol in self.protocols:
+                self.workload.replace_load_balancer(
+                    f"lb-cluster1{suffix}-{protocol}",
+                    protocol,
+                    vips,
+                    switches=(worker["switch"] for worker in self.workload.workers),
+                    routers=(
+                        worker["gateway_router"] for worker in self.workload.workers
+                    ),
+                )
+                for worker in self.workload.workers:
+                    router = worker["gateway_router"]
+                    self.workload.replace_load_balancer(
+                        f"lb-{router}{suffix}-{protocol}",
+                        protocol,
+                        routers=[router],
+                    )
 
     def cleanup(self) -> None:
         _run_all(self.workload.cleanup, self.external.cleanup)

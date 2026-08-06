@@ -64,16 +64,33 @@ def test_scale_baseline_reuses_worker_topology(tmp_path: Path) -> None:
     assert ("ovn-nbctl", "--wait=hv", "--timeout=10", "sync") in [
         call[1] for call in runner.calls
     ]
-    assert (
-        len(
-            [
-                command
-                for _, command, _ in runner.calls
-                if contains(command, "create", "Load_Balancer")
-            ]
-        )
-        == 3
+    load_balancers = [
+        command
+        for _, command, _ in runner.calls
+        if contains(command, "create", "Load_Balancer")
+    ]
+    assert len(load_balancers) == 3
+    cluster = next(
+        command for command in load_balancers if 'name="lb-cluster1-tcp"' in command
     )
+    assert len([argument for argument in cluster if argument.startswith("vips:")]) == 65
+    assert (
+        'vips:"4.0.0.1:80"="6.0.0.1:8080,6.0.0.2:8080,10.0.0.1:8080,10.0.1.1:8080"'
+    ) in cluster
+    assert contains(
+        cluster,
+        "add",
+        "Logical_Router",
+        "gwrouter-worker-1",
+        "load_balancer",
+        "@lb",
+    )
+    gateway = next(
+        command
+        for command in load_balancers
+        if 'name="lb-gwrouter-worker-0-tcp"' in command
+    )
+    assert not [argument for argument in gateway if argument.startswith("vips:")]
 
     baseline.cleanup()
     assert baseline.workload.cleaned

@@ -381,6 +381,7 @@ def test_multihost_runtime_configuration_is_complete(tree: Path) -> None:
 
     assert driver["multihost_driver_user"] == "$OTT_DRIVER_USER"
     assert environment["OTT_DRIVER_CONNECT_TIMEOUT"] == "30"
+    assert environment["OTT_INTEGRATION_BRIDGE"] == "br-int"
     assert driver["multihost_driver_runtime_dir"] == "$OTT_DRIVER_RUNTIME_DIR"
     assert "$OTT_DRIVER_KEY_PATH" in driver["multihost_driver_key_path"]
     assert "$OTT_DRIVER_RUNTIME_DIR" in driver["multihost_driver_key_path"]
@@ -392,6 +393,7 @@ def test_multihost_runtime_configuration_is_complete(tree: Path) -> None:
             "ovn_multihost_sb_wait_timeout": "$OTT_SB_WAIT_TIMEOUT",
             "ovn_multihost_clustered": "$OTT_CLUSTERED",
             "ovn_multihost_monitor_all": "$OTT_MONITOR_ALL",
+            "ovn_multihost_integration_bridge": "$OTT_INTEGRATION_BRIDGE",
             "ovn_multihost_nb_port": "$OTT_NB_PORT",
             "ovn_multihost_nb_raft_port": "$OTT_NB_RAFT_PORT",
             "ovn_multihost_sb_raft_port": "$OTT_SB_RAFT_PORT",
@@ -594,6 +596,10 @@ def test_artifact_role_contract(tree: Path) -> None:
                 "OTT_SCALE_INITIAL_PODS:",
                 "OTT_SCALE_PODS_PER_SERVICE:",
                 "OTT_SCALE_LB_PROTOCOLS:",
+                "OTT_SCALE_SERVICE_BACKEND_PORT:",
+                "OTT_SCALE_SERVICE_VIP_IPV4_NETWORK:",
+                "OTT_SCALE_SERVICE_VIP_IPV6_NETWORK:",
+                "OTT_SCALE_SERVICE_VIP_PORT:",
                 "OTT_SCALE_TOTAL_PODS:",
                 "OTT_SCALE_WORKERS:",
             ),
@@ -706,6 +712,11 @@ def test_scale_workload_contract(
     assert "duration: $OTT_SCALE_DURATION" in plan_path.read_text()
     assert "python3 -m pytest" in (test_dir / "main.fmf").read_text()
     assert "duration:" not in (test_dir / "main.fmf").read_text()
+    assert '"OTT_INTEGRATION_BRIDGE"' in (test_dir / "test.py").read_text()
+    if test == "density-light":
+        source = (test_dir / "test.py").read_text()
+        assert "OTT_SCALE_ENDPOINT_IPV4_NETWORK" in source
+        assert "OTT_SCALE_ENDPOINT_IPV6_NETWORK" in source
     if test in {"density-heavy", "cluster-density", "np-multitenant"}:
         metadata = yaml.safe_load(plan_path.read_text())
         assert metadata["environment+"]["OTT_SCALE_IPV6"] == "false"
@@ -736,7 +747,10 @@ def test_label_policy_plans_share_one_workload(tree: Path, mode: str) -> None:
 def test_scale_workloads_inherit_common_configuration(tree: Path) -> None:
     parent = plan_metadata(tree, "plans/main.fmf", "ovn-scale-testing")
     for setting in (
+        "OTT_INTEGRATION_BRIDGE",
         "OTT_SCALE_DURATION",
+        "OTT_SCALE_ENDPOINT_IPV4_NETWORK",
+        "OTT_SCALE_ENDPOINT_IPV6_NETWORK",
         "OTT_SCALE_TIMEOUT",
         "OTT_SCALE_IPV4",
         "OTT_SCALE_IPV6",
@@ -744,6 +758,7 @@ def test_scale_workloads_inherit_common_configuration(tree: Path) -> None:
         "OTT_SCALE_SYNC_TIMEOUT",
     ):
         assert setting in parent["environment"]
+    assert parent["environment"]["OTT_INTEGRATION_BRIDGE"] == "br-int"
     assert [guest["role"] for guest in parent["provision"]].count("compute") == 2
     assert "Install scale workload dependencies" in {
         phase["name"] for phase in parent["prepare"]

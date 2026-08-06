@@ -1,6 +1,6 @@
 import ipaddress
 import os
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from functools import partial
 from pathlib import Path
 from typing import Any
@@ -20,7 +20,7 @@ def cluster_vip(iteration: int, family: int) -> str:
     return str(network[iteration + 1])
 
 
-def worker_vip(worker: dict[str, Any], family: int) -> str:
+def worker_vip(worker: Mapping[str, Any], family: int) -> str:
     try:
         network = ipaddress.ip_network(worker["external"][f"ipv{family}"])
     except (KeyError, ValueError) as error:
@@ -106,6 +106,7 @@ def workload(request: pytest.FixtureRequest) -> Iterator[Any]:
     scale = ScaleTopology.from_environment(runner, computes, os.environ)
     request.addfinalizer(scale.cleanup)  # noqa: PT021
     scale_topology = scale.create()
+    integration_bridge = os.environ.get("OTT_INTEGRATION_BRIDGE", "br-int")
     config: dict[str, Any] = {
         "iterations": read_int(os.environ, "OTT_SCALE_SERVICE_LOAD_BALANCERS", 16),
         "backends": read_int(os.environ, "OTT_SCALE_SERVICE_BACKENDS", 4),
@@ -134,6 +135,7 @@ def workload(request: pytest.FixtureRequest) -> Iterator[Any]:
         sync_timeout=config["sync_timeout"],
         name="service-route-base",
         prefix="srb",
+        integration_bridge=integration_bridge,
     )
     instance = Workload(
         runner,
@@ -148,6 +150,7 @@ def workload(request: pytest.FixtureRequest) -> Iterator[Any]:
         sync_timeout=config["sync_timeout"],
         scale_topology=scale_topology,
         base_ports_per_worker=config["base_pods"],
+        integration_bridge=integration_bridge,
     )
     try:
         baseline.create()
