@@ -49,6 +49,8 @@
   loop_control:
     loop_var: ovn_install_ovs_binary
     label: "{{ ovn_install_ovs_binary }}"
+  environment:
+    PATH: "/usr/local/sbin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
   changed_when: false
 
 - name: Resolve installed OVN paths
