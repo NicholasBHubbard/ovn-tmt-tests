@@ -37,6 +37,7 @@
   ansible.builtin.include_tasks: artifact.yml
 
 - name: Verify OVS is installed
+  when: ovn_install_destdir | length == 0
   ansible.builtin.command:
     argv:
       - "{{ ovn_install_ovs_binary }}"
@@ -51,9 +52,12 @@
   changed_when: false
 
 - name: Resolve installed OVN paths
+  when: ovn_install_destdir | length == 0
   ansible.builtin.include_tasks: paths.yml
 
 - name: Mark OVN as installed
-  when: not (ovn_installed | default(false))
+  when:
+    - ovn_install_destdir | length == 0
+    - not (ovn_installed | default(false))
   ansible.builtin.set_fact:
     ovn_installed: true
